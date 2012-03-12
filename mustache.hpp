@@ -48,7 +48,7 @@ class Mustache {
     const std::string & getStopSequence() {
       return tokenizer.getStopSequence();
     };
-    bool getEscapteByDefault() {
+    bool getEscapeByDefault() {
       return tokenizer.getEscapeByDefault();
     };
 };
