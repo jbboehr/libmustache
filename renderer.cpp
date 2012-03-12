@@ -188,8 +188,7 @@ void Renderer::_renderNode(Node * node, Stack * dataStack, std::string * output)
       if( !valIsEmpty && val->type == Data::TypeString ) {
         if( (bool) (node->flags & Node::FlagEscape) != true /*escapeByDefault*/ ) { // @todo escape by default
           // Probably shouldn't modify the value
-          htmlspecialchars(val->val);
-          output->append(*val->val);
+          htmlspecialchars_append(val->val, output);
         } else {
           output->append(*val->val);
         }

@@ -48,6 +48,13 @@ void trim(std::string& str, const std::string& trimChars = whiteSpaces);
 void htmlspecialchars(std::string * str);
 
 /**
+ * Escape special HTML charcters and append to string. Not multibyte safe
+ * 
+ * @param str The string to escape
+ */
+void htmlspecialchars_append(std::string * str, std::string * buf);
+
+/**
  * Explode a string
  * http://www.zedwood.com/article/106/cpp-explode-function
  * 

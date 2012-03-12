@@ -55,6 +55,35 @@ void htmlspecialchars(std::string * str)
   str->swap(tmp);
 }
 
+void htmlspecialchars_append(std::string * str, std::string * buf)
+{
+  int pos = 0;
+  int len = str->length();
+  char * chr = (char *) str->c_str();
+  for( pos = 0; pos < len; pos++, chr++ ) {
+    switch( *chr ) {
+      case '&':
+        buf->append("&amp;");
+        break;
+      case '"':
+        buf->append("&quot;");
+        break;
+      case '\'':
+        buf->append("&#039;");
+        break;
+      case '<':
+        buf->append("&lt;");
+        break;
+      case '>':
+        buf->append("&gt;");
+        break;
+      default:
+        buf->append(1, *chr);
+        break;
+    }
+  }
+}
+
 void explode(const std::string &delimiter, const std::string &str, std::vector<std::string> * arr)
 {
   int strleng = str.length();
