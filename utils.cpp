@@ -57,13 +57,11 @@ void htmlspecialchars(std::string * str)
 
 void explode(const std::string &delimiter, const std::string &str, std::vector<std::string> * arr)
 {
-  std::vector<std::string> * arr = new std::vector<std::string>;
-
   int strleng = str.length();
   int delleng = delimiter.length();
   if( delleng == 0 ) {
     // no change
-    return arr;
+    return;
   }
 
   int i = 0;
@@ -83,7 +81,6 @@ void explode(const std::string &delimiter, const std::string &str, std::vector<s
       }
   }
   arr->push_back(str.substr(k, i-k));
-  return arr;
 }
 
 void stringTok(const std::string &str, const std::string &delimiters, std::vector<std::string> * tokens)
@@ -102,8 +99,6 @@ void stringTok(const std::string &str, const std::string &delimiters, std::vecto
     // Find next "non-delimiter"
     pos = str.find_first_of(delimiters, lastPos);
   }
-  
-  return tokens;
 }
 
 
