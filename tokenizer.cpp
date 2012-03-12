@@ -63,12 +63,10 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
   buffer.reserve(100); // Reserver 100 chars
   
   int depth = 0;
-  std::stack<Node *> nodeStack;
-  //Node * root;
+  Node::Stack nodeStack;
   Node * node;
   
   // Initialize root node and stack[0]
-  //root = new Node;
   root->type = Node::TypeRoot;
   root->flags = Node::FlagNone;
   root->data = NULL;
@@ -156,17 +154,17 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
             }
             trim(buffer, " \f\n\r\t\v=");
             
-            std::vector<std::string> * delims = stringTok(buffer, whiteSpaces);
-            if( delims->size() != 2 || delims[0].size() < 1 || delims[1].size() < 1 ) {
-              delete delims;
+            std::vector<std::string> delims;
+            stringTok(buffer, whiteSpaces, &delims);
+            if( delims.size() != 2 || delims[0].size() < 1 || delims[1].size() < 1 ) {
               throw Exception("Invalid delimiter format");
             }
             
             // Assign new start/stop
-            start.assign(delims->at(0));
+            start.assign(delims.at(0));
             startC = start.at(0);
             startL = start.length();
-            stop.assign(delims->at(1));
+            stop.assign(delims.at(1));
             stopC = stop.at(0);
             stopL = stop.length();
             skip = 1;

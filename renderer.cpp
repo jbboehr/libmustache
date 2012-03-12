@@ -64,12 +64,12 @@ void Renderer::_renderNode(Node * node, Stack * dataStack, std::string * output)
     
     // Dot notation
     std::string initial(*nstr);
-    std::vector<std::string> * parts = NULL;
+    std::vector<std::string> parts;
     size_t found = initial.find(".");
     if( found != std::string::npos ) {
-      parts = explode(".", initial);
-      if( parts->size() > 0 ) {
-        initial.assign(parts->front());
+      explode(".", initial, &parts);
+      if( parts.size() > 0 ) {
+        initial.assign(parts.front());
       }
     }
     
@@ -91,10 +91,10 @@ void Renderer::_renderNode(Node * node, Stack * dataStack, std::string * output)
     }
     
     // Resolve or dot notation
-    if( ref != NULL && parts != NULL && parts->size() > 1 ) {
+    if( ref != NULL && parts.size() > 1 ) {
       // Dot notation
       std::vector<std::string>::iterator vs_it;
-      for( vs_it = parts->begin(), vs_it++; vs_it != parts->end(); vs_it++ ) {
+      for( vs_it = parts.begin(), vs_it++; vs_it != parts.end(); vs_it++ ) {
         if( ref == NULL ) {
           break;
         } else if( ref->type != Data::TypeMap ) {

@@ -3,6 +3,7 @@
 #define MUSTACHE_NODE_HPP
 
 #include <memory>
+#include <stack>
 #include <string>
 #include <vector>
 
@@ -13,6 +14,7 @@ class Node {
   public:
     typedef std::auto_ptr<Node> Ptr;
     typedef std::vector<Node *> Children;
+    typedef std::stack<Node *> Stack;
     enum Type {
       TypeNone = 0,
       TypeRoot = 1,

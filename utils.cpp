@@ -5,35 +5,26 @@ namespace mustache {
 
 
 
-// trim
-// http://stackoverflow.com/a/479091
-
 void trimRight(std::string& str, const std::string& trimChars)
 {
-  std::string::size_type pos = str.find_last_not_of( trimChars );
-  str.erase( pos + 1 );    
+  std::string::size_type pos = str.find_last_not_of(trimChars);
+  str.erase(pos + 1);    
 }
 
 void trimLeft(std::string& str, const std::string& trimChars)
 {
-  std::string::size_type pos = str.find_first_not_of( trimChars );
-  str.erase( 0, pos );
+  std::string::size_type pos = str.find_first_not_of(trimChars);
+  str.erase(0, pos);
 }
 
 void trim(std::string& str, const std::string& trimChars)
 {
-  trimRight( str, trimChars );
-  trimLeft( str, trimChars );
+  trimRight(str, trimChars);
+  trimLeft(str, trimChars);
 }
-
-
-
-// htmlspecialchars
 
 void htmlspecialchars(std::string * str)
 {
-  // @todo switch this to php's version
-  // this version is not utf-8 compatible
   std::string tmp;
   int pos = 0;
   int len = str->length();
@@ -64,12 +55,7 @@ void htmlspecialchars(std::string * str)
   str->swap(tmp);
 }
 
-
-
-// explode
-// http://www.zedwood.com/article/106/cpp-explode-function
-
-std::vector<std::string> * explode(const std::string &delimiter, const std::string &str)
+void explode(const std::string &delimiter, const std::string &str, std::vector<std::string> * arr)
 {
   std::vector<std::string> * arr = new std::vector<std::string>;
 
@@ -100,15 +86,8 @@ std::vector<std::string> * explode(const std::string &delimiter, const std::stri
   return arr;
 }
 
-
-
-// strtok
-// http://oopweb.com/CPP/Documents/CPPHOWTO/Volume/C++Programming-HOWTO-7.html
-
-std::vector<std::string> * stringTok(const std::string &str, const std::string &delimiters)
+void stringTok(const std::string &str, const std::string &delimiters, std::vector<std::string> * tokens)
 {
-  std::vector<std::string> * tokens = new std::vector<std::string>;
-  
   // Skip delimiters at beginning.
   std::string::size_type lastPos = str.find_first_not_of(delimiters, 0);
   
