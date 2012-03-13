@@ -35,7 +35,7 @@ class Node {
       FlagPartial = 32,
       FlagInlinePartial = 64,
       
-      FlagHasChildren = Node::FlagNegate | Node::FlagSection | Node::FlagPartial
+      FlagHasChildren = Node::FlagNegate | Node::FlagSection | Node::FlagInlinePartial
     };
     
     Node::Type type;

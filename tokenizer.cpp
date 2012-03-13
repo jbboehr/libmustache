@@ -173,6 +173,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
         if( !skip ) {
           if( currentFlags > 0 ) {
             buffer.erase(0, 1);
+            trim(buffer);
           }
           if( inTripleTag ) {
             currentFlags = currentFlags | Node::FlagEscape;
