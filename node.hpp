@@ -43,6 +43,7 @@ class Node {
     std::string * data;
     Node::Children children;
     
+    Node() : data(NULL) {};
     ~Node();
 };
 

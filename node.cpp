@@ -7,7 +7,9 @@ namespace mustache {
 Node::~Node()
 {
   // Data
-  delete data;
+  if( data != NULL ) {
+    delete data;
+  }
   
   // Children
   if( children.size() > 0 ) {
