@@ -2,6 +2,7 @@
 #ifndef MUSTACHE_NODE_HPP
 #define MUSTACHE_NODE_HPP
 
+#include <map>
 #include <memory>
 #include <stack>
 #include <string>
@@ -15,6 +16,9 @@ class Node {
     typedef std::auto_ptr<Node> Ptr;
     typedef std::vector<Node *> Children;
     typedef std::stack<Node *> Stack;
+    typedef std::map<std::string,std::string> RawPartials;
+    typedef std::map<std::string,Node> Partials;
+    typedef std::pair<std::string,Node> PartialPair;
     enum Type {
       TypeNone = 0,
       TypeRoot = 1,

@@ -15,12 +15,26 @@ namespace mustache {
 
 class Renderer {
   private:
-    void _renderNode(Node * node, Stack * dataStack, std::string * output);
+    Node * _node;
+    Data * _data;
+    Stack * _stack;
+    Node::Partials * _partials;
+    std::string * _output;
+    
+    void _renderNode(Node * node);
     
   public:
     static const int outputBufferLength = 100000;
     
-    void render(Node * root, Data * data, std::string * output);
+    Renderer();
+    ~Renderer();
+    void clear();
+    void init(Node * node, Data * data, Node::Partials * partials, std::string * output);
+    void setNode(Node * node);
+    void setData(Data * data);
+    void setPartials(Node::Partials * partials);
+    void setOutput(std::string * output);
+    void render();
 };
 
 

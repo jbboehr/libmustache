@@ -4,19 +4,82 @@
 namespace mustache {
 
 
-void Renderer::render(Node * root, Data * data, std::string * output)
+Renderer::Renderer()
 {
-  output->reserve(Renderer::outputBufferLength);
-  
-  Stack dataStack;
-  dataStack.push(data);
-  
-  _renderNode(root, &dataStack, output);
+  _stack = NULL;
+  clear();
 }
 
-void Renderer::_renderNode(Node * node, Stack * dataStack, std::string * output)
+Renderer::~Renderer()
 {
-  Data * data = dataStack->top();
+  clear();
+}
+
+void Renderer::clear()
+{
+  _node = NULL;
+  _data = NULL;
+  if( _stack != NULL ) {
+    delete _stack;
+  }
+  _stack = NULL;
+  _partials = NULL;
+  _output = NULL;
+}
+
+void Renderer::init(Node * node, Data * data, Node::Partials * partials, std::string * output)
+{
+  clear();
+  _node = node;
+  _data = data;
+  _partials = partials;
+  _output = output;
+}
+
+void Renderer::setNode(Node * node)
+{
+  _node = node;
+}
+
+void Renderer::setData(Data * data)
+{
+  _data = data;
+}
+
+void Renderer::setPartials(Node::Partials * partials)
+{
+  _partials = partials;
+}
+
+void Renderer::render()
+{
+  // Check node and data
+  if( _node == NULL ) {
+    throw Exception("Empty tree");
+  } else if( _data == NULL ) {
+    throw Exception("Empty data");
+  }
+  
+  // Reserver minimum length
+  _output->reserve(Renderer::outputBufferLength);
+  
+  // Initialize stack
+  if( _stack != NULL ) {
+    delete _stack;
+  }
+  _stack = new Stack();
+  _stack->push(_data);
+  
+  // Render
+  _renderNode(_node);
+  
+  // Clear?
+  //clear();
+}
+
+void Renderer::_renderNode(Node * node)
+{
+  Data * data = _stack->top();
   std::string * nstr = node->data;
   
   if( data == NULL ) {
@@ -28,13 +91,13 @@ void Renderer::_renderNode(Node * node, Stack * dataStack, std::string * output)
     if( node->children.size() > 0 ) {
       Node::Children::iterator it;
       for ( it = node->children.begin() ; it != node->children.end(); it++ ) {
-        _renderNode(*it, dataStack, output);
+        _renderNode(*it);
       }
     }
     return;
   } else if( node->type == Node::TypeOutput ) {
     if( node->data != NULL && node->data->length() > 0 ) {
-      output->append(*node->data);
+      _output->append(*node->data);
     }
     return;
   }
@@ -77,11 +140,11 @@ void Renderer::_renderNode(Node * node, Stack * dataStack, std::string * output)
     Data * ref = NULL;
     Data::Map::iterator d_it;
     int i;
-    Data ** dataStackPos = dataStack->end();
-    for( i = 0; i < dataStack->size; i++, dataStackPos-- ) {
-      if( (*dataStackPos)->type == Data::TypeMap ) {
-        d_it = (*dataStackPos)->data.find(initial);
-        if( d_it != (*dataStackPos)->data.end() ) {
+    Data ** _stackPos = _stack->end();
+    for( i = 0; i < _stack->size; i++, _stackPos-- ) {
+      if( (*_stackPos)->type == Data::TypeMap ) {
+        d_it = (*_stackPos)->data.find(initial);
+        if( d_it != (*_stackPos)->data.end() ) {
           ref = d_it->second;
           if( ref != NULL ) {
             break;
@@ -146,38 +209,38 @@ void Renderer::_renderNode(Node * node, Stack * dataStack, std::string * output)
       if( valIsEmpty || val->type == Data::TypeString ) {
         Node::Children::iterator it;
         for( it = node->children.begin() ; it != node->children.end(); it++ ) {
-          _renderNode(*it, dataStack, output);
+          _renderNode(*it);
         }
       } else if( val->type == Data::TypeList ) {
         // Numeric array/list
         Data::List::iterator childrenIt;
         Node::Children::iterator it;
         for ( childrenIt = val->children.begin() ; childrenIt != val->children.end(); childrenIt++ ) {
-          dataStack->push(*childrenIt);
+          _stack->push(*childrenIt);
           for( it = node->children.begin() ; it != node->children.end(); it++ ) {
-            _renderNode(*it, dataStack, output);
+            _renderNode(*it);
           }
-          dataStack->pop();
+          _stack->pop();
         }
       } else if( val->type == Data::TypeArray ) {
         Data::Array ArrayPtr = val->array;
         int ArrayPos;
         Node::Children::iterator it;
         for ( ArrayPos = 0; ArrayPos < val->length; ArrayPos++, ArrayPtr++ ) {
-          dataStack->push(ArrayPtr);
+          _stack->push(ArrayPtr);
           for( it = node->children.begin() ; it != node->children.end(); it++ ) {
-            _renderNode(*it, dataStack, output);
+            _renderNode(*it);
           }
-          dataStack->pop();
+          _stack->pop();
         }
       } else if( val->type == Data::TypeMap ) {
         // Associate array/map
         Node::Children::iterator it;
-        dataStack->push(val);
+        _stack->push(val);
         for( it = node->children.begin() ; it != node->children.end(); it++ ) {
-          _renderNode(*it, dataStack, output);
+          _renderNode(*it);
         }
-        dataStack->pop();
+        _stack->pop();
       }
       break;
     case Node::FlagPartial:
@@ -188,9 +251,9 @@ void Renderer::_renderNode(Node * node, Stack * dataStack, std::string * output)
       if( !valIsEmpty && val->type == Data::TypeString ) {
         if( (bool) (node->flags & Node::FlagEscape) != true /*escapeByDefault*/ ) { // @todo escape by default
           // Probably shouldn't modify the value
-          htmlspecialchars_append(val->val, output);
+          htmlspecialchars_append(val->val, _output);
         } else {
-          output->append(*val->val);
+          _output->append(*val->val);
         }
       }
       break;

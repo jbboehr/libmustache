@@ -3,6 +3,7 @@
 #define MUSTACHE_HPP
 
 #include <iostream>
+#include <map>
 #include <memory>
 #include <string>
 
@@ -25,7 +26,7 @@ class Mustache {
     Renderer renderer;
     
     void tokenize(std::string * tmpl, Node * root);
-    void render(std::string * tmpl, Data * data, std::string * output);
+    void render(std::string * tmpl, Data * data, Node::RawPartials * partials, std::string * output);
     
     void setStartSequence(const std::string& start) {
       return tokenizer.setStartSequence(start);
