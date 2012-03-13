@@ -208,6 +208,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
           }
           skipUntil++;
         }
+        inTripleTag = false;
       }
     }
     

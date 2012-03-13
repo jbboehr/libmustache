@@ -2,6 +2,7 @@
 #ifndef MUSTACHE_TOKENIZER_HPP
 #define MUSTACHE_TOKENIZER_HPP
 
+#include <iostream>
 #include <memory>
 #include <stack>
 #include <string>
