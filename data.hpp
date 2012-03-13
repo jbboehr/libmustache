@@ -57,7 +57,7 @@ class Data {
     Data() {};
     Data(Data::Type type, int size) {
       init(type, size);
-    }
+    };
     
     //! Destructor
     ~Data();
