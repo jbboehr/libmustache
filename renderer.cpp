@@ -32,7 +32,10 @@ void Renderer::init(Node * node, Data * data, Node::Partials * partials, std::st
   clear();
   _node = node;
   _data = data;
-  _partials = partials;
+  if( partials->size() > 0 ) {
+    // Don't add if no partials so we can check if it's null
+    _partials = partials;
+  }
   _output = output;
 }
 
@@ -244,7 +247,13 @@ void Renderer::_renderNode(Node * node)
       }
       break;
     case Node::FlagPartial:
-      // Not yet implemented
+      if( _partials != NULL ) {
+        Node::Partials::iterator p_it;
+        p_it = _partials->find(*(node->data));
+        if( p_it != _partials->end() ) {
+          _renderNode(&(p_it->second));
+        }
+      }
       break;
     case Node::FlagEscape:
     case Node::FlagNone:

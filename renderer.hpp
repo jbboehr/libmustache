@@ -2,6 +2,7 @@
 #ifndef MUSTACHE_RENDERER_HPP
 #define MUSTACHE_RENDERER_HPP
 
+#include <iostream>
 #include <map>
 #include <string>
 
