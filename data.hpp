@@ -53,6 +53,12 @@ class Data {
     //! The current array value (array)
     Data::Array array;
     
+    //! Constructor
+    Data() {};
+    Data(Data::Type type, int size) {
+      init(type, size);
+    }
+    
     //! Destructor
     ~Data();
     
