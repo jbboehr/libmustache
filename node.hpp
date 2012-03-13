@@ -17,8 +17,8 @@ class Node {
     typedef std::vector<Node *> Children;
     typedef std::stack<Node *> Stack;
     typedef std::map<std::string,std::string> RawPartials;
-    typedef std::map<std::string,Node> Partials;
-    typedef std::pair<std::string,Node> PartialPair;
+    typedef std::map<std::string,Node::Ptr> Partials;
+    typedef std::pair<std::string,Node::Ptr> PartialPair;
     enum Type {
       TypeNone = 0,
       TypeRoot = 1,

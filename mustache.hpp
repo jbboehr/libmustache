@@ -26,7 +26,8 @@ class Mustache {
     Renderer renderer;
     
     void tokenize(std::string * tmpl, Node * root);
-    void render(std::string * tmpl, Data * data, Node::RawPartials * partials, std::string * output);
+    //void tokenizePartial(std::string * name, std::string * tmpl, Node::Partials * partials);
+    void render(Node * node, Data * data, Node::Partials * partials, std::string * output);
     
     void setStartSequence(const std::string& start) {
       return tokenizer.setStartSequence(start);
