@@ -4,12 +4,6 @@
 namespace mustache {
 
 
-Renderer::Renderer()
-{
-  _stack = NULL;
-  clear();
-}
-
 Renderer::~Renderer()
 {
   clear();
@@ -32,7 +26,7 @@ void Renderer::init(Node * node, Data * data, Node::Partials * partials, std::st
   clear();
   _node = node;
   _data = data;
-  if( partials->size() > 0 ) {
+  if( partials != NULL && partials->size() > 0 ) {
     // Don't add if no partials so we can check if it's null
     _partials = partials;
   }

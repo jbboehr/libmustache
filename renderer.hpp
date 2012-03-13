@@ -44,7 +44,7 @@ class Renderer {
     static const int outputBufferLength = 100000;
     
     //! Constructor
-    Renderer();
+    Renderer() : _node(NULL), _data(NULL), _stack(NULL), _partials(NULL), _output(NULL) {};
     
     //! Destructor
     ~Renderer();
