@@ -17,39 +17,64 @@
 namespace mustache {
 
 
+/*! \class Mustache
+    \brief Container class for a tokenizer and a renderer
+
+    This class contains the tokenizer and renderer.
+*/
 class Mustache {
   private:
   public:
     typedef std::auto_ptr<Mustache> Ptr;
     
+    //! Tokenizer
     Tokenizer tokenizer;
+    
+    //! Renderer
     Renderer renderer;
     
+    //! Utility method for Tokenizer::tokenize()
     void tokenize(std::string * tmpl, Node * root);
-    //void tokenizePartial(std::string * name, std::string * tmpl, Node::Partials * partials);
+    
+    //! Utility method for Renderer::init() and Renderer::render()
     void render(Node * node, Data * data, Node::Partials * partials, std::string * output);
     
+    //! Utility method for Tokenizer::setStartSequence()
     void setStartSequence(const std::string& start) {
       return tokenizer.setStartSequence(start);
     };
+    
+    //! Utility method for Tokenizer::setStartSequence()
     void setStartSequence(const char * start) {
       tokenizer.setStartSequence(start);
     };
+    
+    //! Utility method for Tokenizer::setStopSequence()
     void setStopSequence(const std::string& stop) {
       tokenizer.setStopSequence(stop);
     };
+    
+    //! Utility method for Tokenizer::setStopSequence()
     void setStopSequence(const char * stop) {
       tokenizer.setStopSequence(stop);
     };
+    
+    //! Utility method for Tokenizer::setEscapeByDefault()
     void setEscapeByDefault(bool flag) {
       tokenizer.setEscapeByDefault(flag);
     };
+    
+    //! Utility method for Tokenizer::getStartSequence()
     const std::string & getStartSequence() {
       return tokenizer.getStartSequence();
     }
+    
+    //! Utility method for Tokenizer::getStopSequence()
     const std::string & getStopSequence() {
       return tokenizer.getStopSequence();
     };
+    
+    //! Utility method for Tokenizer::getEscapeByDefault()
     bool getEscapeByDefault() {
       return tokenizer.getEscapeByDefault();
     };

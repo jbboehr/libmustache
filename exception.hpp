@@ -9,6 +9,11 @@
 namespace mustache {
 
 
+/*! \class Exception
+    \brief Exception class
+
+    Exceptions thrown will be of this class.
+*/
 class Exception : public std::runtime_error {
   public:
       Exception(const std::string& desc) : std::runtime_error(desc) { }
