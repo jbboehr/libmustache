@@ -60,7 +60,7 @@ class Node {
     Node::Children children;
     
     //! Constructor
-    Node() : data(NULL) {};
+    Node() : data(NULL), type(Node::TypeNone), flags(Node::FlagNone) {};
     
     //! Destructor
     ~Node();
