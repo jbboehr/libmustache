@@ -8,16 +8,24 @@ void Tokenizer::setStartSequence(const std::string& start) {
   _startSequence.assign(start);
 }
 
-void Tokenizer::setStartSequence(const char * start) {
-  _startSequence.assign(start);
+void Tokenizer::setStartSequence(const char * start, long len) {
+  if( len <= 0 ) {
+    _startSequence.assign(start);
+  } else {
+    _startSequence.assign(start, (size_t) len);
+  }
 }
 
 void Tokenizer::setStopSequence(const std::string& stop) {
   _stopSequence.assign(stop);
 }
 
-void Tokenizer::setStopSequence(const char * stop) {
-  _stopSequence.assign(stop);
+void Tokenizer::setStopSequence(const char * stop, long len) {
+  if( len <= 0 ) {
+    _stopSequence.assign(stop);
+  } else {
+    _stopSequence.assign(stop, (size_t) len);
+  }
 }
 
 void Tokenizer::setEscapeByDefault(bool flag) {

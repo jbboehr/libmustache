@@ -45,8 +45,8 @@ class Mustache {
     };
     
     //! Utility method for Tokenizer::setStartSequence()
-    void setStartSequence(const char * start) {
-      tokenizer.setStartSequence(start);
+    void setStartSequence(const char * start, long len = 0) {
+      tokenizer.setStartSequence(start, len);
     };
     
     //! Utility method for Tokenizer::setStopSequence()
@@ -55,8 +55,8 @@ class Mustache {
     };
     
     //! Utility method for Tokenizer::setStopSequence()
-    void setStopSequence(const char * stop) {
-      tokenizer.setStopSequence(stop);
+    void setStopSequence(const char * stop, long len = 0) {
+      tokenizer.setStopSequence(stop, len);
     };
     
     //! Utility method for Tokenizer::setEscapeByDefault()

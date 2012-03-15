@@ -40,13 +40,13 @@ class Tokenizer {
     void setStartSequence(const std::string& start);
     
     //! Sets the start sequence
-    void setStartSequence(const char * start);
+    void setStartSequence(const char * start, long len = 0);
     
     //! Sets the stop sequence
     void setStopSequence(const std::string& stop);
     
     //! Sets the stop sequence
-    void setStopSequence(const char * stop);
+    void setStopSequence(const char * stop, long len = 0);
     
     //! Sets whether to escape HTML by default
     void setEscapeByDefault(bool flag);
