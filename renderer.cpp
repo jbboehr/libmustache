@@ -97,6 +97,9 @@ void Renderer::_renderNode(Node * node)
       _output->append(*node->data);
     }
     return;
+  } else if( node->type == Node::TypeContainer ) {
+    _renderNode(node->child);
+    return;
   }
   
   if( nstr == NULL ) {

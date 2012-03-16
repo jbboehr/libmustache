@@ -30,7 +30,8 @@ class Node {
       TypeNone = 0,
       TypeRoot = 1,
       TypeOutput = 2,
-      TypeTag = 3
+      TypeTag = 3,
+      TypeContainer = 4
     };
     
     //! Enum of token flags
@@ -59,11 +60,11 @@ class Node {
     //! Child nodes
     Node::Children children;
     
-    //! The children are references to an external instance
-    bool childrenAreRef;
+    //! Child node. Should not be freed
+    Node * child;
     
     //! Constructor
-    Node() : data(NULL), type(Node::TypeNone), flags(Node::FlagNone), childrenAreRef(false) {};
+    Node() : data(NULL), type(Node::TypeNone), flags(Node::FlagNone), child(NULL) {};
     
     //! Destructor
     ~Node();

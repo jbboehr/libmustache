@@ -12,13 +12,15 @@ Node::~Node()
   }
   
   // Children
-  if( !childrenAreRef && children.size() > 0 ) {
+  if( children.size() > 0 ) {
     Node::Children::iterator it;
     for ( it = children.begin() ; it != children.end(); it++ ) {
       delete *it;
     }
   }
   children.clear();
+  
+  // Child should not be freed
 }
 
 
