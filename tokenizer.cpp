@@ -60,12 +60,14 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
   long pos = 0;
   const char * chr;
   long skipUntil = -1;
-  long lineNo = 0;
+  long lineNo = 1;
   long charNo = 0;
   
   int inTag = 0;
   int inTripleTag = 0;
   int skip = 0;
+  int startCharNo = 0;
+  int startLineNo = 0;
   int currentFlags = Node::FlagNone;
   std::string buffer;
   buffer.reserve(100); // Reserver 100 chars
@@ -117,10 +119,13 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
         // Open new buffer
         inTag = true;
         skipUntil = pos + startL - 1;
+        startLineNo = lineNo;
+        startCharNo = charNo; // Could be inaccurate
         // Triple mustache
         if( start.compare("{{") == 0 && tmpl->compare(pos+2, 1, "{") == 0 ) {
           inTripleTag = true;
           skipUntil++;
+          startCharNo++;
         }
       }
     } else {
@@ -128,7 +133,11 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
         // Trim buffer
         trim(buffer);
         if( buffer.length() <= 0 ) {
-          throw Exception("Empty tag");
+          std::ostringstream oss;
+          oss << "Empty tag"
+              << " at "
+              << startLineNo << ":" << startCharNo;
+          throw Exception(oss.str());
         }
         // Close and process previous buffer
         skip = false;
@@ -158,14 +167,22 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
             break;
           case '=':
             if( buffer.at(buffer.length()-1) != '=' ) {
-              throw Exception("Missing closing delimiter (=)");
+              std::ostringstream oss;
+              oss << "Missing closing delimiter (=)"
+                  << " in tag starting at "
+                  << startLineNo << ":" << startCharNo;
+              throw Exception(oss.str());
             }
             trim(buffer, " \f\n\r\t\v=");
             
             std::vector<std::string> delims;
             stringTok(buffer, whiteSpaces, &delims);
             if( delims.size() != 2 || delims[0].size() < 1 || delims[1].size() < 1 ) {
-              throw Exception("Invalid delimiter format");
+              std::ostringstream oss;
+              oss << "Invalid delimiter format"
+                  << " in tag starting at "
+                  << startLineNo << ":" << startCharNo;
+              throw Exception(oss.str());
             }
             
             // Assign new start/stop
@@ -208,7 +225,11 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
             nodeStack.pop();
             depth--;
             if( depth < 0 ) {
-              throw Exception("Extra closing section or missing opening section");
+              std::ostringstream oss;
+              oss << "Extra closing section or missing opening section"
+                  << " detected after tag starting at "
+                  << startLineNo << ":" << startCharNo;
+              throw Exception(oss.str());
             }
           }
         }
@@ -220,11 +241,19 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
         // Triple mustache
         if( !skip && inTripleTag && stop.compare("}}") == 0 ) {
           if( tmpl->compare(pos+2, 1, "}") != 0 ) {
-            throw Exception("Missing closing triple mustache delimiter");
+            std::ostringstream oss;
+            oss << "Missing closing triple mustache delimiter at "
+                << lineNo << ":" << charNo
+                << " in tag starting at "
+                << startLineNo << ":" << startCharNo;
+            throw Exception(oss.str());
           }
           skipUntil++;
+          startCharNo++;
         }
         inTripleTag = false;
+        startLineNo = lineNo;
+        startCharNo = charNo; // Could be inaccurate
       }
     }
     
@@ -238,7 +267,11 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
   }
   
   if( inTag ) {
-    throw Exception("Unclosed tag");
+    std::ostringstream oss;
+    oss << "Unclosed tag at end of template, "
+        << "starting at "
+        << startLineNo << ":" << startCharNo;
+    throw Exception(oss.str());
   } else if( buffer.length() > 0 ) {
     node = new Node();
     node->type = Node::TypeOutput;
