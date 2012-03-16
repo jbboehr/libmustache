@@ -59,8 +59,11 @@ class Node {
     //! Child nodes
     Node::Children children;
     
+    //! The children are references to an external instance
+    bool childrenAreRef;
+    
     //! Constructor
-    Node() : data(NULL), type(Node::TypeNone), flags(Node::FlagNone) {};
+    Node() : data(NULL), type(Node::TypeNone), flags(Node::FlagNone), childrenAreRef(false) {};
     
     //! Destructor
     ~Node();
