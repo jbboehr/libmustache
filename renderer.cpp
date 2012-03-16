@@ -78,6 +78,7 @@ void Renderer::_renderNode(Node * node)
 {
   Data * data = _stack->top();
   std::string * nstr = node->data;
+  bool partialFound = false;
   
   if( data == NULL ) {
     throw Exception("Whoops, empty data");
@@ -244,10 +245,19 @@ void Renderer::_renderNode(Node * node)
       }
       break;
     case Node::FlagPartial:
-      if( _partials != NULL ) {
+      if( !partialFound && _partials != NULL ) {
         Node::Partials::iterator p_it;
         p_it = _partials->find(*(node->data));
         if( p_it != _partials->end() ) {
+          partialFound = true;
+          _renderNode(&(p_it->second));
+        }
+      }
+      if( !partialFound && _node->partials.size() > 0 ) {
+        Node::Partials::iterator p_it;
+        p_it = _node->partials.find(*(node->data));
+        if( p_it != _node->partials.end() ) {
+          partialFound = true;
           _renderNode(&(p_it->second));
         }
       }

@@ -187,11 +187,19 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
             currentFlags = currentFlags | Node::FlagEscape;
           }
           // Create node
-          node = new Node();
-          node->type = Node::TypeTag;
-          node->data = new std::string(buffer);
-          node->flags = currentFlags;
-          nodeStack.top()->children.push_back(node);
+          if( currentFlags & Node::FlagInlinePartial ) { 
+            root->partials.insert(std::make_pair(buffer, mustache::Node()));
+            node = &(root->partials[buffer]);
+            node->type = Node::TypeRoot; // Kind of hackish
+            node->data = new std::string(buffer);
+            node->flags = currentFlags;
+          } else {
+            node = new Node();
+            node->type = Node::TypeTag;
+            node->data = new std::string(buffer);
+            node->flags = currentFlags;
+            nodeStack.top()->children.push_back(node);
+          }
           // Push/pop stack
           if( currentFlags & Node::FlagHasChildren ) {
             depth++;

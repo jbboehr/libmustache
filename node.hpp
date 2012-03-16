@@ -63,6 +63,9 @@ class Node {
     //! Child node. Should not be freed
     Node * child;
     
+    //! Internal partials
+    Node::Partials partials;
+    
     //! Constructor
     Node() : data(NULL), type(Node::TypeNone), flags(Node::FlagNone), child(NULL) {};
     
