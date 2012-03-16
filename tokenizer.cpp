@@ -125,7 +125,6 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
         if( start.compare("{{") == 0 && tmpl->compare(pos+2, 1, "{") == 0 ) {
           inTripleTag = true;
           skipUntil++;
-          startCharNo++;
         }
       }
     } else {
@@ -249,7 +248,6 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
             throw Exception(oss.str());
           }
           skipUntil++;
-          startCharNo++;
         }
         inTripleTag = false;
         startLineNo = lineNo;
@@ -271,6 +269,10 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
     oss << "Unclosed tag at end of template, "
         << "starting at "
         << startLineNo << ":" << startCharNo;
+    throw Exception(oss.str());
+  } else if( depth > 0 ) {
+    std::ostringstream oss;
+    oss << "Unclosed section at end of template";
     throw Exception(oss.str());
   } else if( buffer.length() > 0 ) {
     node = new Node();
