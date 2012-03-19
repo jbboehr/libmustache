@@ -8,6 +8,14 @@
 #include <string>
 #include <vector>
 
+#ifdef HAVE_TR1
+#include <tr1/unordered_map>
+#elif HAVE_LIBBOOST
+#include <boost/unordered_map.hpp>
+#else
+#include <map>
+#endif
+
 #include "exception.hpp"
 
 namespace mustache {
@@ -22,7 +30,13 @@ class Data {
   public:
     typedef std::auto_ptr<Data> Ptr;
     typedef std::string String;
+#ifdef HAVE_TR1
+    typedef std::tr1::unordered_map<std::string,Data *> Map;
+#elif HAVE_LIBBOOST
+    typedef boost::unordered_map<std::string,Data *> Map;
+#else
     typedef std::map<std::string,Data *> Map;
+#endif
     typedef std::list<Data *> List;
     typedef Data * Array;
     

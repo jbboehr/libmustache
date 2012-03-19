@@ -202,6 +202,9 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
           if( inTripleTag ) {
             currentFlags = currentFlags | Node::FlagEscape;
           }
+          if( !_escapeByDefault ) {
+            currentFlags = currentFlags ^ Node::FlagEscape;
+          }
           // Create node
           if( currentFlags & Node::FlagInlinePartial ) { 
             root->partials.insert(std::make_pair(buffer, mustache::Node(Node::TypeRoot, buffer, currentFlags)));
