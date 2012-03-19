@@ -9,11 +9,12 @@ void Tokenizer::setStartSequence(const std::string& start) {
 }
 
 void Tokenizer::setStartSequence(const char * start, long len) {
-  if( len <= 0 ) {
+  // @todo specifying the length seems to cause huge allocations
+  //if( len <= 0 ) {
     _startSequence.assign(start);
-  } else {
-    _startSequence.assign(start, (size_t) len);
-  }
+  //} else {
+  //  _startSequence.assign(start, (size_t) len);
+  //}
 }
 
 void Tokenizer::setStopSequence(const std::string& stop) {
@@ -21,11 +22,12 @@ void Tokenizer::setStopSequence(const std::string& stop) {
 }
 
 void Tokenizer::setStopSequence(const char * stop, long len) {
-  if( len <= 0 ) {
+  // @todo specifying the length seems to cause huge allocations
+  //if( len <= 0 ) {
     _stopSequence.assign(stop);
-  } else {
-    _stopSequence.assign(stop, (size_t) len);
-  }
+  //} else {
+  //  _stopSequence.assign(stop, (size_t) len);
+  //}
 }
 
 void Tokenizer::setEscapeByDefault(bool flag) {
@@ -47,6 +49,7 @@ bool Tokenizer::getEscapeByDefault() {
 void Tokenizer::tokenize(std::string * tmpl, Node * root)
 {
   unsigned int tmplL = tmpl->length();
+  const char * chr = tmpl->c_str();
   
   std::string start(_startSequence);
   char startC = start.at(0);
@@ -58,7 +61,6 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
   long tmpStopL = stopL;
   
   long pos = 0;
-  const char * chr;
   long skipUntil = -1;
   long lineNo = 1;
   long charNo = 0;
