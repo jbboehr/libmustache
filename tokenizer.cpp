@@ -112,9 +112,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
       if( *chr == startC && tmpl->compare(pos, startL, start) == 0 ) {
         // Close previous buffer
         if( buffer.length() > 0 ) {
-          node = new Node();
-          node->type = Node::TypeOutput;
-          node->data = new std::string(buffer);
+          node = new Node(Node::TypeOutput, buffer);
           nodeStack.top()->children.push_back(node);
           buffer.clear();
         }
@@ -206,16 +204,13 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
           }
           // Create node
           if( currentFlags & Node::FlagInlinePartial ) { 
-            root->partials.insert(std::make_pair(buffer, mustache::Node()));
+            root->partials.insert(std::make_pair(buffer, mustache::Node(Node::TypeRoot, buffer, currentFlags)));
             node = &(root->partials[buffer]);
-            node->type = Node::TypeRoot; // Kind of hackish
-            node->data = new std::string(buffer);
-            node->flags = currentFlags;
+//            node->type = Node::TypeRoot; // Kind of hackish
+//            node->data = new std::string(buffer);
+//            node->flags = currentFlags;
           } else {
-            node = new Node();
-            node->type = Node::TypeTag;
-            node->data = new std::string(buffer);
-            node->flags = currentFlags;
+            node = new Node(Node::TypeTag, buffer, currentFlags);
             nodeStack.top()->children.push_back(node);
           }
           // Push/pop stack
