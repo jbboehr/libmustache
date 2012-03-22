@@ -1,6 +1,12 @@
 
 #include "mustache.hpp"
 
+
+int mustache_version() {
+  return LIBMUSTACHE_VERSION_INT;
+}
+
+
 namespace mustache {
 
 
