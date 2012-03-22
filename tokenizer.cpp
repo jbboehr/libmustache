@@ -136,7 +136,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
           oss << "Empty tag"
               << " at "
               << startLineNo << ":" << startCharNo;
-          throw Exception(oss.str());
+          throw TokenizerException(oss.str(), startLineNo, startCharNo);
         }
         // Close and process previous buffer
         skip = false;
@@ -170,7 +170,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
               oss << "Missing closing delimiter (=)"
                   << " in tag starting at "
                   << startLineNo << ":" << startCharNo;
-              throw Exception(oss.str());
+              throw TokenizerException(oss.str(), startLineNo, startCharNo);
             }
             trim(buffer, " \f\n\r\t\v=");
             
@@ -181,7 +181,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
               oss << "Invalid delimiter format"
                   << " in tag starting at "
                   << startLineNo << ":" << startCharNo;
-              throw Exception(oss.str());
+              throw TokenizerException(oss.str(), startLineNo, startCharNo);
             }
             
             // Assign new start/stop
@@ -228,7 +228,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
               oss << "Extra closing section or missing opening section"
                   << " detected after tag starting at "
                   << startLineNo << ":" << startCharNo;
-              throw Exception(oss.str());
+              throw TokenizerException(oss.str(), startLineNo, startCharNo);
             }
           }
         }
@@ -245,7 +245,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
                 << lineNo << ":" << charNo
                 << " in tag starting at "
                 << startLineNo << ":" << startCharNo;
-            throw Exception(oss.str());
+            throw TokenizerException(oss.str(), lineNo, charNo);
           }
           skipUntil++;
         }
@@ -269,11 +269,11 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
     oss << "Unclosed tag at end of template, "
         << "starting at "
         << startLineNo << ":" << startCharNo;
-    throw Exception(oss.str());
+    throw TokenizerException(oss.str(), startLineNo, startCharNo);
   } else if( depth > 0 ) {
     std::ostringstream oss;
     oss << "Unclosed section at end of template";
-    throw Exception(oss.str());
+    throw TokenizerException(oss.str(), -1, -1);
   } else if( buffer.length() > 0 ) {
     node = new Node();
     node->type = Node::TypeOutput;

@@ -20,8 +20,22 @@ class Exception : public std::runtime_error {
 };
 
 
+/*! \class TokenizerException
+    \brief Exception class
+
+    Exceptions thrown in the tokenizer will be of this class.
+*/
+class TokenizerException : public Exception {
+  public:
+    const int lineNo;
+    const int charNo;
+    TokenizerException(const std::string& desc, int lineNo = 0, int charNo = 0) : 
+        Exception(desc),
+        lineNo(lineNo),
+        charNo(charNo) {};
+};
+
+
 } // namespace Mustache
 
 #endif
-
-
