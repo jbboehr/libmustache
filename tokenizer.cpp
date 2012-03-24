@@ -199,11 +199,14 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
             buffer.erase(0, 1);
             trim(buffer);
           }
-          if( inTripleTag ) {
-            currentFlags = currentFlags | Node::FlagEscape;
-          }
-          if( !_escapeByDefault ) {
-            currentFlags = currentFlags ^ Node::FlagEscape;
+          if( currentFlags == 0 || currentFlags == Node::FlagEscape ) {
+            // @todo kind of hack-ish
+            if( inTripleTag ) {
+              currentFlags = currentFlags | Node::FlagEscape;
+            }
+            if( !_escapeByDefault ) {
+              currentFlags = currentFlags ^ Node::FlagEscape;
+            }
           }
           // Create node
           if( currentFlags & Node::FlagInlinePartial ) { 
