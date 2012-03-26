@@ -34,10 +34,12 @@ void Node::setData(const std::string& data)
 {
   this->data = new std::string(data);
   
-  size_t found = data.find(".");
-  if( found != std::string::npos ) {
-    dataParts = new std::vector<std::string>;
-    explode(".", *(this->data), dataParts);
+  if( this->type & Node::TypeHasDot ) {
+    size_t found = data.find(".");
+    if( found != std::string::npos ) {
+      dataParts = new std::vector<std::string>;
+      explode(".", *(this->data), dataParts);
+    }
   }
 }
 

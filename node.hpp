@@ -49,7 +49,10 @@ class Node {
       TypeHasData = Node::TypeVariable | Node::TypeNegate | Node::TypeSection | Node::TypePartial,
       
       // If the type does not have a string
-      TypeHasNoString = Node::TypeNone | Node::TypeRoot | Node::TypeContainer
+      TypeHasNoString = Node::TypeNone | Node::TypeRoot | Node::TypeContainer,
+      
+      // If the type can use dot notation
+      TypeHasDot = Node::TypeNegate | Node::TypeSection | Node::TypeStop | Node::TypeTag | Node::TypeVariable
     };
     
     //! Enum of token flags
