@@ -19,14 +19,6 @@ Data::~Data()
         data.clear();
       }
       break;
-    case Data::TypeList:
-      if( children.size() > 0 ) {
-        Data::List::iterator childrenIt;
-        for ( childrenIt = children.begin() ; childrenIt != children.end(); childrenIt++ ) {
-          delete *childrenIt;
-        }
-        children.clear();
-      }
     case Data::TypeArray:
       delete[] array;
       break;
@@ -40,9 +32,6 @@ void Data::init(Data::Type type, int size) {
     case Data::TypeString:
       val = new std::string();
       val->reserve(size);
-      break;
-    case Data::TypeList:
-      // Do nothing
       break;
     case Data::TypeMap:
       // Do nothing

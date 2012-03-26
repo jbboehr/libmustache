@@ -57,6 +57,9 @@ class Node {
     //! The string value
     std::string * data;
     
+    //! The string parts for dot notation
+    std::vector<std::string> * dataParts;
+    
     //! Child nodes
     Node::Children children;
     
@@ -69,18 +72,24 @@ class Node {
     //! Constructor
     Node() : 
         type(Node::TypeNone),
-        data(NULL), 
+        data(NULL),
+        dataParts(NULL),
         flags(Node::FlagNone), 
         child(NULL) {};
     Node(Node::Type type, const std::string& data, int flags = 0) :
         type(type),
-        data(new std::string(data)), 
+        dataParts(NULL), 
         flags(flags), 
-        child(NULL) {};
+        child(NULL) {
+      setData(data);
+    };
         
     
     //! Destructor
     ~Node();
+    
+    //! Set data
+    void setData(const std::string& data);
 };
 
 

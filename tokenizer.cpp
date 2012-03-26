@@ -48,17 +48,20 @@ bool Tokenizer::getEscapeByDefault() {
 
 void Tokenizer::tokenize(std::string * tmpl, Node * root)
 {
+  std::string stop(_stopSequence);
+  std::string start(_startSequence);
+  std::string buffer;
+  buffer.reserve(100); // Reserver 100 chars
+  
   register unsigned int tmplL = tmpl->length();
   register const char * chr = tmpl->c_str();
   
-  std::string start(_startSequence);
-  char startC = start.at(0);
-  int startL = start.length();
+  register char startC = start.at(0);
+  register int startL = start.length();
   
-  std::string stop(_stopSequence);
-  char stopC = stop.at(0);
-  int stopL = stop.length();
-  int tmpStopL = stopL;
+  register char stopC = stop.at(0);
+  register int stopL = stop.length();
+  register int tmpStopL = stopL;
   
   register int pos = 0;
   register int skipUntil = -1;
@@ -66,15 +69,12 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
   register int charNo = 0;
   
   register int inTag = 0;
-  int inTripleTag = 0;
-  int skip = 0;
-  int startCharNo = 0;
-  int startLineNo = 0;
-  int currentFlags = Node::FlagNone;
-  std::string buffer;
-  buffer.reserve(100); // Reserver 100 chars
+  register int inTripleTag = 0;
+  register int skip = 0;
+  register int startCharNo = 0;
+  register int startLineNo = 0;
+  register int currentFlags = Node::FlagNone;
   
-  int depth = 0;
   Node::Stack nodeStack;
   Node * node;
   
@@ -86,8 +86,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
   nodeStack.push(root);
   
   // Scan loop
-  chr = tmpl->c_str();
-  for( pos = 0; pos < tmplL; pos++ ) {
+  for( pos = 0; pos < tmplL; pos++, chr++ ) {
     
     // Track line numbers
     if( *chr == '\n' ) {
@@ -100,7 +99,6 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
     // Skip until position
     if( skipUntil > -1 ) {
       if( pos <= skipUntil ) {
-        chr++;
         continue;
       } else {
         skipUntil = -1;
@@ -142,7 +140,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
         skip = false;
         tmpStopL = stopL;
         currentFlags = Node::FlagNone;
-        switch( buffer.at(0) ) {
+        switch( buffer[0] ) {
           case '&':
             currentFlags = Node::FlagEscape;
             break;
@@ -212,27 +210,22 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
           if( currentFlags & Node::FlagInlinePartial ) { 
             root->partials.insert(std::make_pair(buffer, mustache::Node(Node::TypeRoot, buffer, currentFlags)));
             node = &(root->partials[buffer]);
-//            node->type = Node::TypeRoot; // Kind of hackish
-//            node->data = new std::string(buffer);
-//            node->flags = currentFlags;
           } else {
             node = new Node(Node::TypeTag, buffer, currentFlags);
             nodeStack.top()->children.push_back(node);
           }
           // Push/pop stack
           if( currentFlags & Node::FlagHasChildren ) {
-            depth++;
             nodeStack.push(node);
           } else if( currentFlags & Node::FlagStop ) {
-            nodeStack.pop();
-            depth--;
-            if( depth < 0 ) {
+            if( nodeStack.size() <= 0 ) {
               std::ostringstream oss;
               oss << "Extra closing section or missing opening section"
                   << " detected after tag starting at "
                   << startLineNo << ":" << startCharNo;
               throw TokenizerException(oss.str(), startLineNo, startCharNo);
             }
+            nodeStack.pop();
           }
         }
         // Clear buffer
@@ -262,9 +255,6 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
     if( skipUntil == -1 ) {
       buffer.append(1, *chr);
     }
-    
-    // Increment character pointer
-    chr++;
   }
   
   if( inTag ) {
@@ -273,7 +263,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
         << "starting at "
         << startLineNo << ":" << startCharNo;
     throw TokenizerException(oss.str(), startLineNo, startCharNo);
-  } else if( depth > 0 ) {
+  } else if( nodeStack.size() > 1 ) {
     std::ostringstream oss;
     oss << "Unclosed section at end of template";
     throw TokenizerException(oss.str(), -1, -1);

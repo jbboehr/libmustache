@@ -39,6 +39,8 @@ class Renderer {
     //! Renders a single node
     void _renderNode(Node * node);
     
+    Data * _lookup(Node * node);
+    
   public:
     //! The default output buffer length
     static const int outputBufferLength = 100000;

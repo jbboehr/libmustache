@@ -76,117 +76,48 @@ void Renderer::render()
 
 void Renderer::_renderNode(Node * node)
 {
-  Data * data = _stack->top();
-  std::string * nstr = node->data;
-  bool partialFound = false;
-  
-  if( data == NULL ) {
+  // Check stack size?
+  if( _stack->size <= 0 ) {
     throw Exception("Whoops, empty data");
   }
   
     // Handle simple cases
-  if( node->type == Node::TypeRoot ) {
-    if( node->children.size() > 0 ) {
-      Node::Children::iterator it;
-      for ( it = node->children.begin() ; it != node->children.end(); it++ ) {
-        _renderNode(*it);
+  switch( node->type ) {
+    case Node::TypeRoot:
+      if( node->children.size() > 0 ) {
+        Node::Children::iterator it;
+        for ( it = node->children.begin() ; it != node->children.end(); it++ ) {
+          _renderNode(*it);
+        }
       }
-    }
-    return;
-  } else if( node->type == Node::TypeOutput ) {
-    if( node->data != NULL && node->data->length() > 0 ) {
-      _output->append(*node->data);
-    }
-    return;
-  } else if( node->type == Node::TypeContainer ) {
-    _renderNode(node->child);
-    return;
+      return;
+      break;
+    case Node::TypeOutput:
+      if( node->data != NULL && node->data->length() > 0 ) {
+        _output->append(*node->data);
+      }
+      return;
+      break;
+    case Node::TypeContainer:
+      _renderNode(node->child);
+      return;
+      break;
   }
   
-  if( nstr == NULL ) {
+  // Check node is not empty
+  if( node->data == NULL ) {
     throw Exception("Whoops, empty tag");
   }
   
   // Resolve data
-  Data * val = NULL;
-  if( data->type == Data::TypeString ) {
-    // Simple
-    if( nstr->compare(".") == 0 ) {
-      val = data;
-    }
-  } else if( data->type == Data::TypeMap ) {
-    // Check top level
-    Data::Map::iterator it = data->data.find(*nstr);
-    if( it != data->data.end() ) {
-      val = it->second;
-    }
-  }
-  
-  // Data was not resolved quickly
-  if( val == NULL ) {
-    // Search whole stack
-    
-    // Dot notation
-    std::string initial(*nstr);
-    std::vector<std::string> parts;
-    size_t found = initial.find(".");
-    if( found != std::string::npos ) {
-      explode(".", initial, &parts);
-      if( parts.size() > 0 ) {
-        initial.assign(parts.front());
-      }
-    }
-    
-    // Resolve up the data stack
-    Data * ref = NULL;
-    Data::Map::iterator d_it;
-    int i;
-    Data ** _stackPos = _stack->end();
-    for( i = 0; i < _stack->size; i++, _stackPos-- ) {
-      if( (*_stackPos)->type == Data::TypeMap ) {
-        d_it = (*_stackPos)->data.find(initial);
-        if( d_it != (*_stackPos)->data.end() ) {
-          ref = d_it->second;
-          if( ref != NULL ) {
-            break;
-          }
-        }
-      }
-    }
-    
-    // Resolve or dot notation
-    if( ref != NULL && parts.size() > 1 ) {
-      // Dot notation
-      std::vector<std::string>::iterator vs_it;
-      for( vs_it = parts.begin(), vs_it++; vs_it != parts.end(); vs_it++ ) {
-        if( ref == NULL ) {
-          break;
-        } else if( ref->type != Data::TypeMap ) {
-          ref = NULL; // Not sure about this
-          break;
-        } else {
-          d_it = ref->data.find(*vs_it);
-          if( d_it == ref->data.end() ) {
-            ref = NULL; // Not sure about this
-            break; 
-          }
-          ref = d_it->second;
-        }
-      }
-    }
-    
-    if( ref != NULL ) {
-      val = ref;
-    }
-  }
-  
-  // Calculate if value is empty
   bool valIsEmpty = true;
+  Data * val = _lookup(node);
   if( val != NULL && !val->isEmpty() ) {
     valIsEmpty = false;
   }
   
   // Switch on node flags
+  bool partialFound = false;
   switch( node->flags ) {
     case Node::FlagComment:
     case Node::FlagStop:
@@ -277,6 +208,72 @@ void Renderer::_renderNode(Node * node)
       //php_error("Unknown node flags");
       break;
   }
+}
+
+Data * Renderer::_lookup(Node * node)
+{
+  Data * data = _stack->top();
+  
+  if( data->type == Data::TypeString ) {
+    // Simple
+    if( node->data->compare(".") == 0 ) {
+      return data;
+    }
+  } else if( data->type == Data::TypeMap ) {
+    // Check top level
+    Data::Map::iterator it = data->data.find(*(node->data));
+    if( it != data->data.end() ) {
+      return it->second;
+    }
+  }
+  
+  // Get initial segment for dot notation
+  std::string * initial;
+  if( node->dataParts != NULL ) {
+    initial = &(node->dataParts->at(0));
+  } else {
+    initial = node->data;
+  }
+  
+  // Resolve up the data stack
+  Data * ref = NULL;
+  Data::Map::iterator d_it;
+  register int i;
+  Data ** _stackPos = _stack->end();
+  for( i = 0; i < _stack->size; i++, _stackPos-- ) {
+    if( (*_stackPos)->type == Data::TypeMap ) {
+      d_it = (*_stackPos)->data.find(*initial);
+      if( d_it != (*_stackPos)->data.end() ) {
+        ref = d_it->second;
+        if( ref != NULL ) {
+          break;
+        }
+      }
+    }
+  }
+
+  // Resolve or dot notation
+  if( ref != NULL && node->dataParts != NULL && node->dataParts->size() > 1 ) {
+    // Dot notation
+    std::vector<std::string>::iterator vs_it;
+    for( vs_it = node->dataParts->begin(), vs_it++; vs_it != node->dataParts->end(); vs_it++ ) {
+      if( ref == NULL ) {
+        break;
+      } else if( ref->type != Data::TypeMap ) {
+        ref = NULL; // Not sure about this
+        break;
+      } else {
+        d_it = ref->data.find(*vs_it);
+        if( d_it == ref->data.end() ) {
+          ref = NULL; // Not sure about this
+          break; 
+        }
+        ref = d_it->second;
+      }
+    }
+  }
+  
+  return ref;
 }
 
 
