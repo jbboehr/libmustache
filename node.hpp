@@ -30,22 +30,32 @@ class Node {
       TypeNone = 0,
       TypeRoot = 1,
       TypeOutput = 2,
-      TypeTag = 3,
-      TypeContainer = 4
+      TypeTag = 4,
+      TypeContainer = 8,
+      
+      // These are extensions of the tag type
+      TypeVariable = 16,
+      TypeNegate = 32,
+      TypeSection = 64,
+      TypeStop = 128,
+      TypeComment = 256,
+      TypePartial = 512,
+      TypeInlinePartial = 1024,
+      
+      // If the type allows children
+      TypeHasChildren = Node::TypeNegate | Node::TypeSection | Node::TypeInlinePartial,
+      
+      // If the type pushes data to the stack
+      TypeHasData = Node::TypeVariable | Node::TypeNegate | Node::TypeSection | Node::TypePartial,
+      
+      // If the type does not have a string
+      TypeHasNoString = Node::TypeNone | Node::TypeRoot | Node::TypeContainer
     };
     
     //! Enum of token flags
     enum Flag { 
       FlagNone = 0,
-      FlagEscape = 1,
-      FlagNegate = 2,
-      FlagSection = 4,
-      FlagStop = 8,
-      FlagComment = 16,
-      FlagPartial = 32,
-      FlagInlinePartial = 64,
-      
-      FlagHasChildren = Node::FlagNegate | Node::FlagSection | Node::FlagInlinePartial
+      FlagEscape = 1
     };
     
     //! The type from Node::Type

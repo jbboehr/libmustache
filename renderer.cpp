@@ -79,10 +79,29 @@ void Renderer::_renderNode(Node * node)
   // Check stack size?
   if( _stack->size <= 0 ) {
     throw Exception("Whoops, empty data");
+  } else if( !(node->type & Node::TypeHasNoString) && node->data == NULL ) {
+    throw Exception("Whoops, empty tag");
   }
   
-    // Handle simple cases
+  // Lookup data
+  bool valIsEmpty = true;
+  Data * val = NULL;
+  if( node->type & Node::TypeHasData ) {
+    val = _lookup(node);
+  }
+  if( val != NULL && !val->isEmpty() ) {
+    valIsEmpty = false;
+  }
+  
+  // Handle simple cases
+  bool partialFound = false;
   switch( node->type ) {
+    case Node::TypeComment:
+    case Node::TypeStop:
+    case Node::TypeInlinePartial:
+      // Do nothing
+      break;
+      
     case Node::TypeRoot:
       if( node->children.size() > 0 ) {
         Node::Children::iterator it;
@@ -102,80 +121,72 @@ void Renderer::_renderNode(Node * node)
       _renderNode(node->child);
       return;
       break;
-  }
-  
-  // Check node is not empty
-  if( node->data == NULL ) {
-    throw Exception("Whoops, empty tag");
-  }
-  
-  // Resolve data
-  bool valIsEmpty = true;
-  Data * val = _lookup(node);
-  if( val != NULL && !val->isEmpty() ) {
-    valIsEmpty = false;
-  }
-  
-  // Switch on node flags
-  bool partialFound = false;
-  switch( node->flags ) {
-    case Node::FlagComment:
-    case Node::FlagStop:
-    case Node::FlagInlinePartial:
-      // Do nothing
-      break;
-    case Node::FlagNegate:
-    case Node::FlagSection:
-      // Negate/Empty list
-      if( (node->flags & Node::FlagNegate) && !valIsEmpty ) {
-        // Not-empty negation
-        break;
-      } else if( !(node->flags & Node::FlagNegate) && valIsEmpty ) {
-        // Empty section
-        break;
-      } else if( node->children.size() <= 0 ) {
-        // No children
-        break;
-      }
       
-      if( valIsEmpty || val->type == Data::TypeString ) {
-        Node::Children::iterator it;
-        for( it = node->children.begin() ; it != node->children.end(); it++ ) {
-          _renderNode(*it);
+    case Node::TypeTag:
+    case Node::TypeVariable:
+      if( !valIsEmpty && val->type == Data::TypeString ) {
+        if( node->flags & Node::FlagEscape ) {
+          htmlspecialchars_append(val->val, _output);
+        } else {
+          _output->append(*val->val);
         }
-      } else if( val->type == Data::TypeList ) {
-        // Numeric array/list
-        Data::List::iterator childrenIt;
-        Node::Children::iterator it;
-        for ( childrenIt = val->children.begin() ; childrenIt != val->children.end(); childrenIt++ ) {
-          _stack->push(*childrenIt);
-          for( it = node->children.begin() ; it != node->children.end(); it++ ) {
-            _renderNode(*it);
-          }
-          _stack->pop();
-        }
-      } else if( val->type == Data::TypeArray ) {
-        Data::Array ArrayPtr = val->array;
-        int ArrayPos;
-        Node::Children::iterator it;
-        for ( ArrayPos = 0; ArrayPos < val->length; ArrayPos++, ArrayPtr++ ) {
-          _stack->push(ArrayPtr);
-          for( it = node->children.begin() ; it != node->children.end(); it++ ) {
-            _renderNode(*it);
-          }
-          _stack->pop();
-        }
-      } else if( val->type == Data::TypeMap ) {
-        // Associate array/map
-        Node::Children::iterator it;
-        _stack->push(val);
-        for( it = node->children.begin() ; it != node->children.end(); it++ ) {
-          _renderNode(*it);
-        }
-        _stack->pop();
       }
       break;
-    case Node::FlagPartial:
+      
+    case Node::TypeNegate:
+      if( valIsEmpty ) {
+        Node::Children::iterator it;
+        for( it = node->children.begin() ; it != node->children.end(); it++ ) {
+          _renderNode(*it);
+        }
+      }
+      break;
+      
+    case Node::TypeSection:
+      if( !valIsEmpty ) {
+        Node::Children::iterator it;
+        Data::List::iterator childrenIt;
+        Data::Array ArrayPtr = val->array;
+        
+        switch( val->type ) {
+          default:
+          case Data::TypeString:
+            for( it = node->children.begin() ; it != node->children.end(); it++ ) {
+              _renderNode(*it);
+            }
+            break;
+          case Data::TypeList:
+            // Numeric array/list
+            for ( childrenIt = val->children.begin() ; childrenIt != val->children.end(); childrenIt++ ) {
+              _stack->push(*childrenIt);
+              for( it = node->children.begin() ; it != node->children.end(); it++ ) {
+                _renderNode(*it);
+              }
+              _stack->pop();
+            }
+            break;
+          case Data::TypeArray:
+            for ( int ArrayPos = 0; ArrayPos < val->length; ArrayPos++, ArrayPtr++ ) {
+              _stack->push(ArrayPtr);
+              for( it = node->children.begin() ; it != node->children.end(); it++ ) {
+                _renderNode(*it);
+              }
+              _stack->pop();
+            }
+            break;
+          case Data::TypeMap:
+            // Associate array/map
+            _stack->push(val);
+            for( it = node->children.begin() ; it != node->children.end(); it++ ) {
+              _renderNode(*it);
+            }
+            _stack->pop();
+            break;
+        }
+      }
+      break;
+      
+    case Node::TypePartial:
       if( !partialFound && _partials != NULL ) {
         Node::Partials::iterator p_it;
         p_it = _partials->find(*(node->data));
@@ -193,20 +204,14 @@ void Renderer::_renderNode(Node * node)
         }
       }
       break;
-    case Node::FlagEscape:
-    case Node::FlagNone:
-      if( !valIsEmpty && val->type == Data::TypeString ) {
-        if( (bool) (node->flags & Node::FlagEscape) != true /*escapeByDefault*/ ) { // @todo escape by default
-          // Probably shouldn't modify the value
-          htmlspecialchars_append(val->val, _output);
-        } else {
-          _output->append(*val->val);
-        }
-      }
-      break;
+      
     default:
       //php_error("Unknown node flags");
       break;
+  }
+  
+  // Switch on node flags
+  switch( node->flags ) {
   }
 }
 

@@ -73,6 +73,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
   register int skip = 0;
   register int startCharNo = 0;
   register int startLineNo = 0;
+  register Node::Type currentType = Node::TypeNone;
   register int currentFlags = Node::FlagNone;
   
   Node::Stack nodeStack;
@@ -139,28 +140,29 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
         // Close and process previous buffer
         skip = false;
         tmpStopL = stopL;
+        currentType = Node::TypeVariable;
         currentFlags = Node::FlagNone;
         switch( buffer[0] ) {
           case '&':
-            currentFlags = Node::FlagEscape;
+            currentFlags = currentFlags ^ Node::FlagEscape;
             break;
           case '^':
-            currentFlags = Node::FlagNegate;
+            currentType = Node::TypeNegate;
             break;
           case '#':
-            currentFlags = Node::FlagSection;
+            currentType = Node::TypeSection;
             break;
           case '/':
-            currentFlags = Node::FlagStop;
+            currentType = Node::TypeStop;
             break;
           case '!':
-            currentFlags = Node::FlagComment;
+            currentType = Node::TypeComment;
             break;
           case '>':
-            currentFlags = Node::FlagPartial;
+            currentType = Node::TypePartial;
             break;
           case '<':
-            currentFlags = Node::FlagInlinePartial;
+            currentType = Node::TypeInlinePartial;
             break;
           case '=':
             if( buffer.at(buffer.length()-1) != '=' ) {
@@ -193,31 +195,30 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
             break;
         }
         if( !skip ) {
-          if( currentFlags > 0 ) {
+          if( currentType != Node::TypeVariable || currentFlags != 0 ) {
             buffer.erase(0, 1);
             trim(buffer);
           }
-          if( currentFlags == 0 || currentFlags == Node::FlagEscape ) {
-            // @todo kind of hack-ish
+          if( currentType == Node::TypeVariable || currentType == Node::TypeTag ) {
             if( inTripleTag ) {
-              currentFlags = currentFlags | Node::FlagEscape;
+              currentFlags = currentFlags ^ Node::FlagEscape;
             }
-            if( !_escapeByDefault ) {
+            if( _escapeByDefault ) {
               currentFlags = currentFlags ^ Node::FlagEscape;
             }
           }
           // Create node
-          if( currentFlags & Node::FlagInlinePartial ) { 
+          if( currentType == Node::TypeInlinePartial ) { 
             root->partials.insert(std::make_pair(buffer, mustache::Node(Node::TypeRoot, buffer, currentFlags)));
             node = &(root->partials[buffer]);
           } else {
-            node = new Node(Node::TypeTag, buffer, currentFlags);
+            node = new Node(currentType, buffer, currentFlags);
             nodeStack.top()->children.push_back(node);
           }
           // Push/pop stack
-          if( currentFlags & Node::FlagHasChildren ) {
+          if( currentType & Node::TypeHasChildren ) {
             nodeStack.push(node);
-          } else if( currentFlags & Node::FlagStop ) {
+          } else if( currentType == Node::TypeStop ) {
             if( nodeStack.size() <= 0 ) {
               std::ostringstream oss;
               oss << "Extra closing section or missing opening section"
@@ -265,7 +266,8 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
     throw TokenizerException(oss.str(), startLineNo, startCharNo);
   } else if( nodeStack.size() > 1 ) {
     std::ostringstream oss;
-    oss << "Unclosed section at end of template";
+    oss << "Unclosed section at end of template, depth was "
+        << (nodeStack.size() - 1);
     throw TokenizerException(oss.str(), -1, -1);
   } else if( buffer.length() > 0 ) {
     node = new Node();
