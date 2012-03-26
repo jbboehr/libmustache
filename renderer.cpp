@@ -93,7 +93,7 @@ void Renderer::_renderNode(Node * node)
     valIsEmpty = false;
   }
   
-  // Handle simple cases
+  // Switch on token type
   bool partialFound = false;
   switch( node->type ) {
     case Node::TypeComment:
@@ -144,31 +144,28 @@ void Renderer::_renderNode(Node * node)
       
     case Node::TypeSection:
       if( !valIsEmpty ) {
-        Node::Children::iterator it;
-        Data::List::iterator childrenIt;
-        Data::Array ArrayPtr = val->array;
-        
+        int ArrayPos = 0;
         switch( val->type ) {
           default:
           case Data::TypeString:
-            for( it = node->children.begin() ; it != node->children.end(); it++ ) {
+            for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
               _renderNode(*it);
             }
             break;
           case Data::TypeList:
             // Numeric array/list
-            for ( childrenIt = val->children.begin() ; childrenIt != val->children.end(); childrenIt++ ) {
+            for( Data::List::iterator childrenIt = val->children.begin() ; childrenIt != val->children.end(); childrenIt++ ) {
               _stack->push(*childrenIt);
-              for( it = node->children.begin() ; it != node->children.end(); it++ ) {
+              for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
                 _renderNode(*it);
               }
               _stack->pop();
             }
             break;
           case Data::TypeArray:
-            for ( int ArrayPos = 0; ArrayPos < val->length; ArrayPos++, ArrayPtr++ ) {
+            for( Data::Array ArrayPtr = val->array; ArrayPos < val->length; ArrayPos++, ArrayPtr++ ) {
               _stack->push(ArrayPtr);
-              for( it = node->children.begin() ; it != node->children.end(); it++ ) {
+              for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
                 _renderNode(*it);
               }
               _stack->pop();
@@ -177,7 +174,7 @@ void Renderer::_renderNode(Node * node)
           case Data::TypeMap:
             // Associate array/map
             _stack->push(val);
-            for( it = node->children.begin() ; it != node->children.end(); it++ ) {
+            for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
               _renderNode(*it);
             }
             _stack->pop();
@@ -208,10 +205,6 @@ void Renderer::_renderNode(Node * node)
     default:
       //php_error("Unknown node flags");
       break;
-  }
-  
-  // Switch on node flags
-  switch( node->flags ) {
   }
 }
 
