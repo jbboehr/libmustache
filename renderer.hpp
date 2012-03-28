@@ -28,7 +28,7 @@ class Renderer {
     Data * _data;
     
     //! The data stack
-    Stack * _stack;
+    DataStack * _stack;
     
     //! Partials
     Node::Partials * _partials;
@@ -46,7 +46,12 @@ class Renderer {
     static const int outputBufferLength = 100000;
     
     //! Constructor
-    Renderer() : _node(NULL), _data(NULL), _stack(NULL), _partials(NULL), _output(NULL) {};
+    Renderer() : 
+        _node(NULL), 
+        _data(NULL), 
+        _stack(NULL), 
+        _partials(NULL), 
+        _output(NULL) {};
     
     //! Destructor
     ~Renderer();

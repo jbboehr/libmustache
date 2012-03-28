@@ -64,8 +64,8 @@ void Renderer::render()
   if( _stack != NULL ) {
     delete _stack;
   }
-  _stack = new Stack();
-  _stack->push(_data);
+  _stack = new DataStack();
+  _stack->push_back(_data);
   
   // Render
   _renderNode(_node);
@@ -155,29 +155,29 @@ void Renderer::_renderNode(Node * node)
           case Data::TypeList:
             // Numeric array/list
             for( Data::List::iterator childrenIt = val->children.begin() ; childrenIt != val->children.end(); childrenIt++ ) {
-              _stack->push(*childrenIt);
+              _stack->push_back(*childrenIt);
               for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
                 _renderNode(*it);
               }
-              _stack->pop();
+              _stack->pop_back();
             }
             break;
           case Data::TypeArray:
             for( Data::Array ArrayPtr = val->array; ArrayPos < val->length; ArrayPos++, ArrayPtr++ ) {
-              _stack->push(ArrayPtr);
+              _stack->push_back(ArrayPtr);
               for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
                 _renderNode(*it);
               }
-              _stack->pop();
+              _stack->pop_back();
             }
             break;
           case Data::TypeMap:
             // Associate array/map
-            _stack->push(val);
+            _stack->push_back(val);
             for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
               _renderNode(*it);
             }
-            _stack->pop();
+            _stack->pop_back();
             break;
         }
       }
@@ -210,7 +210,7 @@ void Renderer::_renderNode(Node * node)
 
 Data * Renderer::_lookup(Node * node)
 {
-  Data * data = _stack->top();
+  Data * data = _stack->back();
   
   if( data->type == Data::TypeString ) {
     // Simple

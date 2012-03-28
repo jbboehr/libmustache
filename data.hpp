@@ -83,33 +83,33 @@ class Data {
     void init(Data::Type type, int size);
 };
 
-/*! \class Stack
+/*! \class DataStack
     \brief Data stack.
 
     This class is used to implement stack lookups in the renderer.
 */
-class Stack {
+class DataStack {
   public:
     //! The maximum size of the stack
     static const int MAXSIZE = 100;
     
     //! Constructor
-    Stack() : size(0) {};
+    DataStack() : size(0) {};
     
     //! The current size
     int size;
     
     //! The data
-    Data * stack[Stack::MAXSIZE];
+    Data * stack[DataStack::MAXSIZE];
     
     //! Add an element onto the top of the stack
-    void push(Data * data);
+    void push_back(Data * data);
     
     //! Pop an element off the top of the stack
-    void pop();
+    void pop_back();
     
     //! Get the top of the stack
-    Data * top();
+    Data * back();
     
     //! Gets a pointer to the beginning of the stack
     Data ** begin();
