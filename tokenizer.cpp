@@ -76,7 +76,8 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
   register Node::Type currentType = Node::TypeNone;
   register int currentFlags = Node::FlagNone;
   
-  Node::Stack nodeStack;
+  //Node::Stack nodeStack;
+  NodeStack nodeStack;
   Node * node;
   
   // Initialize root node and stack[0]
@@ -84,7 +85,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
   root->flags = Node::FlagNone;
   root->data = NULL;
   
-  nodeStack.push(root);
+  nodeStack.push_back(root);
   
   // Scan loop
   for( pos = 0; pos < tmplL; pos++, chr++ ) {
@@ -112,7 +113,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
         // Close previous buffer
         if( buffer.length() > 0 ) {
           node = new Node(Node::TypeOutput, buffer);
-          nodeStack.top()->children.push_back(node);
+          nodeStack.back()->children.push_back(node);
           buffer.clear();
         }
         // Open new buffer
@@ -213,11 +214,11 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
             node = &(root->partials[buffer]);
           } else {
             node = new Node(currentType, buffer, currentFlags);
-            nodeStack.top()->children.push_back(node);
+            nodeStack.back()->children.push_back(node);
           }
           // Push/pop stack
           if( currentType & Node::TypeHasChildren ) {
-            nodeStack.push(node);
+            nodeStack.push_back(node);
           } else if( currentType == Node::TypeStop ) {
             if( nodeStack.size() <= 0 ) {
               std::ostringstream oss;
@@ -226,7 +227,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
                   << startLineNo << ":" << startCharNo;
               throw TokenizerException(oss.str(), startLineNo, startCharNo);
             }
-            nodeStack.pop();
+            nodeStack.pop_back();
           }
         }
         // Clear buffer
@@ -273,7 +274,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
     node = new Node();
     node->type = Node::TypeOutput;
     node->data = new std::string(buffer);
-    nodeStack.top()->children.push_back(node);
+    nodeStack.back()->children.push_back(node);
     buffer.clear();
   }
 }

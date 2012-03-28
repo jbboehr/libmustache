@@ -77,7 +77,7 @@ void Renderer::render()
 void Renderer::_renderNode(Node * node)
 {
   // Check stack size?
-  if( _stack->size <= 0 ) {
+  if( _stack->size() <= 0 ) {
     throw Exception("Whoops, empty data");
   } else if( !(node->type & Node::TypeHasNoString) && node->data == NULL ) {
     throw Exception("Whoops, empty tag");
@@ -238,7 +238,7 @@ Data * Renderer::_lookup(Node * node)
   Data::Map::iterator d_it;
   register int i;
   Data ** _stackPos = _stack->end();
-  for( i = 0; i < _stack->size; i++, _stackPos-- ) {
+  for( i = 0; i < _stack->size(); i++, _stackPos-- ) {
     if( (*_stackPos)->type == Data::TypeMap ) {
       d_it = (*_stackPos)->data.find(*initial);
       if( d_it != (*_stackPos)->data.end() ) {

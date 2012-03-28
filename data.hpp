@@ -91,16 +91,22 @@ class Data {
 class DataStack {
   public:
     //! The maximum size of the stack
-    static const int MAXSIZE = 100;
+#ifdef LIBMUSTACHE_DATA_STACK_MAXSIZE
+    static const int MAXSIZE = LIBMUSTACHE_DATA_STACK_MAXSIZE;
+#else
+    static const int MAXSIZE = 32;
+#endif
     
-    //! Constructor
-    DataStack() : size(0) {};
-    
+  private:
     //! The current size
-    int size;
+    int _size;
     
     //! The data
-    Data * stack[DataStack::MAXSIZE];
+    Data * _stack[DataStack::MAXSIZE];
+    
+  public:
+    //! Constructor
+    DataStack() : _size(0) {};
     
     //! Add an element onto the top of the stack
     void push_back(Data * data);
@@ -110,6 +116,9 @@ class DataStack {
     
     //! Get the top of the stack
     Data * back();
+    
+    //! Get the size of the stack
+    int size() { return _size; };
     
     //! Gets a pointer to the beginning of the stack
     Data ** begin();

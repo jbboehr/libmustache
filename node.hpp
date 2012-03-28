@@ -20,7 +20,6 @@ class Node {
   public:
     typedef std::auto_ptr<Node> Ptr;
     typedef std::vector<Node *> Children;
-    typedef std::stack<Node *> Stack;
     typedef std::map<std::string,std::string> RawPartials;
     typedef std::map<std::string,Node> Partials;
     typedef std::pair<std::string,Node> PartialPair;
@@ -105,6 +104,49 @@ class Node {
     void setData(const std::string& data);
 };
 
+/*! \class NodeStack
+    \brief Node stack.
+
+    This class is used to implement stack lookups in the tokenizer.
+*/
+class NodeStack {
+  public:
+    //! The maximum size of the stack
+#ifdef LIBMUSTACHE_NODE_STACK_MAXSIZE
+    static const int MAXSIZE = LIBMUSTACHE_NODE_STACK_MAXSIZE;
+#else
+    static const int MAXSIZE = 32;
+#endif
+    
+  private:
+    //! The current size
+    int _size;
+    
+    //! The data
+    Node * _stack[NodeStack::MAXSIZE];
+    
+  public:
+    //! Constructor
+    NodeStack() : _size(0) {};
+    
+    //! Add an element onto the top of the stack
+    void push_back(Node * data);
+    
+    //! Pop an element off the top of the stack
+    void pop_back();
+    
+    //! Get the top of the stack
+    Node * back();
+    
+    //! Get the size of the stack
+    int size() { return _size; };
+    
+    //! Gets a pointer to the beginning of the stack
+    Node ** begin();
+    
+    //! Gets a pointer to the end of the stack
+    Node ** end();
+};
 
 } // namespace Mustache
 

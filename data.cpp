@@ -86,40 +86,41 @@ int Data::isEmpty()
 }
 
 
+
 void DataStack::push_back(Data * data)
 {
-  if( this->size < 0 || this->size >= DataStack::MAXSIZE ) {
+  if( _size < 0 || _size >= DataStack::MAXSIZE ) {
     throw Exception("Reached max stack size");
   }
-  this->stack[this->size] = data;
-  this->size++;
+  _stack[_size] = data;
+  _size++;
 }
 
 void DataStack::pop_back()
 {
-  if( this->size > 0 ) {
-    this->size--;
-    this->stack[this->size] = NULL;
+  if( _size > 0 ) {
+    _size--;
+    _stack[_size] = NULL;
   }
 }
 
 Data * DataStack::back()
 {
-  if( this->size <= 0 ) {
+  if( _size <= 0 ) {
     throw Exception("Reached bottom of stack");
   } else {
-    return this->stack[this->size - 1];
+    return _stack[_size - 1];
   }
 }
 
 Data ** DataStack::begin()
 {
-  return stack;
+  return _stack;
 }
 
 Data ** DataStack::end()
 {
-  return (stack + size - 1);
+  return (_stack + _size - 1);
 }
 
 

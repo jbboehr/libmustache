@@ -1,6 +1,7 @@
 
 #include "node.hpp"
 
+#include "exception.hpp"
 #include "utils.hpp"
 
 namespace mustache {
@@ -41,6 +42,44 @@ void Node::setData(const std::string& data)
       explode(".", *(this->data), dataParts);
     }
   }
+}
+
+
+
+void NodeStack::push_back(Node * node)
+{
+  if( _size < 0 || _size >= NodeStack::MAXSIZE ) {
+    throw Exception("Reached max stack size");
+  }
+  _stack[_size] = node;
+  _size++;
+}
+
+void NodeStack::pop_back()
+{
+  if( _size > 0 ) {
+    _size--;
+    _stack[_size] = NULL;
+  }
+}
+
+Node * NodeStack::back()
+{
+  if( _size <= 0 ) {
+    throw Exception("Reached bottom of stack");
+  } else {
+    return _stack[_size - 1];
+  }
+}
+
+Node ** NodeStack::begin()
+{
+  return _stack;
+}
+
+Node ** NodeStack::end()
+{
+  return (_stack + _size - 1);
 }
 
 
