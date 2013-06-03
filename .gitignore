@@ -30,7 +30,9 @@ stamp-h1
 
 # specific
 doc/html
+nbproject
 src/mustache_config.h
+test/spec/test_spec
 
 # distros
 *.tar.gz
