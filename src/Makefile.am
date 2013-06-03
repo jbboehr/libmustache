@@ -1,7 +1,17 @@
 
 # EXTRA_DIST = mustache.def
 
-include_HEADERS = mustache.hpp mustache_config.h
+# include_HEADERS = mustache.hpp mustache_config.h
+mustacheincludedir = $(includedir)/mustache
+mustacheinclude_HEADERS = \
+	mustache_config.h \
+	data.hpp \
+	exception.hpp \
+	mustache.hpp \
+	node.hpp \
+	renderer.hpp \
+	tokenizer.hpp \
+	utils.hpp
 
 lib_LTLIBRARIES = libmustache.la
 libmustache_la_SOURCES = \
