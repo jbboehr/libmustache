@@ -7,6 +7,15 @@ AM_INIT_AUTOMAKE([1.10 foreign])
 AC_CONFIG_SRCDIR([src/mustache.cpp])
 AC_CONFIG_HEADERS([config.h])
 
+# gcov
+AC_ARG_ENABLE([gcov],
+    AS_HELP_STRING([--enable-gcov], [Enable gcov]))
+
+AS_IF([test "x$enable_gcov" = "xyes"], [
+  LDFLAGS="$LDFLAGS -lgcov"
+  CPPFLAGS="$CPPFLAGS -fprofile-arcs -ftest-coverage"
+])
+
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_LIBTOOL
@@ -15,6 +24,9 @@ AC_LANG(C++)
 
 # Checks for libraries.
 AC_CHECK_LIB(yaml, yaml_get_version_string)
+AS_IF([test "x$enable_gcov" = "xyes"], [
+  AC_CHECK_LIB(gcov, main)
+])
 
 # Checks for header files.
 AC_CHECK_HEADERS(cstdlib)

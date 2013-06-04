@@ -27,6 +27,9 @@ stamp-h1
 *.pyc
 *.pc
 *.exe
+*.gcov
+*.gcda
+*.gcno
 
 # specific
 doc/html

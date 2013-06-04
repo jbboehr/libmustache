@@ -11,3 +11,5 @@ export AM_CFLAGS = -Wall -Wextra -Wdeclaration-after-statement
 endif
 
 test: all check
+
+coverage: test
