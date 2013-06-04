@@ -7,6 +7,8 @@ AM_INIT_AUTOMAKE([1.10 foreign])
 AC_CONFIG_SRCDIR([src/mustache.cpp])
 AC_CONFIG_HEADERS([config.h])
 
+AC_SUBST([VERSION_INT], [1])
+
 # gcov
 AC_ARG_ENABLE([gcov],
     AS_HELP_STRING([--enable-gcov], [Enable gcov]))

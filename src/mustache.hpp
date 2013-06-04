@@ -14,17 +14,14 @@
 #include "tokenizer.hpp"
 #include "utils.hpp"
 
-#define LIBMUSTACHE_VERSION 0.2.0
-#define LIBMUSTACHE_VERSION_INT 200
+#include "mustache_config.h"
 
 
-extern "C" int mustache_version();
+extern "C" const char * mustache_version();
+extern "C" int mustache_version_int();
 
 
 namespace mustache {
-
-
-const int version = LIBMUSTACHE_VERSION_INT;
 
 
 /*! \class Mustache

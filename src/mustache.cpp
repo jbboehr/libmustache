@@ -2,7 +2,11 @@
 #include "mustache.hpp"
 
 
-int mustache_version() {
+const char * mustache_version() {
+  return LIBMUSTACHE_VERSION;
+}
+
+int mustache_version_int() {
   return LIBMUSTACHE_VERSION_INT;
 }
 
