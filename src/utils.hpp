@@ -14,6 +14,19 @@ const std::string whiteSpaces(" \f\n\r\t\v");
 //! Special HTML character list
 const std::string specialChars("&\"'<>");
 
+//! String whitespace from a string
+/*!
+  /param str The string to strip
+  /param trimChars The charaters to strip
+*/
+void stripWhitespace(std::string& str, const std::string& chars = whiteSpaces);
+
+//! Trim trailing zeros from a decimal-like string
+/*!
+  /param str The string to trim
+*/
+void trimDecimal(std::string& str);
+
 //! Trim a string (right)
 /*!
   http://stackoverflow.com/a/479091

@@ -5,6 +5,29 @@ namespace mustache {
 
 
 
+void stripWhitespace(std::string& str, const std::string& chars)
+{
+  std::string tmp;
+  std::string::iterator it = str.begin();
+  char * chr;
+  for( ; it != str.end() ; it++ ) {
+    std::size_t found = chars.find(*it);
+    if( found == std::string::npos ) {
+      tmp += *it;
+    }
+  }
+  str.swap(tmp);
+}
+
+void trimDecimal(std::string& str) {
+  if( str.length() < 20 ) {
+    std::string::size_type found = str.find_first_not_of("0123456789.");
+    if( found == std::string::npos ) {
+      trimRight(str, "0");
+    }
+  }
+}
+
 void trimRight(std::string& str, const std::string& trimChars)
 {
   std::string::size_type pos = str.find_last_not_of(trimChars);

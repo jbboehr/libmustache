@@ -192,12 +192,38 @@ void mustache_spec_parse_data(yaml_document_t * document, yaml_node_t * node, mu
     }
   } else if( node->type == YAML_SCALAR_NODE ) {
     char * keyValue = reinterpret_cast<char *>(node->data.scalar.value);
-    data->init(mustache::Data::TypeString, node->data.scalar.length);
-    data->val->assign(keyValue);
+    if( strcmp(keyValue, "0") == 0 ||
+        strcmp(keyValue, "false") == 0 ) {
+      data->init(mustache::Data::TypeString, 0);
+    } else {
+      data->init(mustache::Data::TypeString, node->data.scalar.length);
+      data->val->assign(keyValue);
+      mustache::trimDecimal(*(data->val));
+    }
   }
 }
 
 void mustache_spec_parse_partials(yaml_document_t * document, yaml_node_t * node, mustache::Node::Partials * partials)
 {
-  // @todo
+  if( node->type != YAML_MAPPING_NODE ) {
+    return;
+  }
+  
+  mustache::Mustache mustache;
+  std::string ckey;
+  yaml_node_pair_t * pair;
+
+  for( pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; pair++ ) {
+    yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
+    yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
+    char * keyValue = reinterpret_cast<char *>(keyNode->data.scalar.value);
+    char * valueValue = reinterpret_cast<char *>(valueNode->data.scalar.value);
+    
+    std::string ckey(keyValue);
+    std::string tmpl(valueValue);
+    mustache::Node node;
+
+    partials->insert(std::make_pair(ckey, node));
+    mustache.tokenize(&tmpl, &(*partials)[ckey]);
+  }
 }

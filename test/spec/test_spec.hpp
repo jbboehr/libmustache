@@ -30,15 +30,31 @@ class MustacheSpecTest {
     mustache::Node::Partials partials;
     std::string expected;
     std::string output;
+    int _passed;
+    MustacheSpecTest() : _passed(-1) {};
     bool passed() {
-      return (expected == output);
+      if( -1 == _passed ) {
+        std::string strippedExpected = expected;
+        std::string strippedOutput = output;
+        mustache::stripWhitespace(strippedExpected);
+        mustache::stripWhitespace(strippedOutput);
+        if( strippedOutput == strippedExpected ) {
+          _passed = 1;
+        } else {
+          _passed = 0;
+        }
+      }
+      return (_passed == 1);
     };
     void print() {
-      
+      bool _passed = passed();
       std::cout << name << " ... " 
-                << (passed() ? "PASSED" : "FAILED")
+                << (_passed ? "PASSED" : "FAILED")
                 << "\n";
-              
+      if( !_passed ) {
+        std::cout << "Expected: " << expected << "\n";
+        std::cout << "Output: " << output << "\n";
+      }
     }
     std::string toString() {
       std::string ret;
