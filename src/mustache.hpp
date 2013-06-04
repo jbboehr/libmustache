@@ -14,8 +14,9 @@
 #include "tokenizer.hpp"
 #include "utils.hpp"
 
-#include "mustache_config.h"
 
+#define LIBMUSTACHE_VERSION "0.0.1-dev"
+#define LIBMUSTACHE_VERSION_INT 1
 
 extern "C" const char * mustache_version();
 extern "C" int mustache_version_int();
