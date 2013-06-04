@@ -5,6 +5,7 @@ includedir=${prefix}/include
 
 Name: Mustache
 Description: Library for mustache
+URL: https://github.com/jbboehr/libmustache
 Version: @VERSION@
 Libs: -L${libdir} -lmustache
 Cflags: -I${includedir}

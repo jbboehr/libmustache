@@ -5,17 +5,14 @@
 
 #define MAX_TEST_FILES 50
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <dirent.h>
 #include <yaml.h>
-#include <sys/stat.h>
 
+#include <cstdlib>
+#include <list>
 #include <string>
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <exception>
 
 #include "mustache.hpp";

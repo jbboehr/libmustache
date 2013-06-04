@@ -6,7 +6,7 @@ std::list<MustacheSpecTest *> tests;
 int main( int argc, char * argv[] )
 {
   if( argc < 2 ) {
-    fprintf(stderr, "Requires at least one argument\n");
+    std::cerr << "Requires at least one argument\n";
     return 1;
   }
   
@@ -14,7 +14,7 @@ int main( int argc, char * argv[] )
   struct dirent * ent;
   char * directory = argv[1];
   if( (dir = opendir(directory)) == NULL ) {
-    fprintf(stderr, "Unable to open directory\n");
+    std::cerr << "Unable to open directory\n";
     return 1;
   }
   
@@ -35,6 +35,7 @@ int main( int argc, char * argv[] )
     
     std::ifstream pFile(fileName.c_str());
     if( !pFile.is_open() ) {
+      std::cerr << "Unable to open file: " << fileName;
       continue;
     }
     
@@ -67,7 +68,9 @@ int main( int argc, char * argv[] )
     }
   }
   int total = nPassed + nFailed;
-  printf("%d passed, %d failed of %d tests\n", nPassed, nFailed, total);
+  std::cout << nPassed << " passed, "
+            << nFailed << " failed of "
+            << total << " tests\n";
   return (nFailed > 0 ? 1 : 0);
 }
 
@@ -76,15 +79,17 @@ void parse_file(char * fileData, int length)
   // start yaml parser
   yaml_parser_t parser;
   yaml_document_t document;
-  yaml_event_t event;
   yaml_parser_initialize(&parser);
 
   const unsigned char * input = reinterpret_cast<const unsigned char *>(fileData);
 
   yaml_parser_set_input_string(&parser, input, length);
   yaml_parser_load(&parser, &document);
+  
   mustache_spec_parse_document(&document);
+  
   yaml_document_delete(&document);
+  yaml_parser_delete(&parser);
 }
 
 
