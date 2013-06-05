@@ -235,7 +235,6 @@ AC_CONFIG_FILES([
         Makefile
         doc/Makefile
         src/Makefile
-        src/mustache_config.h
         test/Makefile
         test/spec/Makefile
 ])

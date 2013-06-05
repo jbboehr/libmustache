@@ -4,7 +4,6 @@
 # include_HEADERS = mustache.hpp mustache_config.h
 mustacheincludedir = $(includedir)/mustache
 mustacheinclude_HEADERS = \
-	mustache_config.h \
 	data.hpp \
 	exception.hpp \
 	mustache.hpp \
