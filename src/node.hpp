@@ -7,6 +7,7 @@
 #include <stack>
 #include <string>
 #include <vector>
+#include <stdint.h>
 
 namespace mustache {
 
@@ -102,6 +103,12 @@ class Node {
     
     //! Set data
     void setData(const std::string& data);
+    
+    //! Serialize
+    std::vector<uint8_t> * serialize();
+    
+    //! Unserialize
+    static Node * unserialize(std::vector<uint8_t> & serial, size_t offset, size_t * vpos);
 };
 
 /*! \class NodeStack
