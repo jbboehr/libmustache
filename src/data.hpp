@@ -68,8 +68,10 @@ class Data {
     Data::Array array;
     
     //! Constructor
-    Data() {};
-    Data(Data::Type type, int size) {
+    Data() : 
+        type(Data::TypeNone),
+        val(NULL) {};
+    Data(Data::Type type, int size) : val(NULL) {
       init(type, size);
     };
     
