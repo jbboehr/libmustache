@@ -1,13 +1,20 @@
 
 #include "test_spec.hpp"
 
-std::list<MustacheSpecTest *> tests; 
+std::list<MustacheSpecTest *> tests;
+int execNum = 1;
 
 int main( int argc, char * argv[] )
 {
   if( argc < 2 ) {
     std::cerr << "Requires at least one argument\n";
     return 1;
+  }
+  
+  char * numStr = getenv("EXEC_NUM");
+  if( numStr != NULL ) {
+    printf("%s\n", numStr);
+    execNum = atoi(numStr);
   }
   
   DIR * dir;
@@ -162,10 +169,13 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
   }
   
   // Execute the test
-  mustache::Mustache mustache;
-  mustache::Node root;
-  mustache.tokenize(&test->tmpl, &root);
-  mustache.render(&root, &test->data, &test->partials, &test->output);
+  for( int i = 0; i < execNum; i++ ) {
+    test->output.clear();
+    mustache::Mustache mustache;
+    mustache::Node root;
+    mustache.tokenize(&test->tmpl, &root);
+    mustache.render(&root, &test->data, &test->partials, &test->output);
+  }
   
   // Output result
   test->print();

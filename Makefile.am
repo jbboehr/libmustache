@@ -14,4 +14,39 @@ endif
 
 test: all check
 
-coverage: test
+# Coverage
+if GCOV
+clean-local:: gcov-clean lcov-clean
+
+coverage-init: 
+	lcov --directory . --zerocounters -q
+
+coverage-main:
+	lcov --capture --compat-libtool --directory . --output-file libmustache_test.info
+	lcov --remove libmustache_test.info "/usr*" --compat-libtool --output-file libmustache_test.info
+	genhtml -o test_coverage -t "libmustache test coverage" --num-spaces 4 libmustache_test.info
+
+coverage: all coverage-init test coverage-main
+
+gcov-clean:
+	find . -name '*.gcda' -delete
+	find . -name '*.gcno' -delete
+
+lcov-clean:
+	rm -rf test_coverage
+	rm -f libmustache_test.info
+endif
+
+# profile
+if GPROF
+clean-local:: profile-clean
+	
+profile: test
+	rm test/gmon.out
+	EXEC_NUM=10000 test/spec/test_spec spec/specs
+	gprof test/spec/test_spec gmon.out > gprof.out
+
+profile-clean:
+	find . -name 'gmon.out' -delete
+	find . -name 'gprof.out' -delete
+endif

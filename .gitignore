@@ -18,6 +18,8 @@ config.status
 config.sub
 configure
 depcomp
+gmon.out
+gprof.out
 install-sh
 libtool
 ltmain.sh
@@ -34,9 +36,11 @@ stamp-h1
 
 # specific
 doc/html
+libmustache_test.info
 nbproject
 src/mustache_config.h
 test/spec/test_spec
+test_coverage
 
 # distros
 *.tar.gz
