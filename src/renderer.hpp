@@ -41,9 +41,11 @@ class Renderer {
     
     Data * _lookup(Node * node);
     
+    bool _strictPaths;
+    
   public:
     //! The default output buffer length
-    static const int outputBufferLength = 100000;
+    static const int outputBufferLength = 1000;
     
     //! Constructor
     Renderer() : 
@@ -51,7 +53,8 @@ class Renderer {
         _data(NULL), 
         _stack(NULL), 
         _partials(NULL), 
-        _output(NULL) {};
+        _output(NULL), 
+        _strictPaths(false) {};
     
     //! Destructor
     ~Renderer();

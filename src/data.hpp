@@ -2,16 +2,18 @@
 #ifndef MUSTACHE_DATA_HPP
 #define MUSTACHE_DATA_HPP
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <list>
 #include <memory>
 #include <map>
 #include <string>
 #include <vector>
 
-#ifdef HAVE_TR1
-#include <tr1/unordered_map>
-#elif HAVE_LIBBOOST
-#include <boost/unordered_map.hpp>
+#ifdef HAVE_CXX11
+#include <unordered_map>
 #else
 #include <map>
 #endif
@@ -30,10 +32,8 @@ class Data {
   public:
     typedef std::auto_ptr<Data> Ptr;
     typedef std::string String;
-#ifdef HAVE_TR1
-    typedef std::tr1::unordered_map<std::string,Data *> Map;
-#elif HAVE_LIBBOOST
-    typedef boost::unordered_map<std::string,Data *> Map;
+#ifdef HAVE_CXX11
+    typedef std::unordered_map<std::string,Data *> Map;
 #else
     typedef std::map<std::string,Data *> Map;
 #endif

@@ -2,10 +2,14 @@
 AC_PREREQ([2.60])
 AC_INIT([mustache], [0.0.1-dev], [jbboehr@gmail.com])
 
+AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_SRCDIR([src/mustache.cpp])
+AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_AUX_DIR([build])
+
 AM_INIT_AUTOMAKE([1.10 foreign])
 
-AC_CONFIG_SRCDIR([src/mustache.cpp])
-AC_CONFIG_HEADERS([config.h])
+m4_include(m4/ax_cxx_compile_stdcxx_11.m4)
 
 AC_SUBST([VERSION_INT], [1])
 
@@ -23,6 +27,7 @@ AC_PROG_CXX
 AC_PROG_LIBTOOL
 AM_CONDITIONAL([GCC], [test x$GCC = xyes])
 AC_LANG(C++)
+AX_CXX_COMPILE_STDCXX_11
 
 # Checks for libraries.
 AC_CHECK_LIB(yaml, yaml_get_version_string)

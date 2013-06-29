@@ -57,8 +57,10 @@ void Renderer::render()
     throw Exception("Empty data");
   }
   
-  // Reserver minimum length
-  _output->reserve(Renderer::outputBufferLength);
+  // Reserver minimum length (if not already set)
+  if( _output->capacity() <= 0 ) {
+    _output->reserve(Renderer::outputBufferLength);
+  }
   
   // Initialize stack
   if( _stack != NULL ) {
@@ -223,6 +225,11 @@ Data * Renderer::_lookup(Node * node)
     if( it != data->data.end() ) {
       return it->second;
     }
+  } 
+  
+  // Stop here for strict paths
+  if( this->_strictPaths ) {
+    return NULL;
   }
   
   // Get initial segment for dot notation
