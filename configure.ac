@@ -38,6 +38,8 @@ AC_LANG(C++)
 AX_CXX_COMPILE_STDCXX_11
 
 # Checks for libraries.
+AC_CHECK_LIB(jansson, json_equal)
+AC_CHECK_LIB(json, json_tokener_new)
 AC_CHECK_LIB(yaml, yaml_get_version_string)
 AS_IF([test "x$enable_gcov" = "xyes"], [
   AC_CHECK_LIB(gcov, main)
@@ -76,6 +78,7 @@ AC_CONFIG_FILES([
         Makefile
         doc/Makefile
         src/Makefile
+        bin/Makefile
         test/Makefile
         test/spec/Makefile
 ])

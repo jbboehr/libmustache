@@ -1,6 +1,6 @@
 
 EXTRA_DIST = Readme.md
-SUBDIRS = doc src test
+SUBDIRS = doc src bin test
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = mustache.pc

@@ -35,6 +35,7 @@ stamp-h1
 *.gcno
 
 # specific
+bin/mustache
 doc/html
 libmustache_test.info
 nbproject
