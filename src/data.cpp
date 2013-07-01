@@ -1,6 +1,16 @@
 
 #include "data.hpp"
 
+#ifdef HAVE_LIBYAML
+#include "yaml.h"
+#endif
+
+#if defined(HAVE_LIBJSON)
+#include "json.h"
+#elif defined(HAVE_LIBJANSSON)
+#include "jansson.h"
+#endif
+
 namespace mustache {
 
 
@@ -121,6 +131,29 @@ Data ** DataStack::begin()
 Data ** DataStack::end()
 {
   return (_stack + _size - 1);
+}
+
+
+
+// Data integrations
+Data & Data::createFromJSON(const char * string)
+{
+#if defined(HAVE_LIBJSON)
+  throw Exception("JSON support using libjson not implemented");
+#elif defined(HAVE_LIBJANNSON)
+  throw Exception("JSON support using libjannson not implemented");
+#else
+  throw Exception("JSON support not enabled");
+#endif
+}
+
+Data & Data::createFromYAML(const char * string)
+{
+#if defined(HAVE_LIBYAML)
+  throw Exception("YAML support using libyaml not implemented");
+#else
+  throw Exception("YAML support not enabled");
+#endif
 }
 
 

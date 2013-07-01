@@ -6,21 +6,47 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
+#include <cerrno>
+#include <iostream>
+#include <fstream>
+
 #include "mustache.hpp"
+#include "exception.hpp"
 
 #define MUSTACHE_BIN_MODE_COMPILE 1
 #define MUSTACHE_BIN_MODE_EXECUTE 2
+
+#define MUSTACHE_BIN_INPUT_UNKNOWN 0
+#define MUSTACHE_BIN_INPUT_JSON 1
+#define MUSTACHE_BIN_INPUT_YAML 2
+#define MUSTACHE_BIN_INPUT_MUSTACHE 3
+#define MUSTACHE_BIN_INPUT_NONE 99
 
 static int error = 0;
 static int mode = 0;
 static int number = 1;
 
 static char * inputDataFileName = NULL;
-static char * inputTemplateFileName = NULL;
-static char * outputFileName = NULL;
+static int inputDataFileType = 0;
+static std::string inputData;
 
+static char * inputTemplateFileName = NULL;
+static int inputTemplateFileType = 0;
+static std::string inputTemplate;
+
+static char * outputFileName = NULL;
+static std::ofstream outputFileStream;
+static std::ostream * outputStream = NULL;
+
+static mustache::Mustache must;
+static mustache::Node node;
+static mustache::Data data;
+
+static int detectFileType(char * filename);
+static std::string getFileContents(const char *filename);
 static void showUsage();
 
 int main( int argc, char * argv[] )
@@ -81,13 +107,110 @@ int main( int argc, char * argv[] )
   // Must have input file
   if( inputTemplateFileName == NULL ) {
     error = 1;
-    fprintf(stderr, "Must specify an input file with option -t\n");
+    fprintf(stderr, "Must specify an input template file with option -t\n");
     showUsage();
     goto error;
   }
   
+  // Detect input types
+  inputTemplateFileType = detectFileType(inputTemplateFileName);
+  inputDataFileType = detectFileType(inputDataFileName);
+  
+  // Read input file
+  inputTemplate = getFileContents(inputTemplateFileName);
+  
+  // Check output file
+  if( outputFileName == NULL ) {
+    outputStream = &std::cout;
+  } else {
+    outputFileStream.open(outputFileName, std::ofstream::out/* | std::ofstream::app*/);
+    outputStream = &outputFileStream;
+  }
+  
+  // Execute mode
+  if( mode == MUSTACHE_BIN_MODE_EXECUTE ) {
+    // Tokenize
+    must.tokenize(&inputTemplate, &node);
+    
+    // Get input data
+    if( inputDataFileName != NULL ) {
+      inputData = getFileContents(inputDataFileName);
+    }
+    
+    // Process data
+    try {
+      if( inputData.length() ) {
+        if( inputDataFileType == MUSTACHE_BIN_INPUT_JSON ) {
+          data = mustache::Data::createFromJSON(inputData.c_str());
+        } else if( inputDataFileType == MUSTACHE_BIN_INPUT_YAML ) {
+          data = mustache::Data::createFromYAML(inputData.c_str());
+        }
+      }
+    } catch( mustache::Exception& e ) {
+      error = 1;
+      fprintf(stderr, "%s\n", e.what());
+      goto error;
+    }
+    
+    // Render
+    std::string output;
+    must.render(&node, &data, NULL, &output);
+    
+    // Output
+    *outputStream << output;
+    
+  } else if( mode == MUSTACHE_BIN_MODE_COMPILE ) {
+    error = 1;
+    fprintf(stderr, "Compile mode not yet implemented\n");
+    goto error;
+  } else {
+    error = 1;
+    fprintf(stderr, "Invalid mode\n");
+    goto error;
+  }
+  
 error:
+  if( outputFileStream.is_open() ) {
+    outputFileStream.close();
+  }
   return error;
+}
+
+static int detectFileType(char * filename)
+{
+  if( filename == NULL ) {
+    return MUSTACHE_BIN_INPUT_NONE;
+  }
+  
+  char * ext = strrchr(filename, '.');
+  if( ext == NULL ) {
+    return MUSTACHE_BIN_INPUT_UNKNOWN;
+  }
+  
+  if( strcmp(ext, ".json") == 0 ) {
+    return MUSTACHE_BIN_INPUT_JSON;
+  } else if( strcmp(ext, ".yaml") == 0 ) {
+    return MUSTACHE_BIN_INPUT_YAML;
+  } else if( strcmp(ext, ".mustache") == 0 ) {
+    return MUSTACHE_BIN_INPUT_MUSTACHE;
+  } else {
+    return MUSTACHE_BIN_INPUT_UNKNOWN;
+  }
+}
+
+static std::string getFileContents(const char *filename)
+{
+  std::ifstream in(filename, std::ios::in | std::ios::binary);
+  if( in ) {
+    std::string contents;
+    in.seekg(0, std::ios::end);
+    contents.resize(in.tellg());
+    in.seekg(0, std::ios::beg);
+    in.read(&contents[0], contents.size());
+    in.close();
+    return(contents);
+  }
+  throw(errno);
 }
 
 static void showUsage()
