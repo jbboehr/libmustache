@@ -85,10 +85,10 @@ class Data {
     void init(Data::Type type, int size);
     
     //! Create from json
-    static Data & createFromJSON(const char * string);
+    static Data * createFromJSON(const char * string);
     
     //! Create from yaml
-    static Data & createFromYAML(const char * string);
+    static Data * createFromYAML(const char * string);
 };
 
 /*! \class DataStack

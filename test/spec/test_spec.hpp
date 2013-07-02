@@ -15,7 +15,7 @@
 #include <fstream>
 #include <exception>
 
-#include "mustache.hpp";
+#include "mustache.hpp"
 
 class MustacheSpecTest {
   private:

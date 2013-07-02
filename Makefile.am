@@ -7,6 +7,9 @@ pkgconfig_DATA = mustache.pc
 
 ACLOCAL_AMFLAGS = -I m4
 
+standard: all
+	./bin/mustache -t test/fixtures/standard.mustache -d test/fixtures/standard.yml -e
+
 if GCC
 # These flags are gcc specific
 export AM_CFLAGS = -Wall -Wextra -Wdeclaration-after-statement

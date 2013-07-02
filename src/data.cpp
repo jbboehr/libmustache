@@ -6,10 +6,15 @@
 #endif
 
 #if defined(HAVE_LIBJSON)
-#include "json.h"
+#include "json/json.h"
+//#include "json/json_inttypes.h"
+#include "json/json_object.h"
+#include "json/json_tokener.h"
 #elif defined(HAVE_LIBJANSSON)
 #include "jansson.h"
 #endif
+
+#include "stdio.h"
 
 namespace mustache {
 
@@ -136,25 +141,157 @@ Data ** DataStack::end()
 
 
 // Data integrations
-Data & Data::createFromJSON(const char * string)
-{
+
 #if defined(HAVE_LIBJSON)
-  throw Exception("JSON support using libjson not implemented");
-#elif defined(HAVE_LIBJANNSON)
-  throw Exception("JSON support using libjannson not implemented");
-#else
-  throw Exception("JSON support not enabled");
-#endif
+static void _createFromJSON(Data * data, struct json_object * object)
+{
+  Data * child = NULL;
+  
+  switch( json_object_get_type(object) ) {
+    case json_type_null:
+      data->type = Data::TypeString;
+      data->val = new std::string("");
+      break;
+    case json_type_boolean:
+      data->type = Data::TypeString;
+      if( 0 == (int) json_object_get_boolean(object) ) {
+        data->val = new std::string("");
+      } else {
+        data->val = new std::string("true");
+      }
+      break;
+    case json_type_double:
+    case json_type_int:
+    case json_type_string:
+      data->type = Data::TypeString;
+      data->val = new std::string(json_object_get_string(object));
+      break;
+    case json_type_object: {
+      data->type = Data::TypeMap;
+      std::string ckey;
+      json_object_object_foreach(object, key, value)
+      {
+        ckey.assign(key);
+        child = new Data();
+        _createFromJSON(child, value);
+        data->data.insert(std::pair<std::string,Data *>(ckey,child));
+      }
+      break;
+    }
+    case json_type_array: {
+      int len = json_object_array_length(object);
+      data->init(Data::TypeArray, len);
+      child = data->array;
+      
+      struct json_object * array_item;
+      for( int i = 0; i < len; i++, child++ ) {
+        array_item = json_object_array_get_idx(object, i);
+        _createFromJSON(child, array_item);
+      }
+      break;
+    }
+    default: {
+      throw new Exception("Unknown json type");
+    }
+  }
 }
 
-Data & Data::createFromYAML(const char * string)
+Data * Data::createFromJSON(const char * string)
 {
-#if defined(HAVE_LIBYAML)
-  throw Exception("YAML support using libyaml not implemented");
-#else
-  throw Exception("YAML support not enabled");
-#endif
+  struct json_object * result = json_tokener_parse((char *) string);
+  if( result == NULL ) {
+    throw Exception("Invalid JSON data");
+  }
+  Data * data = new Data();
+  data->type = Data::TypeNone;
+  _createFromJSON(data, result);
+  json_object_put(result);
+  return data;
 }
+#elif defined(HAVE_LIBJANNSON)
+Data * Data::createFromJSON(const char * string)
+{
+  throw Exception("JSON support using libjannson not implemented");
+}
+#else
+Data * Data::createFromJSON(const char * string)
+{
+  throw Exception("JSON support not enabled");
+}
+#endif
+
+#if defined(HAVE_LIBYAML)
+static void _createFromYAML(Data * data, yaml_document_t * document, yaml_node_t * node)
+{
+  Data * child = NULL;
+  
+  switch( node->type ) {
+    case YAML_SCALAR_NODE: {
+      char * value = reinterpret_cast<char *>(node->data.scalar.value);
+      data->type = Data::TypeString;
+      data->val = new std::string(value);
+      break;
+    }
+    case YAML_MAPPING_NODE: {
+      data->type = Data::TypeMap;
+      std::string ckey;
+      yaml_node_pair_t * pair;
+      for( pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; pair++ ) {
+        yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
+        yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
+        char * keyValue = reinterpret_cast<char *>(keyNode->data.scalar.value);
+        
+        ckey.assign(keyValue);
+        child = new Data();
+        _createFromYAML(child, document, valueNode);
+        data->data.insert(std::pair<std::string,Data *>(ckey,child));
+      }
+      break;
+    }
+    case YAML_SEQUENCE_NODE: {
+      int len = (node->data.sequence.items.top - node->data.sequence.items.start);
+      data->init(Data::TypeArray, len);
+      child = data->array;
+      
+      yaml_node_item_t * item;
+      for( item = node->data.sequence.items.start; item < node->data.sequence.items.top; item++, child++) {
+        yaml_node_t * valueNode = yaml_document_get_node(document, *item);
+        _createFromYAML(child, document, valueNode);
+      }
+      break;
+    }
+    default: {
+      throw new Exception("Unknown yaml type");
+    }
+  }
+}
+
+Data * Data::createFromYAML(const char * string)
+{
+  yaml_parser_t parser;
+  yaml_document_t document;
+  yaml_parser_initialize(&parser);
+  
+  const unsigned char * input = reinterpret_cast<const unsigned char *>(string);
+  
+  yaml_parser_set_input_string(&parser, input, strlen(string));
+  yaml_parser_load(&parser, &document);
+  
+  Data * data = new Data();
+  data->type = Data::TypeNone;
+  _createFromYAML(data, &document, yaml_document_get_root_node(&document));
+  
+  yaml_document_delete(&document);
+  yaml_parser_delete(&parser);
+  
+  return data;
+}
+#else
+Data * Data::createFromYAML(const char * string)
+{
+  throw Exception("YAML support not enabled");
+}
+#endif
 
 
 } // namespace Mustache

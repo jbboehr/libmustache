@@ -6,8 +6,16 @@ int execNum = 1;
 
 int main( int argc, char * argv[] )
 {
-  if( argc < 2 ) {
-    std::cerr << "Requires at least one argument\n";
+  char * directory;
+  
+  if( argc >= 2 ) {
+    directory = argv[1];
+  }
+  if( directory == NULL ) {
+    directory = getenv("mustache_spec_dir");
+  }
+  if( directory == NULL ) {
+    std::cerr << "Requires at least one argument or that MUSTACHE_SPEC_DIR be set the the environment\n";
     return 1;
   }
   
@@ -19,7 +27,6 @@ int main( int argc, char * argv[] )
   
   DIR * dir;
   struct dirent * ent;
-  char * directory = argv[1];
   if( (dir = opendir(directory)) == NULL ) {
     std::cerr << "Unable to open directory\n";
     return 1;

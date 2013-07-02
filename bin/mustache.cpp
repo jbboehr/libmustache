@@ -43,7 +43,7 @@ static std::ostream * outputStream = NULL;
 
 static mustache::Mustache must;
 static mustache::Node node;
-static mustache::Data data;
+static mustache::Data * data;
 
 static int detectFileType(char * filename);
 static std::string getFileContents(const char *filename);
@@ -154,7 +154,7 @@ int main( int argc, char * argv[] )
     
     // Render
     std::string output;
-    must.render(&node, &data, NULL, &output);
+    must.render(&node, data, NULL, &output);
     
     // Output
     *outputStream << output;
@@ -173,6 +173,9 @@ error:
   if( outputFileStream.is_open() ) {
     outputFileStream.close();
   }
+  if( data != NULL ) {
+    delete data;
+  }
   return error;
 }
 
@@ -189,7 +192,7 @@ static int detectFileType(char * filename)
   
   if( strcmp(ext, ".json") == 0 ) {
     return MUSTACHE_BIN_INPUT_JSON;
-  } else if( strcmp(ext, ".yaml") == 0 ) {
+  } else if( strcmp(ext, ".yml") == 0 ) {
     return MUSTACHE_BIN_INPUT_YAML;
   } else if( strcmp(ext, ".mustache") == 0 ) {
     return MUSTACHE_BIN_INPUT_MUSTACHE;
