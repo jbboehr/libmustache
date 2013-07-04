@@ -43,7 +43,7 @@ class Node {
       TypeInlinePartial = 1024,
       
       // If the type allows children
-      TypeHasChildren = Node::TypeNegate | Node::TypeSection | Node::TypeInlinePartial,
+      TypeHasChildren = Node::TypeRoot | Node::TypeNegate | Node::TypeSection | Node::TypeInlinePartial,
       
       // If the type pushes data to the stack
       TypeHasData = Node::TypeVariable | Node::TypeNegate | Node::TypeSection | Node::TypePartial,

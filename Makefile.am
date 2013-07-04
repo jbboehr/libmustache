@@ -7,8 +7,22 @@ pkgconfig_DATA = mustache.pc
 
 ACLOCAL_AMFLAGS = -I m4
 
+
 standard: all
-	./bin/mustache -t test/fixtures/standard.mustache -d test/fixtures/standard.yml -e
+	./bin/mustache -e -t test/fixtures/standard.mustache -d test/fixtures/standard.yml
+	
+standardc: all
+	./bin/mustache -c -t test/fixtures/standard.mustache -o test/fixtures/standard.bin
+
+standardr: all
+	./bin/mustache -c -t test/fixtures/standard.mustache -r
+
+standardce: all standardc
+	./bin/mustache -e -t test/fixtures/standard.bin -d test/fixtures/standard.yml
+
+standardcr: all standardc
+	./bin/mustache -p -t test/fixtures/standard.bin -r
+
 
 if GCC
 # These flags are gcc specific

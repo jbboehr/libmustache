@@ -13,6 +13,13 @@ m4_include(m4/ax_cxx_compile_stdcxx_11.m4)
 
 AC_SUBST([VERSION_INT], [1])
 
+# debug
+AC_ARG_ENABLE([debug],
+    AS_HELP_STRING([--enable-debug], [Enable debug mode]))
+if test "x$enable_debug" == "xyes"; then
+    AC_DEFINE([DEBUG], [1], [Defined if debug functions requested])
+fi
+
 # gcov
 AC_ARG_ENABLE([gcov],
     AS_HELP_STRING([--enable-gcov], [Enable gcov]))

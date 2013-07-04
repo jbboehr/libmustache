@@ -10,7 +10,9 @@ mustacheinclude_HEADERS = \
 	node.hpp \
 	renderer.hpp \
 	tokenizer.hpp \
-	utils.hpp
+	utils.hpp \
+	compiler.hpp \
+	vm.hpp
 
 lib_LTLIBRARIES = libmustache.la
 libmustache_la_SOURCES = \
@@ -26,8 +28,11 @@ libmustache_la_SOURCES = \
 	tokenizer.cpp \
 	tokenizer.hpp \
 	utils.cpp \
-	utils.hpp
+	utils.hpp \
+	compiler.cpp \
+	compiler.hpp \
+	vm.cpp \
+	vm.hpp
 libmustache_la_LDFLAGS = \
 	-no-undefined \
-	-export-symbols-regex '^mustache' \
 	-version-info 0:0:0 # https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html

@@ -12,22 +12,28 @@
 #include <cerrno>
 #include <iostream>
 #include <fstream>
+#include <vector>
 
 #include "mustache.hpp"
+#include "compiler.hpp"
 #include "exception.hpp"
+#include "vm.hpp"
 
 #define MUSTACHE_BIN_MODE_COMPILE 1
 #define MUSTACHE_BIN_MODE_EXECUTE 2
+#define MUSTACHE_BIN_MODE_PRINT 3
 
 #define MUSTACHE_BIN_INPUT_UNKNOWN 0
 #define MUSTACHE_BIN_INPUT_JSON 1
 #define MUSTACHE_BIN_INPUT_YAML 2
 #define MUSTACHE_BIN_INPUT_MUSTACHE 3
+#define MUSTACHE_BIN_INPUT_MUSTACHE_BIN 4
 #define MUSTACHE_BIN_INPUT_NONE 99
 
 static int error = 0;
 static int mode = 0;
 static int number = 1;
+static int printReadable = 0;
 
 static char * inputDataFileName = NULL;
 static int inputDataFileType = 0;
@@ -42,6 +48,8 @@ static std::ofstream outputFileStream;
 static std::ostream * outputStream = NULL;
 
 static mustache::Mustache must;
+static mustache::Compiler compiler;
+static mustache::VM vm;
 static mustache::Node node;
 static mustache::Data * data;
 
@@ -56,7 +64,7 @@ int main( int argc, char * argv[] )
   int numopt = 0;
   opterr = 0;
   
-  while( (curopt = getopt(argc, argv, "hced:o:t:")) != -1 ) {
+  while( (curopt = getopt(argc, argv, "hceprd:o:t:")) != -1 ) {
     numopt++;
     switch( curopt ) {
       case 'c':
@@ -64,6 +72,12 @@ int main( int argc, char * argv[] )
         break;
       case 'e':
         mode = MUSTACHE_BIN_MODE_EXECUTE;
+        break;
+      case 'p':
+        mode = MUSTACHE_BIN_MODE_PRINT;
+        break;
+      case 'r':
+        printReadable = 1;
         break;
         
       case 'd':
@@ -97,9 +111,11 @@ int main( int argc, char * argv[] )
   }
   
   // Must specify a mode
-  if( mode != MUSTACHE_BIN_MODE_COMPILE && mode != MUSTACHE_BIN_MODE_EXECUTE ) {
+  if( mode != MUSTACHE_BIN_MODE_COMPILE && 
+      mode != MUSTACHE_BIN_MODE_EXECUTE &&
+      mode != MUSTACHE_BIN_MODE_PRINT ) {
     error = 1;
-    fprintf(stderr, "Must specify either -c (compile) or -e (execute)\n");
+    fprintf(stderr, "Must specify either -c (compile) or -e (execute) or -p (print)\n");
     showUsage();
     goto error;
   }
@@ -130,7 +146,9 @@ int main( int argc, char * argv[] )
   // Execute mode
   if( mode == MUSTACHE_BIN_MODE_EXECUTE ) {
     // Tokenize
-    must.tokenize(&inputTemplate, &node);
+    if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE ) {
+      must.tokenize(&inputTemplate, &node);
+    }
     
     // Get input data
     if( inputDataFileName != NULL ) {
@@ -153,16 +171,50 @@ int main( int argc, char * argv[] )
     }
     
     // Render
-    std::string output;
-    must.render(&node, data, NULL, &output);
+    std::string * output = new std::string;
+    if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE ) {
+      must.render(&node, data, NULL, output);
+    } else if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE_BIN ) {
+      uint8_t * codes = NULL;
+      int length = 0;
+      mustache::Compiler::stringToBuffer(&inputTemplate, &codes, &length);
+      output = vm.execute(codes, length, data);
+    }
     
     // Output
-    *outputStream << output;
+    *outputStream << *output;
     
   } else if( mode == MUSTACHE_BIN_MODE_COMPILE ) {
-    error = 1;
-    fprintf(stderr, "Compile mode not yet implemented\n");
-    goto error;
+    // Tokenize
+    must.tokenize(&inputTemplate, &node);
+    
+    // Compile
+    std::vector<uint8_t> * codes = compiler.compile(&node);
+    
+    // Output
+    if( codes != NULL ) {
+      if( printReadable ) {
+        std::string * out = compiler.print(codes);
+        *outputStream << *out;
+        delete out;
+      } else {
+        char buf[101];
+        std::vector<uint8_t>::iterator it;
+        for( it = codes->begin(); it != codes->end(); it++ ) {
+          *outputStream << *it;
+        }
+      }
+    }
+    
+  } else if( mode == MUSTACHE_BIN_MODE_PRINT ) {
+    
+    std::vector<uint8_t> * codes;
+    mustache::Compiler::stringToVector(&inputTemplate, &codes);
+    std::string * output = compiler.print(codes);
+    
+    // Output
+    *outputStream << *output;
+    
   } else {
     error = 1;
     fprintf(stderr, "Invalid mode\n");
@@ -196,6 +248,8 @@ static int detectFileType(char * filename)
     return MUSTACHE_BIN_INPUT_YAML;
   } else if( strcmp(ext, ".mustache") == 0 ) {
     return MUSTACHE_BIN_INPUT_MUSTACHE;
+  } else if( strcmp(ext, ".bin") == 0 ) {
+    return MUSTACHE_BIN_INPUT_MUSTACHE_BIN;
   } else {
     return MUSTACHE_BIN_INPUT_UNKNOWN;
   }
@@ -228,6 +282,7 @@ static void showUsage()
   fprintf(stdout, "Options:\n");
   fprintf(stdout, "    -d, Input data file\n");
   fprintf(stdout, "    -o, Output file\n");
+  fprintf(stdout, "    -p, Print human-readable bytecode\n");
   fprintf(stdout, "    -t, Input template file\n");
   fprintf(stdout, "\n");
   fprintf(stdout, "Supported data formats:\n");
