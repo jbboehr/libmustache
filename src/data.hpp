@@ -133,6 +133,11 @@ class DataStack {
     
     //! Gets a pointer to the end of the stack
     Data ** end();
+    
+    //! Looks up the stack for a map value
+    Data * search(std::string * key);
+    
+    Data * searchnr(std::string * key);
 };
 
 

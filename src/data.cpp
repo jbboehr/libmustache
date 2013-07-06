@@ -138,6 +138,45 @@ Data ** DataStack::end()
   return (_stack + _size - 1);
 }
 
+Data * DataStack::search(std::string * key)
+{
+  // Resolve up the data stack
+  Data * ref = NULL;
+  Data::Map::iterator d_it;
+  register int i;
+  Data ** _stackPos = this->end();
+  for( i = 0; i < this->size(); i++, _stackPos-- ) {
+    if( (*_stackPos) == NULL ) continue;
+    if( (*_stackPos)->type == Data::TypeMap ) {
+      d_it = (*_stackPos)->data.find(*key);
+      if( d_it != (*_stackPos)->data.end() ) {
+        ref = d_it->second;
+        if( ref != NULL ) {
+          break;
+        }
+      }
+    }
+  }
+  return ref;
+}
+
+Data * DataStack::searchnr(std::string * key)
+{
+  Data * ref = NULL;
+  Data * back = this->back();
+  Data::Map::iterator d_it;
+  if( back != NULL && back->type == Data::TypeMap ) {
+    d_it = back->data.find(*key);
+    if( d_it != back->data.end() ) {
+      ref = d_it->second;
+      if( ref != NULL ) {
+        return ref;
+      }
+    }
+  }
+  return NULL;
+}
+
 
 
 // Data integrations

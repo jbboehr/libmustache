@@ -30,6 +30,7 @@ CompilerState::States CompilerState::next(uint8_t * code, uint8_t * operand) {
           *code = 0;
           *operand = 0;
         }
+        this->lpos = 0;
         break;
       case States::SYMBOL:
         *code = *current;
@@ -38,6 +39,7 @@ CompilerState::States CompilerState::next(uint8_t * code, uint8_t * operand) {
         if( this->state == States::FUNCTION ) {
           this->pos++;
         }
+        this->lpos = 0;
         break;
       case States::STRING:
         *code = *current;
@@ -45,6 +47,7 @@ CompilerState::States CompilerState::next(uint8_t * code, uint8_t * operand) {
         if( *current == opcodes::NOOP ) {
           this->state = States::NOOP;
         }
+        this->lpos++;
         break;
       case States::FUNCTION:
         if( *current == opcodes::NOOP ) {
@@ -55,10 +58,12 @@ CompilerState::States CompilerState::next(uint8_t * code, uint8_t * operand) {
           *code = *current;
           *operand = *next;
           this->pos++;
+          this->lpos++;
         } else {
           *code = *current;
           *operand = 0;
         }
+        this->lpos++;
         break;
     }
     this->pos++;
@@ -90,33 +95,97 @@ CompilerSymbol * Compiler::_compile(Node * node)
       break;
     }
     case Node::TypeSection: {
+      // Don't have to do anything if empty
+      if( node->children.size() <= 0 ) {
+        return NULL;
+      }
+      
+      // Get the main symbol
       sym = getSymbol();
       sym->type = mustache::opcodes::FUNCTION;
       
+      // Make the section name symbol
       CompilerSymbol * nameSym = getSymbol();
       nameSym->type = mustache::opcodes::STRING;
       for( int i = 0, l = node->data->length(); i < l; i++ ) {
         nameSym->code.push_back((uint8_t) node->data->at(i));
       }
       
-      sym->code.push_back(opcodes::LOOKUPSYM);
-      sym->code.push_back(nameSym->name);
-      
-      sym->code.push_back(opcodes::IF_EMPTY);
-      sym->code.push_back(opcodes::RETURN);
-      
-      if( node->children.size() > 0 ) {
-        Node::Children::iterator it;
-        for ( it = node->children.begin() ; it != node->children.end(); it++ ) {
-          if( (*it)->type & Node::TypeHasChildren ) {
-            child = _compile(*it);
-            sym->code.push_back(opcodes::CALLSYM);
-            sym->code.push_back(child->name);
-          } else {
-            _compileIn(*it, sym);
+      // Make the section children function symbol
+      CompilerSymbol * childrenSym = getSymbol();
+      childrenSym->type = mustache::opcodes::FUNCTION;
+      Node::Children::iterator it;
+      for ( it = node->children.begin() ; it != node->children.end(); it++ ) {
+        if( (*it)->type & Node::TypeHasChildren ) {
+          child = _compile(*it);
+          if( child != NULL ) {
+            childrenSym->code.push_back(opcodes::CALLSYM);
+            childrenSym->code.push_back(child->name);
           }
+        } else {
+          _compileIn(*it, childrenSym);
         }
       }
+      childrenSym->code.push_back(opcodes::RETURN);
+      
+      // Make the main symbol
+      sym->code.push_back(opcodes::DLOOKUPSYM);
+      sym->code.push_back(nameSym->name);
+      
+      sym->code.push_back(opcodes::DIF_EMPTY);
+      sym->code.push_back(opcodes::JUMPL);
+      size_t ifemptyoppos = sym->code.size();
+      sym->code.push_back(0x00);
+      
+      // If array, jump to the array loop
+      sym->code.push_back(opcodes::DIF_ARRAY);
+      sym->code.push_back(opcodes::JUMPL);
+      size_t ifarrayoppos = sym->code.size();
+      sym->code.push_back(0x00);
+      
+      // If not array, just call then jump to end
+      sym->code.push_back(opcodes::CALLSYM);
+      sym->code.push_back(childrenSym->name);
+      sym->code.push_back(opcodes::JUMPL);
+      size_t ifnotarrayoppos = sym->code.size();
+      sym->code.push_back(0x00);
+      
+      // Do the array looping code
+      sym->code[ifarrayoppos] = sym->code.size();
+      sym->code.push_back(opcodes::DARRSIZE);
+      sym->code.push_back(opcodes::PUSH);
+      sym->code.push_back(0);
+      size_t ifarrayinoppos = sym->code.size();
+      
+      sym->code.push_back(opcodes::IF_GE);
+      sym->code.push_back(opcodes::JUMPL);
+      size_t ifarrayendoppos = sym->code.size();
+      sym->code.push_back(0x00);
+      
+      sym->code.push_back(opcodes::DLOOKUPA);
+      
+      sym->code.push_back(opcodes::CALLSYM);
+      sym->code.push_back(childrenSym->name);
+      
+      sym->code.push_back(opcodes::DPOP);
+      
+      sym->code.push_back(opcodes::DIF_NOTARRAY);
+      sym->code.push_back(opcodes::JUMPL);
+      size_t ifnotarrayoppos2 = sym->code.size();
+      sym->code.push_back(0x00);
+      
+      sym->code.push_back(opcodes::INCR);
+      sym->code.push_back(opcodes::JUMPL);
+      sym->code.push_back(ifarrayinoppos);
+      
+      sym->code[ifarrayendoppos] = sym->code.size();
+      sym->code.push_back(opcodes::POP);
+      sym->code.push_back(opcodes::POP);
+      
+      sym->code[ifemptyoppos] = sym->code.size();
+      sym->code[ifnotarrayoppos] = sym->code.size();
+      sym->code[ifnotarrayoppos2] = sym->code.size();
+      sym->code.push_back(opcodes::DPOP);
       
       sym->code.push_back(opcodes::RETURN);
       break;
@@ -131,11 +200,13 @@ CompilerSymbol * Compiler::_compile(Node * node)
         nameSym->code.push_back((uint8_t) node->data->at(i));
       }
       
-      sym->code.push_back(opcodes::LOOKUPSYM);
+      sym->code.push_back(opcodes::DLOOKUPSYM);
       sym->code.push_back(nameSym->name);
       
-      sym->code.push_back(opcodes::IF_NOTEMPTY);
-      sym->code.push_back(opcodes::RETURN);
+      sym->code.push_back(opcodes::DIF_NOTEMPTY);
+      sym->code.push_back(opcodes::JUMPL);
+      size_t ifemptyoppos = sym->code.size();
+      sym->code.push_back(0x00);
       
       if( node->children.size() > 0 ) {
         Node::Children::iterator it;
@@ -149,6 +220,9 @@ CompilerSymbol * Compiler::_compile(Node * node)
           }
         }
       }
+      
+      sym->code[ifemptyoppos] = sym->code.size();
+      sym->code.push_back(opcodes::DPOP);
       
       sym->code.push_back(opcodes::RETURN);
     }
@@ -175,20 +249,44 @@ void Compiler::_compileIn(Node * node, CompilerSymbol * symbol)
     }
     case Node::TypeVariable:
     case Node::TypeTag: {
-      // Store string in symbol
-      CompilerSymbol * str = getSymbol();
-      str->type = mustache::opcodes::STRING;
-      for( int i = 0, l = node->data->length(); i < l; i++ ) {
-        str->code.push_back((uint8_t) node->data->at(i));
-      }
-      //str->code.push_back(0x00); // The "linker" will null-terminate the string
-      // Add print for symbol
-      symbol->code.push_back(opcodes::LOOKUPSYM);
-      symbol->code.push_back(str->name & 0xff);
-      if( node->flags && Node::FlagEscape ) {
-        symbol->code.push_back(opcodes::PRINTDE);
+      // Without dots
+      if( node->dataParts == NULL ) {
+        // Store string in symbol
+        CompilerSymbol * str = getSymbol();
+        str->type = mustache::opcodes::STRING;
+        for( int i = 0, l = node->data->length(); i < l; i++ ) {
+          str->code.push_back((uint8_t) node->data->at(i));
+        }
+        symbol->code.push_back(opcodes::DLOOKUPSYM);
+        symbol->code.push_back(str->name & 0xff);
+        if( node->flags && Node::FlagEscape ) {
+          symbol->code.push_back(opcodes::DPRINTE);
+        } else {
+          symbol->code.push_back(opcodes::DPRINT);
+        }
       } else {
-        symbol->code.push_back(opcodes::PRINTD);
+        std::vector<std::string>::iterator vs_it;
+        int num = 0;
+        for( vs_it = node->dataParts->begin(); vs_it != node->dataParts->end(); vs_it++ ) {
+          // Store string in symbol
+          CompilerSymbol * str = getSymbol();
+          str->type = mustache::opcodes::STRING;
+          for( int i = 0, l = vs_it->length(); i < l; i++ ) {
+            str->code.push_back((uint8_t) vs_it->at(i));
+          }
+          symbol->code.push_back(num == 0 ? opcodes::DLOOKUPSYM : opcodes::DLOOKUPNRSYM);
+          symbol->code.push_back(str->name & 0xff);
+          num++;
+        }
+        if( node->flags && Node::FlagEscape ) {
+          symbol->code.push_back(opcodes::DPRINTE);
+        } else {
+          symbol->code.push_back(opcodes::DPRINT);
+        }
+        int i = 0;
+        for( i = 0; i < num - 1; i++ ) {
+          symbol->code.push_back(opcodes::DPOP);
+        }
       }
       break;
     }
@@ -218,16 +316,24 @@ std::vector<uint8_t> * Compiler::_serialize(CompilerSymbol * main)
       continue;
     }
     switch( current ) {
-      case opcodes::LOOKUPSYM:
-        (*codes)[statec->spos] = opcodes::LOOKUP;
-        (*codes)[statec->spos+1] = table[(*codes)[statec->spos+1]];
-        break;
       case opcodes::PRINTSYM:
         (*codes)[statec->spos] = opcodes::PRINTL;
         (*codes)[statec->spos+1] = table[(*codes)[statec->spos+1]];
         break;
       case opcodes::CALLSYM:
         (*codes)[statec->spos] = opcodes::CALL;
+        (*codes)[statec->spos+1] = table[(*codes)[statec->spos+1]];
+        break;
+      case opcodes::JUMPL:
+        (*codes)[statec->spos] = opcodes::JUMP;
+        (*codes)[statec->spos+1] = statec->spos - statec->lpos + (*codes)[statec->spos+1]; // + 1;
+        break;
+      case opcodes::DLOOKUPSYM:
+        (*codes)[statec->spos] = opcodes::DLOOKUP;
+        (*codes)[statec->spos+1] = table[(*codes)[statec->spos+1]];
+        break;
+      case opcodes::DLOOKUPNRSYM:
+        (*codes)[statec->spos] = opcodes::DLOOKUPNR;
         (*codes)[statec->spos+1] = table[(*codes)[statec->spos+1]];
         break;
     }
@@ -260,18 +366,36 @@ const char * Compiler::opcodeName(uint8_t code)
     case opcodes::SYMBOL: return "SYMBOL"; break;
     case opcodes::FUNCTION: return "FUNCTION"; break;
     case opcodes::STRING: return "STRING"; break;
+    
     case opcodes::PRINTSYM: return "PRINTSYM"; break;
     case opcodes::PRINTL: return "PRINTL"; break;
-    case opcodes::PRINTD: return "PRINTD"; break;
-    case opcodes::PRINTDE: return "PRINTDE"; break;
-    case opcodes::LOOKUPSYM: return "LOOKUPSYM"; break;
-    case opcodes::LOOKUP: return "LOOKUP"; break;
     case opcodes::CALLSYM: return "CALLSYM"; break;
     case opcodes::CALL: return "CALL"; break;
     case opcodes::RETURN: return "RETURN"; break;
-    case opcodes::IF_EMPTY: return "IF_EMPTY"; break;
-    case opcodes::IF_NOTEMPTY: return "IF_NOTEMPTY"; break;
-    case opcodes::IF_HASH: return "IF_HASH"; break;
+    case opcodes::JUMP: return "JUMP"; break;
+    case opcodes::JUMPL: return "JUMPL"; break;
+    case opcodes::PUSH: return "PUSH"; break;
+    case opcodes::POP: return "POP"; break;
+    case opcodes::INCR: return "INCR"; break;
+    case opcodes::IF_GE: return "IF_GE"; break;
+    
+    case opcodes::DPUSH: return "DPUSH"; break;
+    case opcodes::DPOP: return "DPOP"; break;
+    case opcodes::DLOOKUPSYM: return "DLOOKUPSYM"; break;
+    case opcodes::DLOOKUP: return "DLOOKUP"; break;
+    case opcodes::DLOOKUPNRSYM: return "DLOOKUPSYM"; break;
+    case opcodes::DLOOKUPNR: return "DLOOKUP"; break;
+    case opcodes::DLOOKUPA: return "DLOOKUPA"; break;
+    case opcodes::DARRSIZE: return "DARRSIZE"; break;
+    case opcodes::DPRINT: return "DPRINT"; break;
+    case opcodes::DPRINTE: return "DPRINTE"; break;
+    
+    case opcodes::DIF_EMPTY: return "DIF_EMPTY"; break;
+    case opcodes::DIF_NOTEMPTY: return "DIF_NOTEMPTY"; break;
+    case opcodes::DIF_HASH: return "DIF_HASH"; break;
+    case opcodes::DIF_NOTHASH: return "DIF_NOTHASH"; break;
+    case opcodes::DIF_ARRAY: return "DIF_ARRAY"; break;
+    case opcodes::DIF_NOTARRAY: return "DIF_NOTARRAY"; break;
   }
   return NULL;
 }
@@ -295,23 +419,29 @@ std::string * Compiler::print(std::vector<uint8_t> * codes)
   while( statec->next(&current, &operand) != CompilerState::END ) {
     switch( statec->state ) {
       case CompilerState::NOOP:
-        snprintf(buf, 100, "N%03d: 0x%02x\n", statec->spos, current);
+        snprintf(buf, 100, "N%03d:      0x%02x\n", 
+                statec->spos, current);
         break;
       case CompilerState::SYMBOL:
-        snprintf(buf, 100, "S%03d: 0x%02x %s %d\n", statec->spos, current, this->opcodeName(current), operand);
+        snprintf(buf, 100, "S%03d:      0x%02x %s %d\n", 
+                statec->spos, current, opcodeName(current), operand);
         break;
       case CompilerState::FUNCTION:
         if( operand != 0 ) {
-          snprintf(buf, 100, "F%03d: 0x%02x %s %d\n", statec->spos, current, this->opcodeName(current), operand);
+          snprintf(buf, 100, "F%03d: %03d: 0x%02x %s %d\n", 
+                  statec->spos, statec->lpos, current, opcodeName(current), operand);
         } else {
-          snprintf(buf, 100, "F%03d: 0x%02x %s\n", statec->spos, current, this->opcodeName(current));
+          snprintf(buf, 100, "F%03d: %03d: 0x%02x %s\n", 
+                  statec->spos, statec->lpos, current, opcodeName(current));
         }
         break;
       case CompilerState::STRING:
         if( current == 0x0a ) {
-          snprintf(buf, 100, "C%03d: 0x%02x %s\n", statec->spos, current, "\\n");
+          snprintf(buf, 100, "C%03d: %03d: 0x%02x %s\n", 
+                  statec->spos, statec->lpos, current, "\\n");
         } else {
-          snprintf(buf, 100, "C%03d: 0x%02x %c\n", statec->spos, current, current);
+          snprintf(buf, 100, "C%03d: %03d: 0x%02x %c\n", 
+                  statec->spos, statec->lpos, current, current);
         }
         break;
     }

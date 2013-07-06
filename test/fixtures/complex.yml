@@ -1,0 +1,13 @@
+labels:
+  name: "Name: "
+  location: "Location: "
+users:
+  - name: John
+    location:
+      name: San Gabriel
+  - name: Bob
+    location:
+      name: Los Angeles
+  - name: Alice
+    location:
+      name: New York

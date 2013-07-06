@@ -13,6 +13,7 @@
 #include "node.hpp"
 #include "data.hpp"
 #include "compiler.hpp"
+#include "utils.hpp"
 
 
 namespace mustache {
@@ -20,6 +21,7 @@ namespace mustache {
 class VM {
 public:
   std::string * execute(uint8_t * codes, int length, Data * data);
+  void execute(uint8_t * codes, int length, Data * data, std::string * output);
 };
 
 }

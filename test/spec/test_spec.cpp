@@ -80,6 +80,11 @@ int main( int argc, char * argv[] )
     } else {
       nFailed++;
     }
+    if( (*it)->compiled_passed() ) {
+      nPassed++;
+    } else {
+      nFailed++;
+    }
   }
   int total = nPassed + nFailed;
   std::cout << nPassed << " passed, "
@@ -175,13 +180,27 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
     }
   }
   
+  mustache::Mustache mustache;
+  mustache::Compiler compiler;
+  mustache::VM vm;
+  
+  // Tokenize
+  mustache::Node root;
+  mustache.tokenize(&test->tmpl, &root);
+  
+  // Compile
+  mustache::Compiler::vectorToBuffer(compiler.compile(&root), &test->compiled, &test->compiled_length);
+  
   // Execute the test
   for( int i = 0; i < execNum; i++ ) {
     test->output.clear();
-    mustache::Mustache mustache;
-    mustache::Node root;
-    mustache.tokenize(&test->tmpl, &root);
     mustache.render(&root, &test->data, &test->partials, &test->output);
+  }
+  
+  // Execute the test in VM mode
+  for( int i = 0; i < execNum; i++ ) {
+    test->compiled_output.clear();
+    vm.execute(test->compiled, test->compiled_length, &test->data, &test->compiled_output);
   }
   
   // Output result

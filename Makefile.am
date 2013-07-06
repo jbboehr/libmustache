@@ -15,7 +15,8 @@ standardc: all
 	./bin/mustache -c -t test/fixtures/standard.mustache -o test/fixtures/standard.bin
 
 standardr: all
-	./bin/mustache -c -t test/fixtures/standard.mustache -r
+	./bin/mustache -c -r -t test/fixtures/complex.mustache -o test/fixtures/standard.log
+	cat test/fixtures/standard.log
 
 standardce: all standardc
 	./bin/mustache -e -t test/fixtures/standard.bin -d test/fixtures/standard.yml
@@ -23,7 +24,26 @@ standardce: all standardc
 standardcr: all standardc
 	./bin/mustache -p -t test/fixtures/standard.bin -r
 
+complexc: all
+	./bin/mustache -c -t test/fixtures/complex.mustache -o test/fixtures/complex.bin
 
+complexr: all
+	./bin/mustache -c -r -t test/fixtures/complex.mustache -o test/fixtures/complex.log
+	cat test/fixtures/complex.log
+
+complexce: all complexc
+	./bin/mustache -e -t test/fixtures/complex.bin -d test/fixtures/complex.yml
+
+deepc: all
+	./bin/mustache -c -t test/fixtures/deep.mustache -o test/fixtures/deep.bin
+
+deepr: all
+	./bin/mustache -c -r -t test/fixtures/deep.mustache -o test/fixtures/deep.log
+	cat test/fixtures/deep.log
+
+deepce: all complexc
+	./bin/mustache -e -t test/fixtures/deep.bin -d test/fixtures/deep.yml
+	
 if GCC
 # These flags are gcc specific
 export AM_CFLAGS = -Wall -Wextra -Wdeclaration-after-statement

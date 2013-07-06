@@ -16,6 +16,8 @@
 #include <exception>
 
 #include "mustache.hpp"
+#include "compiler.hpp"
+#include "vm.hpp"
 
 class MustacheSpecTest {
   private:
@@ -28,7 +30,13 @@ class MustacheSpecTest {
     std::string expected;
     std::string output;
     int _passed;
-    MustacheSpecTest() : _passed(-1) {};
+    
+    uint8_t * compiled;
+    int compiled_length;
+    std::string compiled_output;
+    int _compiled_passed;
+    
+    MustacheSpecTest() : _passed(-1), _compiled_passed(-1) {};
     bool passed() {
       if( -1 == _passed ) {
         std::string strippedExpected = expected;
@@ -43,6 +51,20 @@ class MustacheSpecTest {
       }
       return (_passed == 1);
     };
+    bool compiled_passed() {
+      if( -1 == _compiled_passed ) {
+        std::string strippedExpected = expected;
+        std::string strippedOutput = compiled_output;
+        mustache::stripWhitespace(strippedExpected);
+        mustache::stripWhitespace(strippedOutput);
+        if( strippedOutput == strippedExpected ) {
+          _compiled_passed = 1;
+        } else {
+          _compiled_passed = 0;
+        }
+      }
+      return (_compiled_passed == 1);
+    }
     void print() {
       bool _passed = passed();
       std::cout << name << " ... " 
@@ -51,6 +73,15 @@ class MustacheSpecTest {
       if( !_passed ) {
         std::cout << "Expected: " << expected << "\n";
         std::cout << "Output: " << output << "\n";
+      }
+      bool _compiled_passed = compiled_passed();
+      std::cout << name << " (compiled) ... " 
+                << (_compiled_passed ? "PASSED" : "FAILED")
+                << "\n";
+      if( !_compiled_passed ) {
+        std::cout << "Expected: " << expected << "\n";
+        std::cout << "Output: " << compiled_output << "\n";
+        std::cout << "Code: " << "\n" << *mustache::Compiler::print(compiled, compiled_length) << "\n";
       }
     }
     std::string toString() {
