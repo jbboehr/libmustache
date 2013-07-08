@@ -2,13 +2,14 @@
 #include "vm.hpp"
 
 #define PUSH(v) stack[stackSize++] = v
-#define POPN stackSize--
+#define POPN --stackSize
 #define POPR stack[--stackSize]
 #define TOP stack[stackSize - 1]
 #define TOP1 stack[stackSize - 2]
 #define JUMP(pos) loc = codes + pos
 #define SKIP ++loc; if( Compiler::hasOperand(*loc) ) ++loc
 #define LOC loc - codes
+#define LLOC loc - sloc
 
 #define _DTOP dataStack->back()
 #define _DPOP dataStack->pop_back()
@@ -18,9 +19,13 @@
 #define _DSEARCHNR(v) dataStack->searchnr(v)
 
 #ifdef DEBUG
+#define DBGHEAD printf("%03ld: %03ld: %-8s\t", LOC, LLOC, Compiler::opcodeName(*loc))
 #define DBG(...) printf(__VA_ARGS__)
+#define DBGFOOT printf("\n");
 #else
-#define DBG(...) 
+#define DBGHEAD
+#define DBG(...)
+#define DBGFOOT
 #endif
 
 namespace mustache {
@@ -36,6 +41,7 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
 {
   register uint8_t * loc = codes;
   register uint8_t * end = codes + length;
+  register uint8_t * sloc = loc;
   unsigned long stack[127];
   int stackSize = 0;
   DataStack * dataStack = new DataStack();
@@ -50,186 +56,179 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
       break;
     }
   }
+  sloc = loc;
   
   // First thing to put on stack is code past the end of length so that the VM
   // will terminate when returning from main
   PUSH(length + 1);
   
   for( ; loc < end; loc++ ) {
+    DBGHEAD;
     switch( *loc ) {
       /** Basic operations -------------------------------------------------- */
       case opcodes::PRINTL:
-        DBG("%03d: PRINTL, Jump: %u\n", LOC, *(1 + loc));
-        output->append((const /*unsigned*/ char *) (codes + *(++loc)));
+        DBG("Jump: %u", *(1 + loc));
+        output->append((const char *) (codes + *(++loc)));
         break;
       case opcodes::CALL:
-        DBG("%03d: CALL, Push: %ld, Jump: %u\n", LOC, loc - codes, *(1 + loc));
+        DBG("Push: %ld, Jump: %u", loc - codes, *(1 + loc));
+        PUSH(sloc - codes);
         PUSH(loc - codes + 1);
         JUMP(*(++loc) - 1);  // Need -1 so increment on loop will cancel out
+        sloc = loc + 1;
         break;
       case opcodes::RETURN:
-        DBG("%03d: RETURN, Jump: %lu\n", LOC, TOP);
+        DBG("Jump: %lu", TOP);
         JUMP(POPR);
+        sloc = codes + POPR;
         break;
       case opcodes::JUMP:
-        DBG("%03d: JUMP, Jump: %d\n", LOC, *(1 + loc));
+        DBG("Jump: %u", *(1 + loc));
         JUMP(*(++loc) - 1); // -1 to cancel out the next loop increment
         break;
       case opcodes::PUSH:
-        DBG("%03d: PUSH\n", LOC);
+        DBG("Push: %u", *(1 + loc));
         PUSH(*(++loc));
         break;
       case opcodes::POP:
-        DBG("%03d: POP\n", LOC);
+        DBG("Top: %lu", TOP);
         POPN;
         break;
       case opcodes::INCR:
-        DBG("%03d: INCR\n", LOC);
+        DBG("%lu+1", TOP);
         TOP++;
         break;
       case opcodes::IF_GE:
-        DBG("%03d: IF_GE, %ld >= %ld", LOC, TOP, TOP1);
+        DBG("%ld >= %ld", TOP, TOP1);
         if( TOP >= TOP1 ) {
           DBG(", GE");
         } else {
           DBG(", !GE");
           SKIP;
         }
-        DBG("\n");
         break;
       
       /** Data operations --------------------------------------------------- */
       case opcodes::DPUSH:
-        DBG("%03d: DPUSH, Top %p\n", LOC, TOP);
+        DBG("Top %p", (Data *) TOP);
         _DPUSH((Data *) TOP);
         break;
       case opcodes::DPOP:
-        DBG("%03d: DPOP\n", LOC);
+        DBG("DTop: %p", (Data *) _DTOP);
         _DPOP;
         break;
       case opcodes::DLOOKUP: {
-        DBG("%03d: DLOOKUP, Symbol: %u", LOC, *(1 + loc));
-        char * cstr = (/*unsigned*/ char *) (codes + *(++loc));
+        DBG("Symbol: %u", *(1 + loc));
+        const char * cstr = (const char *) (codes + *(++loc));
         DBG(", String: %s", cstr);
         lookupstr.assign(cstr);
-        DBG(", DPush: %p\n", _DSEARCH(&lookupstr));
+        DBG(", DPush: %p", _DSEARCH(&lookupstr));
         _DPUSH(_DSEARCH(&lookupstr));
         break;
       }
       case opcodes::DLOOKUPNR: {
-        DBG("%03d: DLOOKUPNR, Symbol: %u", LOC, *(1 + loc));
+        DBG("Symbol: %u", *(1 + loc));
         char * cstr = (/*unsigned*/ char *) (codes + *(++loc));
         DBG(", String: %s", cstr);
         lookupstr.assign(cstr);
-        DBG(", DPush: %p\n", _DSEARCHNR(&lookupstr));
+        DBG(", DPush: %p", _DSEARCHNR(&lookupstr));
         _DPUSH(_DSEARCHNR(&lookupstr));
         break;
       }
       case opcodes::DLOOKUPA: {
-        DBG("%03d: DLOOKUP, Index: %d", LOC, TOP);
-        DBG(", DPush: %p\n", _DTOP->array + TOP);
+        DBG("Index: %lu, DPush: %p", TOP, _DTOP->array + TOP);
         _DPUSH(_DTOP->array + TOP);
         break;
       }
       case opcodes::DARRSIZE:
-        DBG("%03d: DARRSIZE", LOC);
         if( _DTOP != NULL && _DTOP->type == Data::TypeArray ) {
-          DBG(", Size: %d", _DTOP->length);
           PUSH(_DTOP->length);
         } else {
-          DBG(", Size: %d", 0);
           PUSH(0);
         }
-        DBG("\n");
+        DBG("Size: %lu", TOP);
         break;
       case opcodes::DPRINT:
-        DBG("%03d: DPRINT, DTop: %p", LOC, _DTOP);
+        DBG("DTop: %p", _DTOP);
         if( _DTOP != NULL && _DTOP->type == Data::TypeString ) {
           output->append(*(_DTOP->val));
         }
         _DPOP;
-        DBG("\n");
         break;
       case opcodes::DPRINTE:
-        DBG("%03d: DPRINTE, DTop: %p", LOC, _DTOP);
+        DBG("DTop: %p", _DTOP);
         if( _DTOP != NULL && _DTOP->type == Data::TypeString ) {
           htmlspecialchars_append((_DTOP->val), output);
         }
         _DPOP;
-        DBG("\n");
         break;
       
       /** Data conditionals ------------------------------------------------- */
       case opcodes::DIF_EMPTY:
-        DBG("%03d: DIF_EMPTY, DTop %p", LOC, _DTOP);
+        DBG("DTop %p", _DTOP);
         if( _DTOP == NULL || _DTOP->isEmpty() ) {
           DBG(", empty");
         } else {
           DBG(", not empty");
           SKIP;
         }
-        DBG("\n");
         break;
       case opcodes::DIF_NOTEMPTY:
-        DBG("%03d: DIF_NOTEMPTY, DTop %p", LOC, _DTOP);
+        DBG("DTop %p", _DTOP);
         if( _DTOP != NULL && !_DTOP->isEmpty() ) {
           DBG(", not empty");
         } else {
           DBG(", empty");
           SKIP;
         }
-        DBG("\n");
         break;
       case opcodes::DIF_HASH:
-        DBG("%03d: DIF_HASH, DTop %p", LOC, _DTOP);
+        DBG("DTop %p", _DTOP);
         if( _DTOP == NULL || _DTOP->type != Data::TypeMap ) {
           DBG(", not hash");
           SKIP;
         } else {
           DBG(", hash");
         }
-        DBG("\n");
         break;
       case opcodes::DIF_NOTHASH:
-        DBG("%03d: DIF_NOTHASH, DTop %p", LOC, _DTOP);
+        DBG("DTop %p", _DTOP);
         if( _DTOP == NULL || _DTOP->type != Data::TypeMap ) {
           DBG(", not hash");
         } else {
           DBG(", hash");
           SKIP;
         }
-        DBG("\n");
         break;
       case opcodes::DIF_ARRAY:
-        DBG("%03d: DIF_ARRAY, DTop %p", LOC, _DTOP);
+        DBG("DTop %p", _DTOP);
         if( _DTOP == NULL || _DTOP->type != Data::TypeArray ) {
           DBG(", not array");
           SKIP;
         } else {
           DBG(", array");
         }
-        DBG("\n");
         break;
       case opcodes::DIF_NOTARRAY:
-        DBG("%03d: DIF_NOTARRAY, DTop %p", LOC, _DTOP);
+        DBG("DTop %p", _DTOP);
         if( _DTOP == NULL || _DTOP->type != Data::TypeArray ) {
           DBG(", not array");
         } else {
           DBG(", array");
           SKIP;
         }
-        DBG("\n");
         break;
       
       /** Unknown ----------------------------------------------------------- */
       case opcodes::NOOP:
-        DBG("%03d: NOOP, Jump: %d\n", LOC, length + 1);
+        DBG("Jump: %d", length + 1);
         JUMP(length + 1);
         break;
       default:
-        DBG("%03d: UNKNOWN 0x%02x\n", LOC, *loc);
+        DBG("UNKNOWN 0x%02x\n", *loc);
         break;
     }
+    DBGFOOT;
   }
 }
 
