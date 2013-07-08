@@ -12,6 +12,16 @@
 
 #include "node.hpp"
 
+#define _PACKI(i, n) ((i & (0xff << n)) >> n)
+#define _PACK1FN(fn, i) fn(_PACKI(i, 0))
+#define _PACK2FN(fn, i) fn(_PACKI(i, 8)); _PACK1FN(fn, i)
+#define _PACK3FN(fn, i) fn(_PACKI(i, 16)); _PACK2FN(fn, i)
+#define _PACK4FN(fn, i) fn(_PACKI(i, 24)); _PACK3FN(fn, i)
+#define _PACK1A(a, k, i) a[k] = _PACKI(i, 0)
+#define _PACK2A(a, k, i) a[k] = _PACKI(i, 8); _PACK1A(a, k + 1, i);
+#define _PACK3A(a, k, i) a[k] = _PACKI(i, 16); _PACK2A(a, k + 1, i);
+#define _PACK4A(a, k, i) a[k] = _PACKI(i, 24); _PACK3A(a, k + 1, i);
+
 namespace mustache {
 
 
@@ -210,7 +220,8 @@ public:
     SYMBOL = 0x01,  //opcodes::SYMBOL,
     FUNCTION = 0x02, //opcodes::FUNCTION,
     STRING = 0x03, //opcodes::STRING,
-    END = 0x04
+    HEADER = 0x04,
+    END = 0x05
   };
   enum States state;
   enum States nextState;

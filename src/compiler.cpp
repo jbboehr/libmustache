@@ -27,7 +27,7 @@ CompilerState::States CompilerState::next(uint8_t * code, uint8_t * operand) {
           this->pos++; // Skip operand
         } else {
           this->state = States::NOOP;
-          *code = 0;
+          *code = *current;
           *operand = 0;
         }
         this->lpos = 0;
@@ -295,10 +295,22 @@ void Compiler::_compileIn(Node * node, CompilerSymbol * symbol)
 
 std::vector<uint8_t> * Compiler::_serialize(CompilerSymbol * main)
 {
-  int * table = new int[symbols.size()];
-  
   std::vector<uint8_t> * codes = new std::vector<uint8_t>;
   std::vector<CompilerSymbol *>::iterator it;
+  
+  /*
+  // Calculate the size of the symbol table and allocate empty space
+  // First four bytes is the number of items in the symbol table
+  // Each symbol has three parts:
+  // One byte for the type.
+  // Three bytes for the name
+  // Four bytes for the location
+  unsigned long header_size = 4 + symbols.size() * 8;
+  codes->resize(header_size, 0);
+  */
+  
+  // Serialize the symbols
+  int * table = new int[symbols.size()];
   for( it = symbols.begin() ; it != symbols.end(); it++ ) {
     codes->push_back((*it)->type);
     codes->push_back((*it)->name);
@@ -306,6 +318,18 @@ std::vector<uint8_t> * Compiler::_serialize(CompilerSymbol * main)
     codes->insert(codes->end(), (*it)->code.begin(), (*it)->code.end());
     codes->push_back(0);
   }
+  
+  /*
+  // Write the symbol table now that we have the positions
+  _PACK4A((*codes), 0, symbols.size());
+  _PACK2FN(header.push_back, symbols.size());
+  for( it = symbols.begin() ; it != symbols.end(); it++ ) {
+    unsigned long off = (it - symbols.begin()) * 8 + 4;
+    _PACK1A((*codes), off, (*it)->type);
+    _PACK3A((*codes), off + 1, (*it)->name);
+    _PACK4A((*codes), off + 4, table[(*it)->name]);
+  }
+  */
   
   // Second pass, resolve symbols to absolute jump points
   CompilerState * statec = new CompilerState(codes);
@@ -419,30 +443,32 @@ std::string * Compiler::print(std::vector<uint8_t> * codes)
   while( statec->next(&current, &operand) != CompilerState::END ) {
     switch( statec->state ) {
       case CompilerState::NOOP:
-        snprintf(buf, 100, "N%03d:      0x%02x\n", 
+        snprintf(buf, 100, "N%03lu:      0x%02x\n", 
                 statec->spos, current);
         break;
       case CompilerState::SYMBOL:
-        snprintf(buf, 100, "S%03d:      0x%02x %s %d\n", 
+        snprintf(buf, 100, "S%03lu:      0x%02x %s %d\n", 
                 statec->spos, current, opcodeName(current), operand);
         break;
       case CompilerState::FUNCTION:
         if( operand != 0 ) {
-          snprintf(buf, 100, "F%03d: %03d: 0x%02x %s %d\n", 
+          snprintf(buf, 100, "F%03lu: %03lu: 0x%02x %s %d\n", 
                   statec->spos, statec->lpos, current, opcodeName(current), operand);
         } else {
-          snprintf(buf, 100, "F%03d: %03d: 0x%02x %s\n", 
+          snprintf(buf, 100, "F%03lu: %03lu: 0x%02x %s\n", 
                   statec->spos, statec->lpos, current, opcodeName(current));
         }
         break;
       case CompilerState::STRING:
         if( current == 0x0a ) {
-          snprintf(buf, 100, "C%03d: %03d: 0x%02x %s\n", 
+          snprintf(buf, 100, "C%03lu: %03lu: 0x%02x %s\n", 
                   statec->spos, statec->lpos, current, "\\n");
         } else {
-          snprintf(buf, 100, "C%03d: %03d: 0x%02x %c\n", 
+          snprintf(buf, 100, "C%03lu: %03lu: 0x%02x %c\n", 
                   statec->spos, statec->lpos, current, current);
         }
+        break;
+      case CompilerState::HEADER:
         break;
     }
     out->append(buf);
