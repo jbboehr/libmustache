@@ -12,12 +12,14 @@
 #include <cerrno>
 #include <iostream>
 #include <fstream>
+#include <map>
 #include <vector>
 
 #include "mustache.hpp"
 #include "compiler.hpp"
 #include "exception.hpp"
 #include "vm.hpp"
+#include "utils.hpp"
 
 #define MUSTACHE_BIN_MODE_COMPILE 1
 #define MUSTACHE_BIN_MODE_EXECUTE 2
@@ -47,10 +49,14 @@ static char * outputFileName = NULL;
 static std::ofstream outputFileStream;
 static std::ostream * outputStream = NULL;
 
+static std::map<std::string, std::string> partialFiles;
+std::map<std::string, std::string>::iterator pf_it;
+
 static mustache::Mustache must;
 static mustache::Compiler compiler;
 static mustache::VM vm;
 static mustache::Node node;
+static mustache::Node::Partials partials;
 static mustache::Data * data;
 
 static int detectFileType(char * filename);
@@ -64,7 +70,7 @@ int main( int argc, char * argv[] )
   int numopt = 0;
   opterr = 0;
   
-  while( (curopt = getopt(argc, argv, "hceprd:o:t:n:")) != -1 ) {
+  while( (curopt = getopt(argc, argv, "hceprd:o:t:n:l:")) != -1 ) {
     numopt++;
     switch( curopt ) {
       case 'c':
@@ -92,6 +98,13 @@ int main( int argc, char * argv[] )
       case 'n':
         number = atoi(optarg);
         break;
+      case 'l': {
+        std::string optargstr(optarg);
+        std::vector<std::string> optargparts;
+        mustache::explode("=", optargstr, &optargparts);
+        partialFiles.insert(std::make_pair(optargparts[0], optargparts[1]));
+        break;
+      }
         
       case '?':
         if( optopt == 'd' || optopt == 'o' || optopt == 't' ) {
@@ -138,6 +151,16 @@ int main( int argc, char * argv[] )
   // Read input file
   inputTemplate = getFileContents(inputTemplateFileName);
   
+  // Read partials
+  for( pf_it = partialFiles.begin(); pf_it != partialFiles.end(); pf_it++ ) {
+    try {
+      partialFiles[pf_it->first] = getFileContents(pf_it->second.c_str());
+    } catch( int e ) {
+      fprintf(stderr, "Error reading partial: %s. Code: %d\n", pf_it->first.c_str(), e);
+      goto error;
+    }
+  }
+  
   // Check output file
   if( outputFileName == NULL ) {
     outputStream = &std::cout;
@@ -151,6 +174,13 @@ int main( int argc, char * argv[] )
     // Tokenize
     if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE ) {
       must.tokenize(&inputTemplate, &node);
+    }
+    
+    // Tokenize partials
+    for( pf_it = partialFiles.begin(); pf_it != partialFiles.end(); pf_it++ ) {
+      mustache::Node node;
+      partials.insert(std::make_pair(pf_it->first, node));
+      must.tokenize(&pf_it->second, &(partials[pf_it->first]));
     }
     
     // Get input data
@@ -179,7 +209,7 @@ int main( int argc, char * argv[] )
     if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE ) {
       for( i = 0; i < number; i++ ) {
         output->clear();
-        must.render(&node, data, NULL, output);
+        must.render(&node, data, &partials, output);
       }
     } else if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE_BIN ) {
       uint8_t * codes = NULL;
@@ -197,10 +227,19 @@ int main( int argc, char * argv[] )
     
   } else if( mode == MUSTACHE_BIN_MODE_COMPILE ) {
     // Tokenize
-    must.tokenize(&inputTemplate, &node);
+    if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE ) {
+      must.tokenize(&inputTemplate, &node);
+    }
+    
+    // Tokenize partials
+    for( pf_it = partialFiles.begin(); pf_it != partialFiles.end(); pf_it++ ) {
+      mustache::Node node;
+      partials.insert(std::make_pair(pf_it->first, node));
+      must.tokenize(&pf_it->second, &(partials[pf_it->first]));
+    }
     
     // Compile
-    std::vector<uint8_t> * codes = compiler.compile(&node);
+    std::vector<uint8_t> * codes = compiler.compile(&node, &partials);
     
     // Output
     if( codes != NULL ) {
@@ -295,6 +334,7 @@ static void showUsage()
   fprintf(stdout, "    -o, Output file\n");
   fprintf(stdout, "    -p, Print human-readable bytecode\n");
   fprintf(stdout, "    -t, Input template file\n");
+  fprintf(stdout, "    -l, Partials in format name=file\n");
   fprintf(stdout, "\n");
   fprintf(stdout, "Supported data formats:\n");
   fprintf(stdout, "    ");

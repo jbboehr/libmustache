@@ -1,0 +1,11 @@
+separator: ---
+items:
+  - key: A
+    value: B
+  - key: C
+    value: D
+otherItems:
+  - key: foo
+    value: bar
+  - key: baz
+    value: what's next?

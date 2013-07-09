@@ -214,7 +214,16 @@ typedef enum opcodes {
    * If the data pointed to by the top of the data stack is not an array,
    * execute the next operation
    */
-  DIF_NOTARRAY = 0x35
+  DIF_NOTARRAY = 0x35,
+  
+  
+  
+  
+  /**
+   * If the data pointed to by the top of the data stack is not an array,
+   * execute the next operation
+   */
+  CALLEXT = 0x36,
   
 } opcodes;
 
@@ -265,6 +274,8 @@ public:
 class Compiler {
 private:
   std::vector<CompilerSymbol *> symbols;
+  Node::Partials * partials;
+  std::map<std::string,int> partialSymbols;
   
   CompilerSymbol * _compile(Node * node);
   void _compileIn(Node * node, CompilerSymbol * symbol);
@@ -273,6 +284,7 @@ private:
   CompilerSymbol * getSymbol();
 public:
   std::vector<uint8_t> * compile(Node * node);
+  std::vector<uint8_t> * compile(Node * node, Node::Partials * partials);
   
   static const char * opcodeName(uint8_t code);
   
@@ -301,6 +313,8 @@ public:
       case opcodes::DLOOKUP:
       case opcodes::DLOOKUPNRSYM:
       case opcodes::DLOOKUPNR:
+        
+      case opcodes::CALLEXT:
         return true;
         break;
       default:

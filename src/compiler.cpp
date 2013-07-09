@@ -303,6 +303,47 @@ void Compiler::_compileIn(Node * node, CompilerSymbol * symbol)
       }
       break;
     }
+    case Node::TypePartial: {
+      // Check for a partial that's already been compiled
+      std::map<std::string,int>::iterator pc_it = partialSymbols.find(*(node->data));
+      if( pc_it != partialSymbols.end() ) {
+        symbol->code.push_back(opcodes::CALLSYM);
+        symbol->code.push_back(pc_it->second);
+        break;
+      }
+      
+      // See if we have a partial
+      Node * foundPartial = NULL;
+      if( partials != NULL ) {
+        Node::Partials::iterator p_it;
+        p_it = partials->find(*(node->data));
+        if( p_it != partials->end() ) {
+          foundPartial = &(p_it->second);
+        }
+      }
+      
+      // If we have a partial, compile it in and call it, and add it to the 
+      // map of compiled partials
+      if( foundPartial != NULL ) {
+        CompilerSymbol * partialSym = _compile(foundPartial);
+        symbol->code.push_back(opcodes::CALLSYM);
+        symbol->code.push_back(partialSym->name);
+        
+        partialSymbols.insert(std::make_pair(*(node->data), partialSym->name));
+      } else {
+        // Otherwise, maybe we should link it at runtime?
+        
+        // Store string in symbol
+        CompilerSymbol * str = getSymbol();
+        str->type = mustache::opcodes::STRING;
+        for( int i = 0, l = node->data->length(); i < l; i++ ) {
+          str->code.push_back((uint8_t) node->data->at(i));
+        }
+
+        symbol->code.push_back(opcodes::CALLEXT);
+        symbol->code.push_back(str->name);
+      }
+    }
   }
 }
 
@@ -383,7 +424,14 @@ CompilerSymbol * Compiler::getSymbol()
 
 std::vector<uint8_t> * Compiler::compile(Node * node)
 {
-  symbols.clear();
+  compile(node, NULL);
+}
+
+std::vector<uint8_t> * Compiler::compile(Node * node, Node::Partials * partials)
+{
+  this->symbols.clear();
+  this->partials = partials;
+  this->partialSymbols.clear();
   CompilerSymbol * main = _compile(node);
   return _serialize(main);
 }
@@ -425,6 +473,8 @@ const char * Compiler::opcodeName(uint8_t code)
     case opcodes::DIF_NOTHASH: return "DIF_NOTHASH"; break;
     case opcodes::DIF_ARRAY: return "DIF_ARRAY"; break;
     case opcodes::DIF_NOTARRAY: return "DIF_NOTARRAY"; break;
+    
+    case opcodes::CALLEXT: return "CALLEXT"; break;
   }
   return NULL;
 }

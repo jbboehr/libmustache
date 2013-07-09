@@ -262,6 +262,9 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
         break;
       
       /** Unknown ----------------------------------------------------------- */
+      case opcodes::CALLEXT:
+        DBG("NOT IMPLEMENTED %d\n", *(++loc));
+        break;
       case opcodes::NOOP:
         DBG("Jump: %d", length + 1);
         JUMP(length + 1);

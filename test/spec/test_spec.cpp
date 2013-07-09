@@ -189,7 +189,7 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
   mustache.tokenize(&test->tmpl, &root);
   
   // Compile
-  mustache::Compiler::vectorToBuffer(compiler.compile(&root), &test->compiled, &test->compiled_length);
+  mustache::Compiler::vectorToBuffer(compiler.compile(&root, &test->partials), &test->compiled, &test->compiled_length);
   
   // Execute the test
   for( int i = 0; i < execNum; i++ ) {
