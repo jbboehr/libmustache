@@ -64,7 +64,7 @@ int main( int argc, char * argv[] )
   int numopt = 0;
   opterr = 0;
   
-  while( (curopt = getopt(argc, argv, "hceprd:o:t:")) != -1 ) {
+  while( (curopt = getopt(argc, argv, "hceprd:o:t:n:")) != -1 ) {
     numopt++;
     switch( curopt ) {
       case 'c':
@@ -88,6 +88,9 @@ int main( int argc, char * argv[] )
         break;
       case 't':
         inputTemplateFileName = optarg;
+        break;
+      case 'n':
+        number = atoi(optarg);
         break;
         
       case '?':
@@ -172,13 +175,21 @@ int main( int argc, char * argv[] )
     
     // Render
     std::string * output = new std::string;
+    int i;
     if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE ) {
-      must.render(&node, data, NULL, output);
+      for( i = 0; i < number; i++ ) {
+        output->clear();
+        must.render(&node, data, NULL, output);
+      }
     } else if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE_BIN ) {
       uint8_t * codes = NULL;
       int length = 0;
       mustache::Compiler::stringToBuffer(&inputTemplate, &codes, &length);
-      output = vm.execute(codes, length, data);
+      for( i = 0; i < number; i++ ) {
+        output->clear();
+        vm.execute(codes, length, data, output);
+      }
+      free(codes);
     }
     
     // Output

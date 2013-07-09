@@ -11,12 +11,12 @@
 #define LOC loc - codes
 #define LLOC loc - sloc
 
-#define _DTOP dataStack->back()
-#define _DPOP dataStack->pop_back()
-#define _DPOPR dataStack->back(); dataStack->pop_back()
-#define _DPUSH(v) dataStack->push_back(v)
-#define _DSEARCH(v) dataStack->search(v)
-#define _DSEARCHNR(v) dataStack->searchnr(v)
+#define _DTOP dataStack.back()
+#define _DPOP dataStack.pop_back()
+#define _DPOPR dataStack.back(); dataStack.pop_back()
+#define _DPUSH(v) dataStack.push_back(v)
+#define _DSEARCH(v) dataStack.search(v)
+#define _DSEARCHNR(v) dataStack.searchnr(v)
 
 #ifdef DEBUG
 #define DBGHEAD printf("%03ld: %03ld: %-8s\t", LOC, LLOC, Compiler::opcodeName(*loc))
@@ -42,24 +42,33 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
   register uint8_t * loc = codes;
   register uint8_t * end = codes + length;
   register uint8_t * sloc = loc;
-  unsigned long stack[127];
-  int stackSize = 0;
-  DataStack * dataStack = new DataStack();
-  dataStack->push_back(data);
-  Data * current = dataStack->back();
+  register uint32_t * symbols = NULL;
+  uint32_t stack[127];
+  uint32_t stackSize = 0;
+  DataStack dataStack;
+  dataStack.push_back(data);
+  Data * current = dataStack.back();
   std::string lookupstr;
   
-  for( ; loc < end; loc++ ) {
-    // Scan to main
-    if( *loc == 0x02 && *(loc + 1) == 0x00 ) {
-      loc += 2;
-      break;
+  // Read the symbol table
+  {
+    uint32_t nSymbols = _UNPACK4A(loc, 0);
+    uint32_t i;
+    loc += 4;
+    symbols = (uint32_t *) malloc(sizeof(uint32_t) * nSymbols);
+    for( i = 0; i < nSymbols; i++ ) {
+      symbols[i] = _UNPACK4A(loc, 0);
+      DBG("Symbol %d @ %u\n", i, symbols[i]);
+      loc += 4;
     }
   }
-  sloc = loc;
+  
+  // Jump to main
+  sloc = loc = codes + symbols[0] + 2;
   
   // First thing to put on stack is code past the end of length so that the VM
   // will terminate when returning from main
+  PUSH(LOC);
   PUSH(length + 1);
   
   for( ; loc < end; loc++ ) {
@@ -70,11 +79,22 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
         DBG("Jump: %u", *(1 + loc));
         output->append((const char *) (codes + *(++loc)));
         break;
+      case opcodes::PRINTSYM:
+        DBG("Symbol: %u, Jump: %u", *(1 + loc), symbols[*(1 + loc)]);
+        output->append((const char *) (codes + symbols[*(++loc)] + 2)); // Need 2 to skip symbol name and type marker
+        break;
       case opcodes::CALL:
         DBG("Push: %ld, Jump: %u", loc - codes, *(1 + loc));
         PUSH(sloc - codes);
         PUSH(loc - codes + 1);
         JUMP(*(++loc) - 1);  // Need -1 so increment on loop will cancel out
+        sloc = loc + 1;
+        break;
+      case opcodes::CALLSYM:
+        DBG("Symbol: %d, Push: %ld, Jump: %u", *(1 + loc), loc - codes, symbols[*(1 + loc)]);
+        PUSH(sloc - codes);
+        PUSH(loc - codes + 1);
+        JUMP(symbols[*(++loc)] + 2 - 1);  // Need -1 so increment on loop will cancel out
         sloc = loc + 1;
         break;
       case opcodes::RETURN:
@@ -85,6 +105,10 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
       case opcodes::JUMP:
         DBG("Jump: %u", *(1 + loc));
         JUMP(*(++loc) - 1); // -1 to cancel out the next loop increment
+        break;
+      case opcodes::JUMPL:
+        DBG("Jump: %u", (sloc - codes) + *(1 + loc));
+        JUMP((sloc - codes) + *(++loc) - 1); // -1 to cancel out the next loop increment
         break;
       case opcodes::PUSH:
         DBG("Push: %u", *(1 + loc));
@@ -109,10 +133,10 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
         break;
       
       /** Data operations --------------------------------------------------- */
-      case opcodes::DPUSH:
-        DBG("Top %p", (Data *) TOP);
-        _DPUSH((Data *) TOP);
-        break;
+//      case opcodes::DPUSH:
+//        DBG("Top %p", (Data *) TOP);
+//        _DPUSH((Data *) TOP);
+//        break;
       case opcodes::DPOP:
         DBG("DTop: %p", (Data *) _DTOP);
         _DPOP;
@@ -126,9 +150,27 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
         _DPUSH(_DSEARCH(&lookupstr));
         break;
       }
+      case opcodes::DLOOKUPSYM: {
+        DBG("Symbol: %u, Jump: %d", *(1 + loc), symbols[*(1 + loc)]);
+        const char * cstr = (const char *) (codes + symbols[*(++loc)] + 2); // Need 2 to skip symbol name and type
+        DBG(", String: %s", cstr);
+        lookupstr.assign(cstr);
+        DBG(", DPush: %p", _DSEARCH(&lookupstr));
+        _DPUSH(_DSEARCH(&lookupstr));
+        break;
+      }
       case opcodes::DLOOKUPNR: {
         DBG("Symbol: %u", *(1 + loc));
         char * cstr = (/*unsigned*/ char *) (codes + *(++loc));
+        DBG(", String: %s", cstr);
+        lookupstr.assign(cstr);
+        DBG(", DPush: %p", _DSEARCHNR(&lookupstr));
+        _DPUSH(_DSEARCHNR(&lookupstr));
+        break;
+      }
+      case opcodes::DLOOKUPNRSYM: {
+        DBG("Symbol: %u, Jump: %d", *(1 + loc), symbols[*(1 + loc)]);
+        const char * cstr = (const char *) (codes + symbols[*(++loc)] + 2); // Need 2 to skip symbol name and type
         DBG(", String: %s", cstr);
         lookupstr.assign(cstr);
         DBG(", DPush: %p", _DSEARCHNR(&lookupstr));
@@ -230,6 +272,9 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
     }
     DBGFOOT;
   }
+  
+  // Free
+  free(symbols);
 }
 
 }

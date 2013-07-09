@@ -6,7 +6,7 @@ int execNum = 1;
 
 int main( int argc, char * argv[] )
 {
-  char * directory;
+  char * directory = NULL;
   
   if( argc >= 2 ) {
     directory = argv[1];
@@ -28,7 +28,7 @@ int main( int argc, char * argv[] )
   DIR * dir;
   struct dirent * ent;
   if( (dir = opendir(directory)) == NULL ) {
-    std::cerr << "Unable to open directory\n";
+    std::cerr << "Unable to open directory " << directory << std::endl;
     return 1;
   }
   

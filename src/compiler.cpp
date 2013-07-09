@@ -7,6 +7,8 @@ namespace mustache {
 CompilerState::States CompilerState::next(uint8_t * code, uint8_t * operand) {
     if( this->pos > this->codes->size() ) {
       return this->state = States::END;
+    } else if( this->pos == 0 ) {
+      this->readHeader();
     }
     this->spos = this->pos;
     uint8_t * current = &((*this->codes)[this->pos]);
@@ -68,6 +70,17 @@ CompilerState::States CompilerState::next(uint8_t * code, uint8_t * operand) {
     }
     this->pos++;
     return this->state;
+}
+
+void CompilerState::readHeader()
+{
+  // Read the symbol table
+  this->numSymbols = _UNPACK4A((*this->codes), 0);
+  int i = 0;
+  for( ; i < this->numSymbols; i++ ) {
+    this->symbols.push_back(_UNPACK4A((*this->codes), 4 + 4 * i));
+  }
+  this->pos = 4 + 4 * this->numSymbols;
 }
 
 CompilerSymbol * Compiler::_compile(Node * node)
@@ -298,39 +311,30 @@ std::vector<uint8_t> * Compiler::_serialize(CompilerSymbol * main)
   std::vector<uint8_t> * codes = new std::vector<uint8_t>;
   std::vector<CompilerSymbol *>::iterator it;
   
-  /*
   // Calculate the size of the symbol table and allocate empty space
   // First four bytes is the number of items in the symbol table
-  // Each symbol has three parts:
-  // One byte for the type.
-  // Three bytes for the name
-  // Four bytes for the location
-  unsigned long header_size = 4 + symbols.size() * 8;
+  // Each symbol is four bytes for the location
+  uint32_t header_size = 4 + symbols.size() * 4;
   codes->resize(header_size, 0);
-  */
   
   // Serialize the symbols
-  int * table = new int[symbols.size()];
+  uint32_t * table = new uint32_t[symbols.size()];
   for( it = symbols.begin() ; it != symbols.end(); it++ ) {
+    table[(*it)->name] = codes->size();
     codes->push_back((*it)->type);
     codes->push_back((*it)->name);
-    table[(*it)->name] = codes->size();
     codes->insert(codes->end(), (*it)->code.begin(), (*it)->code.end());
     codes->push_back(0);
   }
   
-  /*
   // Write the symbol table now that we have the positions
   _PACK4A((*codes), 0, symbols.size());
-  _PACK2FN(header.push_back, symbols.size());
   for( it = symbols.begin() ; it != symbols.end(); it++ ) {
-    unsigned long off = (it - symbols.begin()) * 8 + 4;
-    _PACK1A((*codes), off, (*it)->type);
-    _PACK3A((*codes), off + 1, (*it)->name);
-    _PACK4A((*codes), off + 4, table[(*it)->name]);
+    uint32_t off = (it - symbols.begin()) * 4 + 4;
+    _PACK4A((*codes), off, table[(*it)->name]);
   }
-  */
   
+  /*
   // Second pass, resolve symbols to absolute jump points
   CompilerState * statec = new CompilerState(codes);
   uint8_t current = 0;
@@ -362,6 +366,7 @@ std::vector<uint8_t> * Compiler::_serialize(CompilerSymbol * main)
         break;
     }
   }
+   */
   
   return codes;
 }
@@ -437,34 +442,45 @@ std::string * Compiler::print(std::vector<uint8_t> * codes)
 {
   std::string * out = new std::string;
   char buf[101];
+  buf[0] = '\0';
   CompilerState * statec = new CompilerState(codes);
+  
+  // Print symbol table
+  uint32_t i = 0;
+  for( ; i < statec->symbols.size(); i++ ) {
+    snprintf(buf, 100, "Symbol %03u @ %03u\n", i, statec->symbols[i]);
+    out->append(buf);
+  }
+  
+  
+  // Print symbols
   uint8_t current = 0;
   uint8_t operand = 0;
   while( statec->next(&current, &operand) != CompilerState::END ) {
     switch( statec->state ) {
       case CompilerState::NOOP:
-        snprintf(buf, 100, "N%03lu:      0x%02x\n", 
+        snprintf(buf, 100, "N%03u:      0x%02x\n", 
                 statec->spos, current);
         break;
       case CompilerState::SYMBOL:
-        snprintf(buf, 100, "S%03lu:      0x%02x %s %d\n", 
+        snprintf(buf, 100, "S%03u:      0x%02x %s %d\n", 
                 statec->spos, current, opcodeName(current), operand);
         break;
       case CompilerState::FUNCTION:
         if( operand != 0 ) {
-          snprintf(buf, 100, "F%03lu: %03lu: 0x%02x %s %d\n", 
+          snprintf(buf, 100, "F%03u: %03u: 0x%02x %s %d\n", 
                   statec->spos, statec->lpos, current, opcodeName(current), operand);
         } else {
-          snprintf(buf, 100, "F%03lu: %03lu: 0x%02x %s\n", 
+          snprintf(buf, 100, "F%03u: %03u: 0x%02x %s\n", 
                   statec->spos, statec->lpos, current, opcodeName(current));
         }
         break;
       case CompilerState::STRING:
         if( current == 0x0a ) {
-          snprintf(buf, 100, "C%03lu: %03lu: 0x%02x %s\n", 
+          snprintf(buf, 100, "C%03u: %03u: 0x%02x %s\n", 
                   statec->spos, statec->lpos, current, "\\n");
         } else {
-          snprintf(buf, 100, "C%03lu: %03lu: 0x%02x %c\n", 
+          snprintf(buf, 100, "C%03u: %03u: 0x%02x %c\n", 
                   statec->spos, statec->lpos, current, current);
         }
         break;

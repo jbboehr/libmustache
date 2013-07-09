@@ -21,6 +21,11 @@
 #define _PACK2A(a, k, i) a[k] = _PACKI(i, 8); _PACK1A(a, k + 1, i);
 #define _PACK3A(a, k, i) a[k] = _PACKI(i, 16); _PACK2A(a, k + 1, i);
 #define _PACK4A(a, k, i) a[k] = _PACKI(i, 24); _PACK3A(a, k + 1, i);
+#define _UNPACKI(i, n) (i << n)
+#define _UNPACK1A(a, k) _UNPACKI(a[k], 0)
+#define _UNPACK2A(a, k) _UNPACKI(a[k], 8) + _UNPACK1A(a, k + 1)
+#define _UNPACK3A(a, k) _UNPACKI(a[k], 16) + _UNPACK2A(a, k + 1)
+#define _UNPACK4A(a, k) _UNPACKI(a[k], 24) + _UNPACK3A(a, k + 1)
 
 namespace mustache {
 
@@ -225,9 +230,11 @@ public:
   };
   enum States state;
   enum States nextState;
-  unsigned long pos;
-  unsigned long spos;
-  unsigned long lpos;
+  uint32_t pos;
+  uint32_t spos;
+  uint32_t lpos;
+  uint32_t numSymbols;
+  std::vector<uint32_t> symbols;
   std::vector<uint8_t> * codes;
   CompilerState() : 
         state(States::NOOP),
@@ -241,18 +248,18 @@ public:
     this->state = state;
     this->pos = pos;
     this->codes = codes;
+    this->readHeader();
   };
   States next(uint8_t * code, uint8_t * operand);
+  void readHeader();
 };
 
 class CompilerSymbol {
 public:
-  uint16_t name;
+  uint32_t name;
   uint8_t type;
   std::vector<uint8_t> code;
-  CompilerSymbol() : name(0), type(0) {
-    
-  };
+  CompilerSymbol() : name(0), type(0) {};
 };
 
 class Compiler {

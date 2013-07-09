@@ -102,42 +102,6 @@ int Data::isEmpty()
 
 
 
-void DataStack::push_back(Data * data)
-{
-  if( _size < 0 || _size >= DataStack::MAXSIZE ) {
-    throw Exception("Reached max stack size");
-  }
-  _stack[_size] = data;
-  _size++;
-}
-
-void DataStack::pop_back()
-{
-  if( _size > 0 ) {
-    _size--;
-    _stack[_size] = NULL;
-  }
-}
-
-Data * DataStack::back()
-{
-  if( _size <= 0 ) {
-    throw Exception("Reached bottom of stack");
-  } else {
-    return _stack[_size - 1];
-  }
-}
-
-Data ** DataStack::begin()
-{
-  return _stack;
-}
-
-Data ** DataStack::end()
-{
-  return (_stack + _size - 1);
-}
-
 Data * DataStack::search(std::string * key)
 {
   // Resolve up the data stack
@@ -230,7 +194,7 @@ static void _createFromJSON(Data * data, struct json_object * object)
       break;
     }
     default: {
-      throw new Exception("Unknown json type");
+      throw Exception("Unknown json type");
     }
   }
 }
@@ -300,7 +264,7 @@ static void _createFromYAML(Data * data, yaml_document_t * document, yaml_node_t
       break;
     }
     default: {
-      throw new Exception("Unknown yaml type");
+      throw Exception("Unknown yaml type");
     }
   }
 }

@@ -41,7 +41,7 @@ deepr: all
 	./bin/mustache -c -r -t test/fixtures/deep.mustache -o test/fixtures/deep.log
 	cat test/fixtures/deep.log
 
-deepce: all complexc
+deepce: all deepc
 	./bin/mustache -e -t test/fixtures/deep.bin -d test/fixtures/deep.yml
 	
 if GCC

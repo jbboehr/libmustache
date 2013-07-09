@@ -117,22 +117,51 @@ class DataStack {
     DataStack() : _size(0) {};
     
     //! Add an element onto the top of the stack
-    void push_back(Data * data);
+    void push_back(Data * data) {
+#ifdef MUSTACHE_DATA_STACK_CHECKED
+      if( _size < 0 || _size >= DataStack::MAXSIZE ) {
+        throw Exception("Reached max stack size");
+      }
+#endif
+      _stack[_size] = data;
+      _size++;
+    }
     
     //! Pop an element off the top of the stack
-    void pop_back();
+    void pop_back() {
+#ifdef MUSTACHE_DATA_STACK_CHECKED
+      if( _size <= 0 ) {
+        return;
+      }
+#endif
+      _size--;
+      _stack[_size] = NULL;
+    };
     
     //! Get the top of the stack
-    Data * back();
+    Data * back() {
+#ifdef MUSTACHE_DATA_STACK_CHECKED
+      if( _size <= 0 ) {
+        throw Exception("Reached bottom of stack");
+      }
+#endif
+      return _stack[_size - 1];
+    };
     
     //! Get the size of the stack
-    int size() { return _size; };
+    int size() {
+      return _size;
+    };
     
     //! Gets a pointer to the beginning of the stack
-    Data ** begin();
+    Data ** begin() {
+      return _stack;
+    };
     
     //! Gets a pointer to the end of the stack
-    Data ** end();
+    Data ** end() {
+      return (_stack + _size - 1);
+    };
     
     //! Looks up the stack for a map value
     Data * search(std::string * key);
