@@ -1,17 +1,16 @@
 
 #include "vm.hpp"
 
-#define _EINIT stackSize = 0
-#define PUSH(v) stack[stackSize++] = v
-#define POPN --stackSize
-#define POPR stack[--stackSize]
-#define TOP stack[stackSize - 1]
-#define TOP1 stack[stackSize - 2]
-
 #define JUMP(pos) loc = codes + pos
 #define SKIP ++loc; if( Compiler::hasOperand(*loc) ) ++loc
+#define RUN loc = codes + length + 1
 #define LOC loc - codes
 #define LLOC loc - sloc
+
+#define _EPUSH(v) stack[stackSize++] = v
+#define _EPOP stack[--stackSize]
+#define _ETOP stack[stackSize - 1]
+#define _ETOP1 stack[stackSize - 2]
 
 #define _DINIT(v) dataStack.clear(); dataStack.push_back(v)
 #define _DTOP dataStack.back()
@@ -46,7 +45,8 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
   register uint8_t * end = codes + length;
   register uint8_t * sloc = loc;
   register uint32_t * symbols = NULL;
-  _EINIT;
+  register uint32_t * stack = this->stack;
+  register uint32_t stackSize = 0;
   _DINIT(data);
   
   // Read the symbol table
@@ -67,8 +67,8 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
   
   // First thing to put on stack is code past the end of length so that the VM
   // will terminate when returning from main
-  PUSH(LOC);
-  PUSH(length + 1);
+  _EPUSH(LOC);
+  _EPUSH(length + 1);
   
   for( ; loc < end; loc++ ) {
     DBGHEAD;
@@ -84,22 +84,22 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
         break;
       case opcodes::CALL:
         DBG("Push: %ld, Jump: %u", loc - codes, *(1 + loc));
-        PUSH(sloc - codes);
-        PUSH(loc - codes + 1);
+        _EPUSH(sloc - codes);
+        _EPUSH(loc - codes + 1);
         JUMP(*(++loc) - 1);  // Need -1 so increment on loop will cancel out
         sloc = loc + 1;
         break;
       case opcodes::CALLSYM:
         DBG("Symbol: %d, Push: %ld, Jump: %u", *(1 + loc), loc - codes, symbols[*(1 + loc)]);
-        PUSH(sloc - codes);
-        PUSH(loc - codes + 1);
+        _EPUSH(sloc - codes);
+        _EPUSH(loc - codes + 1);
         JUMP(symbols[*(++loc)] + 2 - 1);  // Need -1 so increment on loop will cancel out
         sloc = loc + 1;
         break;
       case opcodes::RETURN:
-        DBG("Jump: %lu", TOP);
-        JUMP(POPR);
-        sloc = codes + POPR;
+        DBG("Jump: %lu", _ETOP);
+        JUMP(_EPOP);
+        sloc = codes + _EPOP;
         break;
       case opcodes::JUMP:
         DBG("Jump: %u", *(1 + loc));
@@ -111,19 +111,19 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
         break;
       case opcodes::PUSH:
         DBG("Push: %u", *(1 + loc));
-        PUSH(*(++loc));
+        _EPUSH(*(++loc));
         break;
       case opcodes::POP:
-        DBG("Top: %lu", TOP);
-        POPN;
+        DBG("Top: %lu", _ETOP);
+        _EPOP;
         break;
       case opcodes::INCR:
-        DBG("%lu+1", TOP);
-        TOP++;
+        DBG("%lu+1", _ETOP);
+        _ETOP++;
         break;
       case opcodes::IF_GE:
-        DBG("%ld >= %ld", TOP, TOP1);
-        if( TOP >= TOP1 ) {
+        DBG("%ld >= %ld", _ETOP, _ETOP1);
+        if( _ETOP >= _ETOP1 ) {
           DBG(", GE");
         } else {
           DBG(", !GE");
@@ -133,8 +133,8 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
       
       /** Data operations --------------------------------------------------- */
 //      case opcodes::DPUSH:
-//        DBG("Top %p", (Data *) TOP);
-//        _DPUSH((Data *) TOP);
+//        DBG("Top %p", (Data *) _ETOP);
+//        _DPUSH((Data *) _ETOP);
 //        break;
       case opcodes::DPOP:
         DBG("DTop: %p", (Data *) _DTOP);
@@ -177,17 +177,17 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
         break;
       }
       case opcodes::DLOOKUPA: {
-        DBG("Index: %lu, DPush: %p", TOP, _DTOP->array + TOP);
-        _DPUSH(_DTOP->array + TOP);
+        DBG("Index: %lu, DPush: %p", _ETOP, _DTOP->array + _ETOP);
+        _DPUSH(_DTOP->array + _ETOP);
         break;
       }
       case opcodes::DARRSIZE:
         if( _DTOP != NULL && _DTOP->type == Data::TypeArray ) {
-          PUSH(_DTOP->length);
+          _EPUSH(_DTOP->length);
         } else {
-          PUSH(0);
+          _EPUSH(0);
         }
-        DBG("Size: %lu", TOP);
+        DBG("Size: %lu", _ETOP);
         break;
       case opcodes::DPRINT:
         DBG("DTop: %p", _DTOP);
