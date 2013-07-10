@@ -21,8 +21,10 @@ namespace mustache {
 class VM {
 private:
   uint32_t stack[127];
-  DataStack dataStack;
+  Data * dataStack[127];
   std::string lookupstr;
+  Data * search(uint32_t dataStackSize, std::string * key);
+  Data * searchnr(uint32_t dataStackSize, std::string * key);
 public:
   std::string * execute(uint8_t * codes, int length, Data * data);
   void execute(uint8_t * codes, int length, Data * data, std::string * output);
