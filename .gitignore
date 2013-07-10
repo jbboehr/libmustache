@@ -33,6 +33,8 @@ stamp-h1
 *.gcov
 *.gcda
 *.gcno
+*.log
+*.bin
 
 # specific
 bin/mustache
@@ -41,6 +43,7 @@ libmustache_test.info
 nbproject
 src/mustache_config.h
 test/spec/test_spec
+test/test_utils
 test_coverage
 
 # distros

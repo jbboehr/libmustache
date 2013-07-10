@@ -102,6 +102,10 @@ int main( int argc, char * argv[] )
         std::string optargstr(optarg);
         std::vector<std::string> optargparts;
         mustache::explode("=", optargstr, &optargparts);
+        if( optargparts.size() < 2 ) {
+          fprintf(stderr, "Must specify a partial name and file in the format <name>=<file>\n");
+          goto error;
+        }
         partialFiles.insert(std::make_pair(optargparts[0], optargparts[1]));
         break;
       }

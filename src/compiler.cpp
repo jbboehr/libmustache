@@ -85,12 +85,17 @@ void CompilerState::readHeader()
 
 CompilerSymbol * Compiler::_compile(Node * node)
 {
-  CompilerSymbol * sym = NULL;
+  CompilerSymbol * sym = getSymbol();
+  _compile(node, sym);
+  return sym;
+}
+
+CompilerSymbol * Compiler::_compile(Node * node, CompilerSymbol * sym)
+{
   CompilerSymbol * child = NULL;
   
   switch( node->type ) {
     case Node::TypeRoot: {
-      sym = getSymbol();
       sym->type = mustache::opcodes::FUNCTION;
       if( node->children.size() > 0 ) {
         Node::Children::iterator it;
@@ -108,14 +113,14 @@ CompilerSymbol * Compiler::_compile(Node * node)
       break;
     }
     case Node::TypeSection: {
+      // Get the main symbol
+      sym->type = mustache::opcodes::FUNCTION;
+      
       // Don't have to do anything if empty
       if( node->children.size() <= 0 ) {
-        return NULL;
+        sym->code.push_back(opcodes::RETURN);
+        break;
       }
-      
-      // Get the main symbol
-      sym = getSymbol();
-      sym->type = mustache::opcodes::FUNCTION;
       
       // Make the section name symbol
       CompilerSymbol * nameSym = getSymbol();
@@ -204,7 +209,6 @@ CompilerSymbol * Compiler::_compile(Node * node)
       break;
     }
     case Node::TypeNegate: {
-      sym = getSymbol();
       sym->type = mustache::opcodes::FUNCTION;
       
       CompilerSymbol * nameSym = getSymbol();
@@ -238,6 +242,12 @@ CompilerSymbol * Compiler::_compile(Node * node)
       sym->code.push_back(opcodes::DPOP);
       
       sym->code.push_back(opcodes::RETURN);
+      break;
+    }
+    default: {
+      std::ostringstream oss;
+      oss << "Unknown type" << node->type;
+      throw Exception(oss.str());
     }
   }
   
@@ -325,11 +335,14 @@ void Compiler::_compileIn(Node * node, CompilerSymbol * symbol)
       // If we have a partial, compile it in and call it, and add it to the 
       // map of compiled partials
       if( foundPartial != NULL ) {
-        CompilerSymbol * partialSym = _compile(foundPartial);
+        // Need to get and store the symbol now to support recursion
+        CompilerSymbol * partialSym = getSymbol();
         symbol->code.push_back(opcodes::CALLSYM);
         symbol->code.push_back(partialSym->name);
-        
         partialSymbols.insert(std::make_pair(*(node->data), partialSym->name));
+        
+        // Can compile afterwards
+        _compile(foundPartial, partialSym);
       } else {
         // Otherwise, maybe we should link it at runtime?
         

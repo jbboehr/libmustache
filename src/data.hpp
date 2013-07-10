@@ -116,6 +116,11 @@ class DataStack {
     //! Constructor
     DataStack() : _size(0) {};
     
+    //! Clear the data stack
+    void clear() {
+      _size = 0;
+    }
+    
     //! Add an element onto the top of the stack
     void push_back(Data * data) {
 #ifdef MUSTACHE_DATA_STACK_CHECKED

@@ -7,10 +7,13 @@
 #endif
 
 #include <cstring>
+#include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include "node.hpp"
+#include "exception.hpp"
 
 #define _PACKI(i, n) ((i & (0xff << n)) >> n)
 #define _PACK1FN(fn, i) fn(_PACKI(i, 0))
@@ -278,6 +281,7 @@ private:
   std::map<std::string,int> partialSymbols;
   
   CompilerSymbol * _compile(Node * node);
+  CompilerSymbol * _compile(Node * node, CompilerSymbol * sym);
   void _compileIn(Node * node, CompilerSymbol * symbol);
   std::vector<uint8_t> * _serialize(CompilerSymbol * main);
   

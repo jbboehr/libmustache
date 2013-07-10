@@ -1,5 +1,5 @@
 
-bin_PROGRAMS = test_spec
+check_PROGRAMS = test_spec
 
 test_spec_SOURCES = test_spec.cpp test_spec.hpp
 

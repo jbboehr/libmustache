@@ -1,16 +1,19 @@
 
 #include "vm.hpp"
 
+#define _EINIT stackSize = 0
 #define PUSH(v) stack[stackSize++] = v
 #define POPN --stackSize
 #define POPR stack[--stackSize]
 #define TOP stack[stackSize - 1]
 #define TOP1 stack[stackSize - 2]
+
 #define JUMP(pos) loc = codes + pos
 #define SKIP ++loc; if( Compiler::hasOperand(*loc) ) ++loc
 #define LOC loc - codes
 #define LLOC loc - sloc
 
+#define _DINIT(v) dataStack.clear(); dataStack.push_back(v)
 #define _DTOP dataStack.back()
 #define _DPOP dataStack.pop_back()
 #define _DPOPR dataStack.back(); dataStack.pop_back()
@@ -43,12 +46,8 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
   register uint8_t * end = codes + length;
   register uint8_t * sloc = loc;
   register uint32_t * symbols = NULL;
-  uint32_t stack[127];
-  uint32_t stackSize = 0;
-  DataStack dataStack;
-  dataStack.push_back(data);
-  Data * current = dataStack.back();
-  std::string lookupstr;
+  _EINIT;
+  _DINIT(data);
   
   // Read the symbol table
   {
