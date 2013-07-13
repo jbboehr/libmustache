@@ -196,14 +196,12 @@ void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
         if( _DTOP != NULL && _DTOP->type == Data::TypeString ) {
           output->append(*(_DTOP->val));
         }
-        _DPOP;
         break;
       case opcodes::DPRINTE:
         DBG("DTop: %p", _DTOP);
         if( _DTOP != NULL && _DTOP->type == Data::TypeString ) {
           htmlspecialchars_append((_DTOP->val), output);
         }
-        _DPOP;
         break;
       
       /** Data conditionals ------------------------------------------------- */

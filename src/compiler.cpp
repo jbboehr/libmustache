@@ -85,6 +85,11 @@ void CompilerState::readHeader()
 
 int Compiler::_makeLookup(Node * node, CompilerSymbol * sym)
 {
+  // Do nothing for the implicit iterator
+  if( node->data->compare(".") == 0 ) {
+    return 0;
+  }
+  
   if( node->dataParts == NULL ) {
     // Store string in symbol
     CompilerSymbol * str = getSymbol();
@@ -302,8 +307,7 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       }
       
       // Pop the context shifts
-      // Need - 1 because dprint pops
-      this->_makeLookupEnd(num - 1, sym);
+      this->_makeLookupEnd(num, sym);
       break;
     }
     
