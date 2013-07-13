@@ -17,16 +17,33 @@
 
 
 namespace mustache {
-  
+
+
+/**
+ * The virtual machine
+ */
 class VM {
 private:
+  //! Execution stack
   uint32_t stack[127];
+  
+  //! Data stack
   Data * dataStack[127];
+  
+  //! String for doing map lookups
   std::string lookupstr;
+  
+  //! Search the data stack
   Data * search(uint32_t dataStackSize, std::string * key);
+  
+  //! Search the data stack without traversing up it
   Data * searchnr(uint32_t dataStackSize, std::string * key);
+  
 public:
+  //! Execute the VM
   std::string * execute(uint8_t * codes, int length, Data * data);
+  
+  //! Execute the VM
   void execute(uint8_t * codes, int length, Data * data, std::string * output);
 };
 

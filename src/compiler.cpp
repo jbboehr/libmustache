@@ -83,6 +83,44 @@ void CompilerState::readHeader()
   this->pos = 4 + 4 * this->numSymbols;
 }
 
+int Compiler::_makeLookup(Node * node, CompilerSymbol * sym)
+{
+  if( node->dataParts == NULL ) {
+    // Store string in symbol
+    CompilerSymbol * str = getSymbol();
+    str->type = mustache::opcodes::STRING;
+    for( int i = 0, l = node->data->length(); i < l; i++ ) {
+      str->code.push_back((uint8_t) node->data->at(i));
+    }
+    sym->code.push_back(opcodes::DLOOKUPSYM);
+    sym->code.push_back(str->name & 0xff);
+    return 1;
+  } else {
+    std::vector<std::string>::iterator vs_it;
+    int num = 0;
+    for( vs_it = node->dataParts->begin(); vs_it != node->dataParts->end(); vs_it++ ) {
+      // Store string in symbol
+      CompilerSymbol * str = getSymbol();
+      str->type = mustache::opcodes::STRING;
+      for( int i = 0, l = vs_it->length(); i < l; i++ ) {
+        str->code.push_back((uint8_t) vs_it->at(i));
+      }
+      sym->code.push_back(num == 0 ? opcodes::DLOOKUPSYM : opcodes::DLOOKUPNRSYM);
+      sym->code.push_back(str->name & 0xff);
+      num++;
+    }
+    return num;
+  }
+}
+
+void Compiler::_makeLookupEnd(int num, CompilerSymbol * sym)
+{
+  int i = 0;
+  for( ; i < num - 1; i++ ) {
+    sym->code.push_back(opcodes::DPOP);
+  }
+}
+
 CompilerSymbol * Compiler::_compile(Node * node)
 {
   CompilerSymbol * sym = getSymbol();
@@ -90,11 +128,13 @@ CompilerSymbol * Compiler::_compile(Node * node)
   return sym;
 }
 
-CompilerSymbol * Compiler::_compile(Node * node, CompilerSymbol * sym)
+void Compiler::_compile(Node * node, CompilerSymbol * sym)
 {
   CompilerSymbol * child = NULL;
   
   switch( node->type ) {
+    
+    /* Root ----------------------------------------------------------------- */
     case Node::TypeRoot: {
       sym->type = mustache::opcodes::FUNCTION;
       if( node->children.size() > 0 ) {
@@ -105,13 +145,15 @@ CompilerSymbol * Compiler::_compile(Node * node, CompilerSymbol * sym)
             sym->code.push_back(opcodes::CALLSYM);
             sym->code.push_back(child->name);
           } else {
-            _compileIn(*it, sym);
+            _compile(*it, sym);
           }
         }
       }
       sym->code.push_back(opcodes::RETURN);
       break;
     }
+    
+    /* Section -------------------------------------------------------------- */
     case Node::TypeSection: {
       // Get the main symbol
       sym->type = mustache::opcodes::FUNCTION;
@@ -122,13 +164,6 @@ CompilerSymbol * Compiler::_compile(Node * node, CompilerSymbol * sym)
         break;
       }
       
-      // Make the section name symbol
-      CompilerSymbol * nameSym = getSymbol();
-      nameSym->type = mustache::opcodes::STRING;
-      for( int i = 0, l = node->data->length(); i < l; i++ ) {
-        nameSym->code.push_back((uint8_t) node->data->at(i));
-      }
-      
       // Make the section children function symbol
       CompilerSymbol * childrenSym = getSymbol();
       childrenSym->type = mustache::opcodes::FUNCTION;
@@ -136,20 +171,20 @@ CompilerSymbol * Compiler::_compile(Node * node, CompilerSymbol * sym)
       for ( it = node->children.begin() ; it != node->children.end(); it++ ) {
         if( (*it)->type & Node::TypeHasChildren ) {
           child = _compile(*it);
-          if( child != NULL ) {
-            childrenSym->code.push_back(opcodes::CALLSYM);
-            childrenSym->code.push_back(child->name);
-          }
+          childrenSym->code.push_back(opcodes::CALLSYM);
+          childrenSym->code.push_back(child->name);
         } else {
-          _compileIn(*it, childrenSym);
+          _compile(*it, childrenSym);
         }
       }
       childrenSym->code.push_back(opcodes::RETURN);
       
       // Make the main symbol
-      sym->code.push_back(opcodes::DLOOKUPSYM);
-      sym->code.push_back(nameSym->name);
       
+      // Push the context shifts
+      int num = this->_makeLookup(node, sym);
+      
+      // If context empty, jump right to end
       sym->code.push_back(opcodes::DIF_EMPTY);
       sym->code.push_back(opcodes::JUMPL);
       size_t ifemptyoppos = sym->code.size();
@@ -203,22 +238,20 @@ CompilerSymbol * Compiler::_compile(Node * node, CompilerSymbol * sym)
       sym->code[ifemptyoppos] = sym->code.size();
       sym->code[ifnotarrayoppos] = sym->code.size();
       sym->code[ifnotarrayoppos2] = sym->code.size();
-      sym->code.push_back(opcodes::DPOP);
+      
+      // Pop the context shifts
+      this->_makeLookupEnd(num, sym);
       
       sym->code.push_back(opcodes::RETURN);
       break;
     }
+    
+    /* Negate --------------------------------------------------------------- */
     case Node::TypeNegate: {
       sym->type = mustache::opcodes::FUNCTION;
       
-      CompilerSymbol * nameSym = getSymbol();
-      nameSym->type = mustache::opcodes::STRING;
-      for( int i = 0, l = node->data->length(); i < l; i++ ) {
-        nameSym->code.push_back((uint8_t) node->data->at(i));
-      }
-      
-      sym->code.push_back(opcodes::DLOOKUPSYM);
-      sym->code.push_back(nameSym->name);
+      // Push the context shifts
+      int num = this->_makeLookup(node, sym);
       
       sym->code.push_back(opcodes::DIF_NOTEMPTY);
       sym->code.push_back(opcodes::JUMPL);
@@ -233,30 +266,21 @@ CompilerSymbol * Compiler::_compile(Node * node, CompilerSymbol * sym)
             sym->code.push_back(opcodes::CALLSYM);
             sym->code.push_back(child->name);
           } else {
-            _compileIn(*it, sym);
+            _compile(*it, sym);
           }
         }
       }
       
       sym->code[ifemptyoppos] = sym->code.size();
-      sym->code.push_back(opcodes::DPOP);
+      
+      // Pop the context shifts
+      this->_makeLookupEnd(num, sym);
       
       sym->code.push_back(opcodes::RETURN);
       break;
     }
-    default: {
-      std::ostringstream oss;
-      oss << "Unknown type" << node->type;
-      throw Exception(oss.str());
-    }
-  }
-  
-  return sym;
-}
-
-void Compiler::_compileIn(Node * node, CompilerSymbol * symbol)
-{
-  switch( node->type ) {
+    
+    /* Output --------------------------------------------------------------- */
     case Node::TypeOutput: {
       // Store string in symbol
       CompilerSymbol * str = getSymbol();
@@ -266,59 +290,35 @@ void Compiler::_compileIn(Node * node, CompilerSymbol * symbol)
       }
       //str->code.push_back(0x00); // The "linker" will null-terminate the string
       // Add print for symbol
-      symbol->code.push_back(opcodes::PRINTSYM);
-      symbol->code.push_back(str->name & 0xff); // @todo multi-byte
+      sym->code.push_back(opcodes::PRINTSYM);
+      sym->code.push_back(str->name & 0xff); // @todo multi-byte
       break;
     }
+    
+    /* Tag ------------------------------------------------------------------ */
     case Node::TypeVariable:
     case Node::TypeTag: {
-      // Without dots
-      if( node->dataParts == NULL ) {
-        // Store string in symbol
-        CompilerSymbol * str = getSymbol();
-        str->type = mustache::opcodes::STRING;
-        for( int i = 0, l = node->data->length(); i < l; i++ ) {
-          str->code.push_back((uint8_t) node->data->at(i));
-        }
-        symbol->code.push_back(opcodes::DLOOKUPSYM);
-        symbol->code.push_back(str->name & 0xff);
-        if( node->flags && Node::FlagEscape ) {
-          symbol->code.push_back(opcodes::DPRINTE);
-        } else {
-          symbol->code.push_back(opcodes::DPRINT);
-        }
+      // Push the context shifts
+      int num = this->_makeLookup(node, sym);
+      
+      if( node->flags && Node::FlagEscape ) {
+        sym->code.push_back(opcodes::DPRINTE);
       } else {
-        std::vector<std::string>::iterator vs_it;
-        int num = 0;
-        for( vs_it = node->dataParts->begin(); vs_it != node->dataParts->end(); vs_it++ ) {
-          // Store string in symbol
-          CompilerSymbol * str = getSymbol();
-          str->type = mustache::opcodes::STRING;
-          for( int i = 0, l = vs_it->length(); i < l; i++ ) {
-            str->code.push_back((uint8_t) vs_it->at(i));
-          }
-          symbol->code.push_back(num == 0 ? opcodes::DLOOKUPSYM : opcodes::DLOOKUPNRSYM);
-          symbol->code.push_back(str->name & 0xff);
-          num++;
-        }
-        if( node->flags && Node::FlagEscape ) {
-          symbol->code.push_back(opcodes::DPRINTE);
-        } else {
-          symbol->code.push_back(opcodes::DPRINT);
-        }
-        int i = 0;
-        for( i = 0; i < num - 1; i++ ) {
-          symbol->code.push_back(opcodes::DPOP);
-        }
+        sym->code.push_back(opcodes::DPRINT);
       }
+      
+      // Pop the context shifts
+      this->_makeLookupEnd(num, sym);
       break;
     }
+    
+    /* Partial -------------------------------------------------------------- */
     case Node::TypePartial: {
       // Check for a partial that's already been compiled
       std::map<std::string,int>::iterator pc_it = partialSymbols.find(*(node->data));
       if( pc_it != partialSymbols.end() ) {
-        symbol->code.push_back(opcodes::CALLSYM);
-        symbol->code.push_back(pc_it->second);
+        sym->code.push_back(opcodes::CALLSYM);
+        sym->code.push_back(pc_it->second);
         break;
       }
       
@@ -337,8 +337,8 @@ void Compiler::_compileIn(Node * node, CompilerSymbol * symbol)
       if( foundPartial != NULL ) {
         // Need to get and store the symbol now to support recursion
         CompilerSymbol * partialSym = getSymbol();
-        symbol->code.push_back(opcodes::CALLSYM);
-        symbol->code.push_back(partialSym->name);
+        sym->code.push_back(opcodes::CALLSYM);
+        sym->code.push_back(partialSym->name);
         partialSymbols.insert(std::make_pair(*(node->data), partialSym->name));
         
         // Can compile afterwards
@@ -353,9 +353,23 @@ void Compiler::_compileIn(Node * node, CompilerSymbol * symbol)
           str->code.push_back((uint8_t) node->data->at(i));
         }
 
-        symbol->code.push_back(opcodes::CALLEXT);
-        symbol->code.push_back(str->name);
+        sym->code.push_back(opcodes::CALLEXT);
+        sym->code.push_back(str->name);
       }
+    }
+    
+    /* Other ---------------------------------------------------------------- */
+    case Node::TypeComment:
+      // Ignore comments
+      break;
+    case Node::TypeStop:
+      // Ignore close tags (already parsed)
+      break;
+    default: {
+      // Throw exception on unknown token type
+      std::ostringstream oss;
+      oss << "Unknown type" << node->type;
+      throw Exception(oss.str());
     }
   }
 }

@@ -33,6 +33,9 @@
 namespace mustache {
 
 
+/**
+ * Enumeration of opcodes
+ */
 typedef enum opcodes {
   
   /** Symbols --------------------------------------------------------------- */
@@ -230,6 +233,12 @@ typedef enum opcodes {
   
 } opcodes;
 
+
+
+/**
+ * Bytecode parser. Not optimized for speed, only use in the compiler, 
+ * not the VM
+ */
 class CompilerState {
 public:
   enum States {
@@ -266,40 +275,89 @@ public:
   void readHeader();
 };
 
+
+
+/**
+ * Compiler symbol
+ */
 class CompilerSymbol {
 public:
+  //! The name of the symbol
   uint32_t name;
+  
+  //! The type of the symbol (see opcodes 2-3)
   uint8_t type;
+  
+  //! Vector of the symbol code
   std::vector<uint8_t> code;
+  
+  //! Constructor
   CompilerSymbol() : name(0), type(0) {};
 };
 
+
+
+/**
+ * Compiler
+ */
 class Compiler {
 private:
+  //! Stores the symbols during compilation
   std::vector<CompilerSymbol *> symbols;
+  
+  //! Stores any partials to be compiled into the current code
   Node::Partials * partials;
+  
+  //! Stores the symbol names for partials to be compiled in
   std::map<std::string,int> partialSymbols;
   
+  //! Build the context shift bytecode for a node that causes the context to shift
+  int _makeLookup(Node * node, CompilerSymbol * sym);
+  
+  //! Build the context shift cleanup bytecode
+  void _makeLookupEnd(int num, CompilerSymbol * sym);
+  
+  //! Compile a node
   CompilerSymbol * _compile(Node * node);
-  CompilerSymbol * _compile(Node * node, CompilerSymbol * sym);
-  void _compileIn(Node * node, CompilerSymbol * symbol);
+  
+  //! Compile a node
+  void _compile(Node * node, CompilerSymbol * sym);
+  
+  //! Serialize all symbols into contiguous bytecode
   std::vector<uint8_t> * _serialize(CompilerSymbol * main);
   
+  //! Get a symbol
   CompilerSymbol * getSymbol();
+  
 public:
+  //! Compile a node
   std::vector<uint8_t> * compile(Node * node);
+  
+  //! Compile a node (with partials)
   std::vector<uint8_t> * compile(Node * node, Node::Partials * partials);
   
+  //! Get the name of an opcode
   static const char * opcodeName(uint8_t code);
   
+  //! Print readable form of bytecode
   static std::string * print(uint8_t * codes, int length);
+  
+  //! Print readable form of bytecode
   static std::string * print(std::vector<uint8_t> * codes);
   
+  //! Converts a uint8_t buffer to a uint8_t vector
   static void bufferToVector(uint8_t * buffer, int length, std::vector<uint8_t> ** vector);
+  
+  //! Converts a string to a uint8_t buffer
   static void stringToBuffer(std::string * string, uint8_t ** buffer, int * length);
+  
+  //! Converts a string to a uint8_t vector
   static void stringToVector(std::string * string, std::vector<uint8_t> ** vector);
+  
+  //! Converts a uint8_t vector to a uint8_t buffer
   static void vectorToBuffer(std::vector<uint8_t> * vector, uint8_t ** buffer, int * length);
   
+  //! Does the opcode have an operand
   static bool hasOperand(uint8_t code) {
     switch( code ) {
       case opcodes::FUNCTION:
