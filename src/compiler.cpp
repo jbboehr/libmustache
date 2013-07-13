@@ -116,7 +116,7 @@ int Compiler::_makeLookup(Node * node, CompilerSymbol * sym)
 void Compiler::_makeLookupEnd(int num, CompilerSymbol * sym)
 {
   int i = 0;
-  for( ; i < num - 1; i++ ) {
+  for( ; i < num; i++ ) {
     sym->code.push_back(opcodes::DPOP);
   }
 }
@@ -222,11 +222,6 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       
       sym->code.push_back(opcodes::DPOP);
       
-      sym->code.push_back(opcodes::DIF_NOTARRAY);
-      sym->code.push_back(opcodes::JUMPL);
-      size_t ifnotarrayoppos2 = sym->code.size();
-      sym->code.push_back(0x00);
-      
       sym->code.push_back(opcodes::INCR);
       sym->code.push_back(opcodes::JUMPL);
       sym->code.push_back(ifarrayinoppos);
@@ -237,7 +232,6 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       
       sym->code[ifemptyoppos] = sym->code.size();
       sym->code[ifnotarrayoppos] = sym->code.size();
-      sym->code[ifnotarrayoppos2] = sym->code.size();
       
       // Pop the context shifts
       this->_makeLookupEnd(num, sym);
@@ -308,7 +302,8 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       }
       
       // Pop the context shifts
-      this->_makeLookupEnd(num, sym);
+      // Need - 1 because dprint pops
+      this->_makeLookupEnd(num - 1, sym);
       break;
     }
     
