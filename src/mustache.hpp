@@ -11,12 +11,14 @@
 #include <memory>
 #include <string>
 
+#include "compiler.hpp"
 #include "data.hpp"
 #include "exception.hpp"
 #include "node.hpp"
 #include "renderer.hpp"
 #include "tokenizer.hpp"
 #include "utils.hpp"
+#include "vm.hpp"
 
 
 #define LIBMUSTACHE_VERSION "0.0.1-dev"
