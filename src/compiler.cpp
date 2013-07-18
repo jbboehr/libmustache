@@ -1,4 +1,6 @@
 
+#include <limits.h>
+
 #include "compiler.hpp"
 
 namespace mustache {
@@ -568,45 +570,61 @@ std::string * Compiler::print(std::vector<uint8_t> * codes)
   return out;
 }
 
-void Compiler::bufferToVector(uint8_t * buffer, int length, std::vector<uint8_t> ** vector)
+void Compiler::bufferToVector(uint8_t * buffer, size_t length, std::vector<uint8_t> ** vector)
 {
   std::vector<uint8_t> * vect = *vector = new std::vector<uint8_t>;
   vect->resize(length);
+#ifdef HAVE_CXX11
+  memcpy(vect->data(), buffer, length);
+#else
   int i = 0;
   for( ; i < length; i++, buffer++ ) {
     (*vect)[i] = *buffer;
   }
+#endif
 }
 
-void Compiler::stringToBuffer(std::string * string, uint8_t ** buffer, int * length)
+void Compiler::stringToBuffer(std::string * string, uint8_t ** buffer, size_t * length)
 {
-  int len = *length = string->size();
-  uint8_t * buf = *buffer = (uint8_t *) calloc(sizeof(uint8_t), len);
+  size_t len = *length = string->size();
+  uint8_t * buf = *buffer = (uint8_t *) malloc(sizeof(uint8_t) * len);
+#if CHAR_BIT == 8
+  memcpy(buf, string->data(), len);
+#else
   int i = 0;
   for( ; i < len; i++, buf++ ) {
     *buf = (uint8_t) (*string)[i];
   }
+#endif
 }
 
 void Compiler::stringToVector(std::string * string, std::vector<uint8_t> ** vector)
 {
-  int length = string->length();
+  size_t length = string->length();
   std::vector<uint8_t> * vect = *vector = new std::vector<uint8_t>;
   vect->resize(length);
+#if CHAR_BIT == 8 && defined(HAVE_CXX11)
+  memcpy(vect->data(), string->data(), length);
+#else
   int i = 0;
   for( ; i < length; i++ ) {
     (*vect)[i] = (uint8_t) (*string)[i];
   }
+#endif
 }
 
-void Compiler::vectorToBuffer(std::vector<uint8_t> * vector, uint8_t ** buffer, int * length)
+void Compiler::vectorToBuffer(std::vector<uint8_t> * vector, uint8_t ** buffer, size_t * length)
 {
-  int len = *length = vector->size();
-  uint8_t * buf = *buffer = (uint8_t *) calloc(sizeof(uint8_t), len);
+  size_t len = *length = vector->size();
+  uint8_t * buf = *buffer = (uint8_t *) malloc(sizeof(uint8_t) * len);
+#ifdef HAVE_CXX11
+  memcpy(buf, vector->data(), len);
+#else
   int i = 0;
   for( ; i < len; i++, buf++ ) {
     *buf = (*vector)[i];
   }
+#endif
 }
 
 }

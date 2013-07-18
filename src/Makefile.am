@@ -33,6 +33,8 @@ libmustache_la_SOURCES = \
 	compiler.hpp \
 	vm.cpp \
 	vm.hpp
+
+# https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 libmustache_la_LDFLAGS = \
 	-no-undefined \
-	-version-info 0:0:0 # https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
+	-version-info 1:0:0

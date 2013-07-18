@@ -32,7 +32,7 @@ class MustacheSpecTest {
     int _passed;
     
     uint8_t * compiled;
-    int compiled_length;
+    size_t compiled_length;
     std::string compiled_output;
     int _compiled_passed;
     

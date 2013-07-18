@@ -217,7 +217,7 @@ int main( int argc, char * argv[] )
       }
     } else if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE_BIN ) {
       uint8_t * codes = NULL;
-      int length = 0;
+      size_t length = 0;
       mustache::Compiler::stringToBuffer(&inputTemplate, &codes, &length);
       for( i = 0; i < number; i++ ) {
         output->clear();

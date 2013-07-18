@@ -9,6 +9,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "node.hpp"
 #include "data.hpp"
@@ -41,10 +42,13 @@ private:
   
 public:
   //! Execute the VM
-  std::string * execute(uint8_t * codes, int length, Data * data);
+  std::string * execute(uint8_t * codes, size_t length, Data * data);
   
   //! Execute the VM
-  void execute(uint8_t * codes, int length, Data * data, std::string * output);
+  void execute(uint8_t * codes, size_t length, Data * data, std::string * output);
+  
+  //! Execute the VM
+  void execute(std::vector<uint8_t> codes, Data * data, std::string * output);
 };
 
 }

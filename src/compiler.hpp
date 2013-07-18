@@ -346,16 +346,16 @@ public:
   static std::string * print(std::vector<uint8_t> * codes);
   
   //! Converts a uint8_t buffer to a uint8_t vector
-  static void bufferToVector(uint8_t * buffer, int length, std::vector<uint8_t> ** vector);
+  static void bufferToVector(uint8_t * buffer, size_t length, std::vector<uint8_t> ** vector);
   
   //! Converts a string to a uint8_t buffer
-  static void stringToBuffer(std::string * string, uint8_t ** buffer, int * length);
+  static void stringToBuffer(std::string * string, uint8_t ** buffer, size_t * length);
   
   //! Converts a string to a uint8_t vector
   static void stringToVector(std::string * string, std::vector<uint8_t> ** vector);
   
   //! Converts a uint8_t vector to a uint8_t buffer
-  static void vectorToBuffer(std::vector<uint8_t> * vector, uint8_t ** buffer, int * length);
+  static void vectorToBuffer(std::vector<uint8_t> * vector, uint8_t ** buffer, size_t * length);
   
   //! Does the opcode have an operand
   static bool hasOperand(uint8_t code) {

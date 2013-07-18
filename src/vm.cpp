@@ -30,14 +30,27 @@
 
 namespace mustache {
 
-std::string * VM::execute(uint8_t * codes, int length, Data * data)
+std::string * VM::execute(uint8_t * codes, size_t length, Data * data)
 {
   std::string * output = new std::string;
   execute(codes, length, data, output);
   return output;
 }
 
-void VM::execute(uint8_t * codes, int length, Data * data, std::string * output)
+void VM::execute(std::vector<uint8_t> codes, Data * data, std::string * output)
+{
+#ifdef HAVE_CXX11
+  execute(codes.data(), codes.size(), data, output);
+#else
+  uint8_t * codes_buf = NULL;
+  int codes_length = 0;
+  Compiler::vectorToBuffer(codes, &codes_buf, &codes_length);
+  execute(codes_buf, codes_length, data, output);
+  free(codes_buf);
+#endif
+}
+
+void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * output)
 {
   register uint8_t * loc = codes;
   register uint8_t * end = codes + length;

@@ -6,10 +6,12 @@
 #include "config.h"
 #endif
 
+#include <cstdint>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "compiler.hpp"
 #include "data.hpp"
@@ -47,11 +49,26 @@ class Mustache {
     //! Renderer
     Renderer renderer;
     
+    //! Compiler
+    Compiler compiler;
+    
+    //! VM
+    VM vm;
+    
     //! Utility method for Tokenizer::tokenize()
     void tokenize(std::string * tmpl, Node * root);
     
     //! Utility method for Renderer::init() and Renderer::render()
     void render(Node * node, Data * data, Node::Partials * partials, std::string * output);
+    
+    //! Compile a node
+    void compile(Node * node, uint8_t ** codes, size_t * length);
+
+    //! Compile a node (with partials)
+    void compile(Node * node, Node::Partials * partials, uint8_t ** codes, size_t * length);
+    
+    //! Execute the VM
+    void execute(uint8_t * codes, int length, Data * data, std::string * output);
     
     //! Utility method for Tokenizer::setStartSequence()
     void setStartSequence(const std::string& start) {
