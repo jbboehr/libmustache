@@ -68,61 +68,61 @@ typedef enum opcodes {
    * Prints char * in symbol of the operand. Translated into PRINTL, where the
    * operand is the code location
    */
-  PRINTSYM = 0x10,
+  PRINTSYM = 0x04,
   
   /**
    * Prints char * in codes point of the operand.
    */
-  PRINTL = 0x11,
+  PRINTL = 0x05,
   
   /**
    * Call the function symbol specified by the operand. The current point in 
    * execution is pushed onto the execution stack
    */
-  CALLSYM = 0x13,
+  CALLSYM = 0x06,
   
   /**
    * Call the function specified by the operand. The current point in execution
    * is pushed onto the execution stack
    */
-  CALL = 0x14,
+  CALL = 0x07,
   
   /**
    * Return from a function. The current execution point is popped from the top
    * of the stack
    */
-  RETURN = 0x16,
+  RETURN = 0x08,
   
   /**
    * Jump to the operand
    */
-  JUMP = 0x17,
+  JUMP = 0x09,
   
   /**
    * Jump to the local position by the operand. Translated into jump
    */
-  JUMPL = 0x18,
+  JUMPL = 0x0a,
   
   /**
    * Push the operand onto the execution stack
    */
-  PUSH = 0x19,
+  PUSH = 0x0b,
   
   /**
    * Pop the top of the execution stack
    */
-  POP = 0x1a,
+  POP = 0x0c,
   
   /**
    * Increment the top of the execution stack
    */
-  INCR = 0x1b,
+  INCR = 0x0d,
   
   /**
    * If the top of the execution stack is greater than top - 1, then execute
    * the next operation
    */
-  IF_GE = 0x1c,
+  IF_GE = 0x0e,
   
   
   /** Data operations ------------------------------------------------------- */
@@ -130,57 +130,57 @@ typedef enum opcodes {
   /**
    * Push the top of the execution stack onto the data stack
    */
-  DPUSH = 0x20,
+  DPUSH = 0x0f,
   
   /**
    * Pop the top of the data stack
    */
-  DPOP = 0x21,
+  DPOP = 0x10,
   
   /**
    * Pushes the location of the hash value from the hash on the top of the 
    * data stack specified by the symbol of the operand onto the data stack.
    */
-  DLOOKUPSYM = 0x22,
+  DLOOKUPSYM = 0x11,
   
   /**
    * Translated version of DLOOKUPSYM
    */
-  DLOOKUP = 0x23,
+  DLOOKUP = 0x12,
   
   /**
    * Pushes the location of the hash value from the hash on the top of the 
    * data stack specified by the symbol of the operand onto the data stack.
    * Does not recurse up the data stack
    */
-  DLOOKUPNRSYM = 0x24,
+  DLOOKUPNRSYM = 0x13,
   
   /**
    * Translated version of DLOOKUPNRSYM
    */
-  DLOOKUPNR = 0x25,
+  DLOOKUPNR = 0x14,
   
   /**
    * Look up the array key in the data stack specified by the top of the 
    * execution stack and push it on the top of the data stack
    */
-  DLOOKUPA = 0x26,
+  DLOOKUPA = 0x15,
   
   /**
    * Push the size of the array on the top of the data stack onto the 
    * execution stack
    */
-  DARRSIZE = 0x27,
+  DARRSIZE = 0x16,
   
   /**
    * Prints the string data on the top of the data stack
    */
-  DPRINT = 0x28,
+  DPRINT = 0x17,
   
   /**
    * Prints and escapes the string data on the top of the data stack
    */
-  DPRINTE = 0x29,
+  DPRINTE = 0x18,
   
   
   
@@ -190,37 +190,37 @@ typedef enum opcodes {
    * If the data pointed to by the top of the data stack is empty,
    * execute the next operation, otherwise skip
    */
-  DIF_EMPTY = 0x30,
+  DIF_EMPTY = 0x19,
           
   /**
    * If the data pointed to by the top of the data stack is not empty,
    * execute the next operation, otherwise skip
    */
-  DIF_NOTEMPTY = 0x31,
+  DIF_NOTEMPTY = 0x1a,
   
   /**
    * If the data pointed to by the top of the data stack is a hash,
    * execute the next operation
    */
-  DIF_HASH = 0x32,
+  DIF_HASH = 0x1b,
   
   /**
    * If the data pointed to by the top of the data stack is a hash,
    * execute the next operation
    */
-  DIF_NOTHASH = 0x33,
+  DIF_NOTHASH = 0x1c,
   
   /**
    * If the data pointed to by the top of the data stack is an array,
    * execute the next operation
    */
-  DIF_ARRAY = 0x34,
+  DIF_ARRAY = 0x1d,
   
   /**
    * If the data pointed to by the top of the data stack is not an array,
    * execute the next operation
    */
-  DIF_NOTARRAY = 0x35,
+  DIF_NOTARRAY = 0x1e,
   
   
   
@@ -229,7 +229,7 @@ typedef enum opcodes {
    * If the data pointed to by the top of the data stack is not an array,
    * execute the next operation
    */
-  CALLEXT = 0x36,
+  CALLEXT = 0x1f,
   
 } opcodes;
 

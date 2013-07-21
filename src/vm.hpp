@@ -34,6 +34,9 @@ private:
   //! String for doing map lookups
   std::string lookupstr;
   
+  //! Output buffer
+  std::string outputBuffer;
+  
   //! Search the data stack
   Data * search(uint32_t dataStackSize, std::string * key);
   
@@ -41,6 +44,10 @@ private:
   Data * searchnr(uint32_t dataStackSize, std::string * key);
   
 public:
+  VM() {
+    outputBuffer.reserve(1024);
+  };
+  
   //! Execute the VM
   std::string * execute(uint8_t * codes, size_t length, Data * data);
   

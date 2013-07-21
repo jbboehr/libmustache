@@ -61,6 +61,9 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
   register Data ** dataStack = this->dataStack;
   register uint32_t dataStackSize = 0;
   
+  // Clear the output buffer
+  outputBuffer.clear();
+  
   // Push the initial data onto the data stack
   _DPUSH(data);
   
@@ -91,11 +94,11 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
       /** Basic operations -------------------------------------------------- */
       case opcodes::PRINTL:
         DBG("Jump: %u", *(1 + loc));
-        output->append((const char *) (codes + *(++loc)));
+        outputBuffer.append((const char *) (codes + *(++loc)));
         break;
       case opcodes::PRINTSYM:
         DBG("Symbol: %u, Jump: %u", *(1 + loc), symbols[*(1 + loc)]);
-        output->append((const char *) (codes + symbols[*(++loc)] + 2)); // Need 2 to skip symbol name and type marker
+        outputBuffer.append((const char *) (codes + symbols[*(++loc)] + 2)); // Need 2 to skip symbol name and type marker
         break;
       case opcodes::CALL:
         DBG("Push: %ld, Jump: %u", loc - codes, *(1 + loc));
@@ -207,13 +210,13 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
       case opcodes::DPRINT:
         DBG("DTop: %p", _DTOP);
         if( _DTOP != NULL && _DTOP->type == Data::TypeString ) {
-          output->append(*(_DTOP->val));
+          outputBuffer.append(*(_DTOP->val));
         }
         break;
       case opcodes::DPRINTE:
         DBG("DTop: %p", _DTOP);
         if( _DTOP != NULL && _DTOP->type == Data::TypeString ) {
-          htmlspecialchars_append((_DTOP->val), output);
+          htmlspecialchars_append((_DTOP->val), &outputBuffer);
         }
         break;
       
@@ -287,6 +290,9 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
     }
     DBGFOOT;
   }
+  
+  // Copy the internal output buffer to the output
+  output->assign(outputBuffer);
   
   // Free
   free(symbols);
