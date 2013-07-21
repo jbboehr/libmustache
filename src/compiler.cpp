@@ -7,7 +7,7 @@ namespace mustache {
 
 
 CompilerState::States CompilerState::next(uint8_t * code, uint8_t * operand) {
-    if( this->pos > this->codes->size() ) {
+    if( this->pos >= this->codes->size() ) {
       return this->state = States::END;
     } else if( this->pos == 0 ) {
       this->readHeader();
