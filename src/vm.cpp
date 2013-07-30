@@ -37,13 +37,13 @@ std::string * VM::execute(uint8_t * codes, size_t length, Data * data)
   return output;
 }
 
-void VM::execute(std::vector<uint8_t> codes, Data * data, std::string * output)
+void VM::execute(std::vector<uint8_t> * codes, Data * data, std::string * output)
 {
 #ifdef HAVE_CXX11
-  execute(codes.data(), codes.size(), data, output);
+  execute(codes->data(), codes->size(), data, output);
 #else
   uint8_t * codes_buf = NULL;
-  int codes_length = 0;
+  size_t codes_length = 0;
   Compiler::vectorToBuffer(codes, &codes_buf, &codes_length);
   execute(codes_buf, codes_length, data, output);
   free(codes_buf);

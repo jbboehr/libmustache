@@ -55,7 +55,7 @@ public:
   void execute(uint8_t * codes, size_t length, Data * data, std::string * output);
   
   //! Execute the VM
-  void execute(std::vector<uint8_t> codes, Data * data, std::string * output);
+  void execute(std::vector<uint8_t> * codes, Data * data, std::string * output);
 };
 
 }

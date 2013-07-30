@@ -6,7 +6,7 @@
 #include "config.h"
 #endif
 
-#include <cstdint>
+#include <stdint.h>
 #include <iostream>
 #include <map>
 #include <memory>

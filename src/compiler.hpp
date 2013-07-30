@@ -6,6 +6,8 @@
 #include "config.h"
 #endif
 
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -33,6 +35,7 @@
 namespace mustache {
 
 
+namespace opcodes {
 /**
  * Enumeration of opcodes
  */
@@ -232,7 +235,18 @@ typedef enum opcodes {
   CALLEXT = 0x1f,
   
 } opcodes;
+} // namespace opcodes
 
+namespace CompilerStates {
+  typedef enum States {
+    NOOP = 0x00, //opcodes::NOOP,
+    SYMBOL = 0x01,  //opcodes::SYMBOL,
+    FUNCTION = 0x02, //opcodes::FUNCTION,
+    STRING = 0x03, //opcodes::STRING,
+    HEADER = 0x04,
+    END = 0x05
+  } States;
+}
 
 
 /**
@@ -241,16 +255,8 @@ typedef enum opcodes {
  */
 class CompilerState {
 public:
-  enum States {
-    NOOP = 0x00, //opcodes::NOOP,
-    SYMBOL = 0x01,  //opcodes::SYMBOL,
-    FUNCTION = 0x02, //opcodes::FUNCTION,
-    STRING = 0x03, //opcodes::STRING,
-    HEADER = 0x04,
-    END = 0x05
-  };
-  enum States state;
-  enum States nextState;
+  enum CompilerStates::States state;
+  enum CompilerStates::States nextState;
   uint32_t pos;
   uint32_t spos;
   uint32_t lpos;
@@ -258,20 +264,20 @@ public:
   std::vector<uint32_t> symbols;
   std::vector<uint8_t> * codes;
   CompilerState() : 
-        state(States::NOOP),
+        state(CompilerStates::NOOP),
         pos(0),
         codes(NULL) {
     ;
   };
   CompilerState(std::vector<uint8_t> * codes) : 
-        state(States::NOOP),
+        state(CompilerStates::NOOP),
         pos(0) {
     this->state = state;
     this->pos = pos;
     this->codes = codes;
     this->readHeader();
   };
-  States next(uint8_t * code, uint8_t * operand);
+  int next(uint8_t * code, uint8_t * operand);
   void readHeader();
 };
 

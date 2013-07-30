@@ -6,9 +6,9 @@
 namespace mustache {
 
 
-CompilerState::States CompilerState::next(uint8_t * code, uint8_t * operand) {
+int CompilerState::next(uint8_t * code, uint8_t * operand) {
     if( this->pos >= this->codes->size() ) {
-      return this->state = States::END;
+      return this->state = CompilerStates::END;
     } else if( this->pos == 0 ) {
       this->readHeader();
     }
@@ -16,46 +16,46 @@ CompilerState::States CompilerState::next(uint8_t * code, uint8_t * operand) {
     uint8_t * current = &((*this->codes)[this->pos]);
     uint8_t * next = &((*this->codes)[this->pos + 1]);
     switch( this->state ) {
-      case States::NOOP:
+      case CompilerStates::NOOP:
         if( *current == opcodes::FUNCTION ) {
-          this->state = States::SYMBOL;
-          this->nextState = States::FUNCTION;
+          this->state = CompilerStates::SYMBOL;
+          this->nextState = CompilerStates::FUNCTION;
           *code = *current;
           *operand = *next;
           this->pos++; // Skip operand
         } else if( *current == opcodes::STRING ) {
-          this->state = States::SYMBOL;
-          this->nextState = States::STRING;
+          this->state = CompilerStates::SYMBOL;
+          this->nextState = CompilerStates::STRING;
           *code = *current;
           *operand = *next;
           this->pos++; // Skip operand
         } else {
-          this->state = States::NOOP;
+          this->state = CompilerStates::NOOP;
           *code = *current;
           *operand = 0;
         }
         this->lpos = 0;
         break;
-      case States::SYMBOL:
+      case CompilerStates::SYMBOL:
         *code = *current;
         *operand = *next;
         this->state = this->nextState;
-        if( this->state == States::FUNCTION ) {
+        if( this->state == CompilerStates::FUNCTION ) {
           this->pos++;
         }
         this->lpos = 0;
         break;
-      case States::STRING:
+      case CompilerStates::STRING:
         *code = *current;
         *operand = 0;
         if( *current == opcodes::NOOP ) {
-          this->state = States::NOOP;
+          this->state = CompilerStates::NOOP;
         }
         this->lpos++;
         break;
-      case States::FUNCTION:
+      case CompilerStates::FUNCTION:
         if( *current == opcodes::NOOP ) {
-          this->state = States::NOOP;
+          this->state = CompilerStates::NOOP;
           *code = *current;
           *operand = 0;
         } else if( true == Compiler::hasOperand(*current) ) {
@@ -534,17 +534,17 @@ std::string * Compiler::print(std::vector<uint8_t> * codes)
   // Print symbols
   uint8_t current = 0;
   uint8_t operand = 0;
-  while( statec->next(&current, &operand) != CompilerState::END ) {
+  while( statec->next(&current, &operand) != CompilerStates::END ) {
     switch( statec->state ) {
-      case CompilerState::NOOP:
+      case CompilerStates::NOOP:
         snprintf(buf, 100, "N%03u:      0x%02x\n", 
                 statec->spos, current);
         break;
-      case CompilerState::SYMBOL:
+      case CompilerStates::SYMBOL:
         snprintf(buf, 100, "S%03u:      0x%02x %s %d\n", 
                 statec->spos, current, opcodeName(current), operand);
         break;
-      case CompilerState::FUNCTION:
+      case CompilerStates::FUNCTION:
         if( operand != 0 ) {
           snprintf(buf, 100, "F%03u: %03u: 0x%02x %s %d\n", 
                   statec->spos, statec->lpos, current, opcodeName(current), operand);
@@ -553,7 +553,7 @@ std::string * Compiler::print(std::vector<uint8_t> * codes)
                   statec->spos, statec->lpos, current, opcodeName(current));
         }
         break;
-      case CompilerState::STRING:
+      case CompilerStates::STRING:
         if( current == 0x0a ) {
           snprintf(buf, 100, "C%03u: %03u: 0x%02x %s\n", 
                   statec->spos, statec->lpos, current, "\\n");
@@ -562,7 +562,7 @@ std::string * Compiler::print(std::vector<uint8_t> * codes)
                   statec->spos, statec->lpos, current, current);
         }
         break;
-      case CompilerState::HEADER:
+      case CompilerStates::HEADER:
         break;
     }
     out->append(buf);
