@@ -6,9 +6,6 @@ compiler:
 before_install:
   - git submodule update --init --recursive
 
-before_script:
-  - chmod +x test/run
-
 script:
   - autoreconf --install
   - ./configure
