@@ -452,7 +452,7 @@ CompilerSymbol * Compiler::getSymbol()
 
 std::vector<uint8_t> * Compiler::compile(Node * node)
 {
-  compile(node, NULL);
+  return compile(node, NULL);
 }
 
 std::vector<uint8_t> * Compiler::compile(Node * node, Node::Partials * partials)

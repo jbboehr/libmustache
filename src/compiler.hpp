@@ -14,6 +14,10 @@
 #include <sstream>
 #include <string>
 
+#ifdef _MSC_VER
+#define snprintf _snprintf_s
+#endif
+
 #include "node.hpp"
 #include "exception.hpp"
 
