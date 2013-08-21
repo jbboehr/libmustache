@@ -97,10 +97,9 @@ int Compiler::_makeLookup(Node * node, CompilerSymbol * sym)
     CompilerSymbol * str = getSymbol();
     str->type = mustache::opcodes::STRING;
     for( int i = 0, l = node->data->length(); i < l; i++ ) {
-      str->code.push_back((uint8_t) node->data->at(i));
+      _CPUSH(str->code, node->data->at(i));
     }
-    sym->code.push_back(opcodes::DLOOKUPSYM);
-    sym->code.push_back(str->name & 0xff);
+    _CPUSHOP(sym->code, opcodes::DLOOKUPSYM, str->name);
     return 1;
   } else {
     std::vector<std::string>::iterator vs_it;
@@ -110,10 +109,11 @@ int Compiler::_makeLookup(Node * node, CompilerSymbol * sym)
       CompilerSymbol * str = getSymbol();
       str->type = mustache::opcodes::STRING;
       for( int i = 0, l = vs_it->length(); i < l; i++ ) {
-        str->code.push_back((uint8_t) vs_it->at(i));
+        _CPUSH(str->code, vs_it->at(i));
       }
-      sym->code.push_back(num == 0 ? opcodes::DLOOKUPSYM : opcodes::DLOOKUPNRSYM);
-      sym->code.push_back(str->name & 0xff);
+      _CPUSHOP(sym->code, 
+               num == 0 ? opcodes::DLOOKUPSYM : opcodes::DLOOKUPNRSYM,
+               str->name);
       num++;
     }
     return num;
@@ -124,7 +124,7 @@ void Compiler::_makeLookupEnd(int num, CompilerSymbol * sym)
 {
   int i = 0;
   for( ; i < num; i++ ) {
-    sym->code.push_back(opcodes::DPOP);
+    _CPUSH(sym->code, opcodes::DPOP);
   }
 }
 
@@ -149,14 +149,13 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
         for ( it = node->children.begin() ; it != node->children.end(); it++ ) {
           if( (*it)->type & Node::TypeHasChildren ) {
             child = _compile(*it);
-            sym->code.push_back(opcodes::CALLSYM);
-            sym->code.push_back(child->name);
+            _CPUSHOP(sym->code, opcodes::CALLSYM, child->name);
           } else {
             _compile(*it, sym);
           }
         }
       }
-      sym->code.push_back(opcodes::RETURN);
+      _CPUSH(sym->code, opcodes::RETURN);
       break;
     }
     
@@ -167,7 +166,7 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       
       // Don't have to do anything if empty
       if( node->children.size() <= 0 ) {
-        sym->code.push_back(opcodes::RETURN);
+        _CPUSH(sym->code, opcodes::RETURN);
         break;
       }
       
@@ -178,13 +177,12 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       for ( it = node->children.begin() ; it != node->children.end(); it++ ) {
         if( (*it)->type & Node::TypeHasChildren ) {
           child = _compile(*it);
-          childrenSym->code.push_back(opcodes::CALLSYM);
-          childrenSym->code.push_back(child->name);
+          _CPUSHOP(childrenSym->code, opcodes::CALLSYM, child->name);
         } else {
           _compile(*it, childrenSym);
         }
       }
-      childrenSym->code.push_back(opcodes::RETURN);
+      _CPUSH(childrenSym->code, opcodes::RETURN);
       
       // Make the main symbol
       
@@ -192,58 +190,50 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       int num = this->_makeLookup(node, sym);
       
       // If context empty, jump right to end
-      sym->code.push_back(opcodes::DIF_EMPTY);
-      sym->code.push_back(opcodes::JUMPL);
-      size_t ifemptyoppos = sym->code.size();
-      sym->code.push_back(0x00);
+      _CPUSH(sym->code, opcodes::DIF_EMPTY);
+      _CPUSHOP(sym->code, opcodes::JUMPL, 0x00);
+      size_t ifemptyoppos = sym->code.size() - 1;
       
       // If array, jump to the array loop
-      sym->code.push_back(opcodes::DIF_ARRAY);
-      sym->code.push_back(opcodes::JUMPL);
-      size_t ifarrayoppos = sym->code.size();
-      sym->code.push_back(0x00);
+      _CPUSH(sym->code, opcodes::DIF_ARRAY);
+      _CPUSHOP(sym->code, opcodes::JUMPL, 0x00);
+      size_t ifarrayoppos = sym->code.size() - 1;
       
       // If not array, just call then jump to end
-      sym->code.push_back(opcodes::CALLSYM);
-      sym->code.push_back(childrenSym->name);
-      sym->code.push_back(opcodes::JUMPL);
-      size_t ifnotarrayoppos = sym->code.size();
-      sym->code.push_back(0x00);
+      _CPUSHOP(sym->code, opcodes::CALLSYM, childrenSym->name);
+      _CPUSHOP(sym->code, opcodes::JUMPL, 0x00);
+      size_t ifnotarrayoppos = sym->code.size() - 1;
       
       // Do the array looping code
-      sym->code[ifarrayoppos] = sym->code.size();
-      sym->code.push_back(opcodes::DARRSIZE);
-      sym->code.push_back(opcodes::PUSH);
-      sym->code.push_back(0);
+      _CSET(sym->code, ifarrayoppos, sym->code.size());
+      _CPUSH(sym->code, opcodes::DARRSIZE);
+      _CPUSHOP(sym->code, opcodes::PUSH, 0x00);
       size_t ifarrayinoppos = sym->code.size();
       
-      sym->code.push_back(opcodes::IF_GE);
-      sym->code.push_back(opcodes::JUMPL);
-      size_t ifarrayendoppos = sym->code.size();
-      sym->code.push_back(0x00);
+      _CPUSH(sym->code, opcodes::IF_GE);
+      _CPUSHOP(sym->code, opcodes::JUMPL, 0x00);
+      size_t ifarrayendoppos = sym->code.size() - 1;
       
-      sym->code.push_back(opcodes::DLOOKUPA);
+      _CPUSH(sym->code, opcodes::DLOOKUPA);
       
-      sym->code.push_back(opcodes::CALLSYM);
-      sym->code.push_back(childrenSym->name);
+      _CPUSHOP(sym->code, opcodes::CALLSYM, childrenSym->name);
       
-      sym->code.push_back(opcodes::DPOP);
+      _CPUSH(sym->code, opcodes::DPOP);
       
-      sym->code.push_back(opcodes::INCR);
-      sym->code.push_back(opcodes::JUMPL);
-      sym->code.push_back(ifarrayinoppos);
+      _CPUSH(sym->code, opcodes::INCR);
+      _CPUSHOP(sym->code, opcodes::JUMPL, ifarrayinoppos);
       
-      sym->code[ifarrayendoppos] = sym->code.size();
-      sym->code.push_back(opcodes::POP);
-      sym->code.push_back(opcodes::POP);
+      _CSET(sym->code, ifarrayendoppos, sym->code.size());
+      _CPUSH(sym->code, opcodes::POP);
+      _CPUSH(sym->code, opcodes::POP);
       
-      sym->code[ifemptyoppos] = sym->code.size();
-      sym->code[ifnotarrayoppos] = sym->code.size();
+      _CSET(sym->code, ifemptyoppos, sym->code.size());
+      _CSET(sym->code, ifnotarrayoppos, sym->code.size());
       
       // Pop the context shifts
       this->_makeLookupEnd(num, sym);
       
-      sym->code.push_back(opcodes::RETURN);
+      _CPUSH(sym->code, opcodes::RETURN);
       break;
     }
     
@@ -254,30 +244,28 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       // Push the context shifts
       int num = this->_makeLookup(node, sym);
       
-      sym->code.push_back(opcodes::DIF_NOTEMPTY);
-      sym->code.push_back(opcodes::JUMPL);
-      size_t ifemptyoppos = sym->code.size();
-      sym->code.push_back(0x00);
+      _CPUSH(sym->code, opcodes::DIF_NOTEMPTY);
+      _CPUSHOP(sym->code, opcodes::JUMPL, 0x00);
+      size_t ifemptyoppos = sym->code.size() - 1;
       
       if( node->children.size() > 0 ) {
         Node::Children::iterator it;
         for ( it = node->children.begin() ; it != node->children.end(); it++ ) {
           if( (*it)->type & Node::TypeHasChildren ) {
             child = _compile(*it);
-            sym->code.push_back(opcodes::CALLSYM);
-            sym->code.push_back(child->name);
+            _CPUSHOP(sym->code, opcodes::CALLSYM, child->name);
           } else {
             _compile(*it, sym);
           }
         }
       }
       
-      sym->code[ifemptyoppos] = sym->code.size();
+      _CSET(sym->code, ifemptyoppos, sym->code.size());
       
       // Pop the context shifts
       this->_makeLookupEnd(num, sym);
       
-      sym->code.push_back(opcodes::RETURN);
+      _CPUSH(sym->code, opcodes::RETURN);
       break;
     }
     
@@ -287,12 +275,10 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       CompilerSymbol * str = getSymbol();
       str->type = mustache::opcodes::STRING;
       for( int i = 0, l = node->data->length(); i < l; i++ ) {
-        str->code.push_back((uint8_t) node->data->at(i));
+        _CPUSH(str->code, node->data->at(i));
       }
-      //str->code.push_back(0x00); // The "linker" will null-terminate the string
       // Add print for symbol
-      sym->code.push_back(opcodes::PRINTSYM);
-      sym->code.push_back(str->name & 0xff); // @todo multi-byte
+      _CPUSHOP(sym->code, opcodes::PRINTSYM, str->name);
       break;
     }
     
@@ -303,9 +289,9 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       int num = this->_makeLookup(node, sym);
       
       if( node->flags && Node::FlagEscape ) {
-        sym->code.push_back(opcodes::DPRINTE);
+        _CPUSH(sym->code, opcodes::DPRINTE);
       } else {
-        sym->code.push_back(opcodes::DPRINT);
+        _CPUSH(sym->code, opcodes::DPRINT);
       }
       
       // Pop the context shifts
@@ -318,8 +304,7 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       // Check for a partial that's already been compiled
       std::map<std::string,int>::iterator pc_it = partialSymbols.find(*(node->data));
       if( pc_it != partialSymbols.end() ) {
-        sym->code.push_back(opcodes::CALLSYM);
-        sym->code.push_back(pc_it->second);
+        _CPUSHOP(sym->code, opcodes::CALLSYM, pc_it->second);
         break;
       }
       
@@ -338,8 +323,7 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       if( foundPartial != NULL ) {
         // Need to get and store the symbol now to support recursion
         CompilerSymbol * partialSym = getSymbol();
-        sym->code.push_back(opcodes::CALLSYM);
-        sym->code.push_back(partialSym->name);
+        _CPUSHOP(sym->code, opcodes::CALLSYM, partialSym->name);
         partialSymbols.insert(std::make_pair(*(node->data), partialSym->name));
         
         // Can compile afterwards
@@ -351,11 +335,10 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
         CompilerSymbol * str = getSymbol();
         str->type = mustache::opcodes::STRING;
         for( int i = 0, l = node->data->length(); i < l; i++ ) {
-          str->code.push_back((uint8_t) node->data->at(i));
+          _CPUSH(str->code, node->data->at(i));
         }
-
-        sym->code.push_back(opcodes::CALLEXT);
-        sym->code.push_back(str->name);
+        
+        _CPUSHOP(sym->code, opcodes::CALLEXT, str->name);
       }
     }
     
@@ -402,40 +385,6 @@ std::vector<uint8_t> * Compiler::_serialize(CompilerSymbol * main)
     uint32_t off = (it - symbols.begin()) * 4 + 4;
     _PACK4A((*codes), off, table[(*it)->name]);
   }
-  
-  /*
-  // Second pass, resolve symbols to absolute jump points
-  CompilerState * statec = new CompilerState(codes);
-  uint8_t current = 0;
-  uint8_t operand = 0;
-  while( statec->next(&current, &operand) != CompilerState::END ) {
-    if( statec->state != CompilerState::FUNCTION ) {
-      continue;
-    }
-    switch( current ) {
-      case opcodes::PRINTSYM:
-        (*codes)[statec->spos] = opcodes::PRINTL;
-        (*codes)[statec->spos+1] = table[(*codes)[statec->spos+1]];
-        break;
-      case opcodes::CALLSYM:
-        (*codes)[statec->spos] = opcodes::CALL;
-        (*codes)[statec->spos+1] = table[(*codes)[statec->spos+1]];
-        break;
-      case opcodes::JUMPL:
-        (*codes)[statec->spos] = opcodes::JUMP;
-        (*codes)[statec->spos+1] = statec->spos - statec->lpos + (*codes)[statec->spos+1]; // + 1;
-        break;
-      case opcodes::DLOOKUPSYM:
-        (*codes)[statec->spos] = opcodes::DLOOKUP;
-        (*codes)[statec->spos+1] = table[(*codes)[statec->spos+1]];
-        break;
-      case opcodes::DLOOKUPNRSYM:
-        (*codes)[statec->spos] = opcodes::DLOOKUPNR;
-        (*codes)[statec->spos+1] = table[(*codes)[statec->spos+1]];
-        break;
-    }
-  }
-   */
   
   return codes;
 }

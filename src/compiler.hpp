@@ -36,6 +36,15 @@
 #define _UNPACK3A(a, k) _UNPACKI(a[k], 16) + _UNPACK2A(a, k + 1)
 #define _UNPACK4A(a, k) _UNPACKI(a[k], 24) + _UNPACK3A(a, k + 1)
 
+#define _COPERANDSIZE 1
+#define _CPUSH(vect, code) vect.push_back(code)
+#define _CPUSHOP(vect, code, operand) \
+    do { \
+      vect.push_back(code); \
+      vect.push_back(operand); \
+    } while(0)
+#define _CSET(vect, index, code) vect[index] = code
+
 namespace mustache {
 
 
