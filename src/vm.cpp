@@ -6,6 +6,10 @@
 #define RUN loc = codes + length + 1
 #define LOC loc - codes
 #define LLOC loc - sloc
+#define RLOC sloc - codes
+#define CODE (*loc)
+#define OP (*(1 + loc))
+#define HADOP ++loc;
 
 #define _EPUSH(v) stack[stackSize++] = v
 #define _EPOP stack[--stackSize]
@@ -90,28 +94,32 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
   
   for( ; loc < end; loc++ ) {
     DBGHEAD;
-    switch( *loc ) {
+    switch( CODE ) {
       /** Basic operations -------------------------------------------------- */
       case opcodes::PRINTL:
-        DBG("Jump: %u", *(1 + loc));
-        outputBuffer.append((const char *) (codes + *(++loc)));
+        DBG("Jump: %u", OP);
+        outputBuffer.append((const char *) (codes + OP));
+        HADOP;
         break;
       case opcodes::PRINTSYM:
-        DBG("Symbol: %u, Jump: %u", *(1 + loc), symbols[*(1 + loc)]);
-        outputBuffer.append((const char *) (codes + symbols[*(++loc)] + 2)); // Need 2 to skip symbol name and type marker
+        DBG("Symbol: %u, Jump: %u", OP, symbols[OP]);
+        outputBuffer.append((const char *) (codes + symbols[OP] + 2)); // Need 2 to skip symbol name and type marker
+        HADOP;
         break;
       case opcodes::CALL:
-        DBG("Push: %ld, Jump: %u", loc - codes, *(1 + loc));
-        _EPUSH(sloc - codes);
-        _EPUSH(loc - codes + 1);
-        JUMP(*(++loc) - 1);  // Need -1 so increment on loop will cancel out
+        DBG("Push: %ld, Jump: %u", LOC, OP);
+        _EPUSH(RLOC);
+        _EPUSH(LOC + _COPERANDSIZE);
+        JUMP(OP - 1);  // Need -1 so increment on loop will cancel out
+        // Don't need HADOP because JUMP
         sloc = loc + 1;
         break;
       case opcodes::CALLSYM:
-        DBG("Symbol: %d, Push: %ld, Jump: %u", *(1 + loc), loc - codes, symbols[*(1 + loc)]);
-        _EPUSH(sloc - codes);
-        _EPUSH(loc - codes + 1);
-        JUMP(symbols[*(++loc)] + 2 - 1);  // Need -1 so increment on loop will cancel out
+        DBG("Symbol: %d, Push: %ld, Jump: %u", OP, LOC, symbols[OP]);
+        _EPUSH(RLOC);
+        _EPUSH(LOC + _COPERANDSIZE);
+        JUMP(symbols[OP] + 2 - 1);  // Need -1 so increment on loop will cancel out
+        // Don't need HADOP because JUMP
         sloc = loc + 1;
         break;
       case opcodes::RETURN:
@@ -120,16 +128,19 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
         sloc = codes + _EPOP;
         break;
       case opcodes::JUMP:
-        DBG("Jump: %u", *(1 + loc));
-        JUMP(*(++loc) - 1); // -1 to cancel out the next loop increment
+        DBG("Jump: %u", OP);
+        JUMP(OP - 1); // -1 to cancel out the next loop increment
+        // Don't need HADOP because JUMP
         break;
       case opcodes::JUMPL:
-        DBG("Jump: %u", (sloc - codes) + *(1 + loc));
-        JUMP((sloc - codes) + *(++loc) - 1); // -1 to cancel out the next loop increment
+        DBG("Jump: %u", (RLOC) + OP);
+        JUMP((RLOC) + OP - 1); // -1 to cancel out the next loop increment
+        // Don't need HADOP because JUMP
         break;
       case opcodes::PUSH:
         DBG("Push: %u", *(1 + loc));
-        _EPUSH(*(++loc));
+        _EPUSH(OP);
+        HADOP;
         break;
       case opcodes::POP:
         DBG("Top: %lu", _ETOP);
@@ -159,39 +170,43 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
         _DPOP;
         break;
       case opcodes::DLOOKUP: {
-        DBG("Symbol: %u", *(1 + loc));
-        const char * cstr = (const char *) (codes + *(++loc));
+        DBG("Symbol: %u", OP);
+        const char * cstr = (const char *) (codes + OP);
         DBG(", String: %s", cstr);
         lookupstr.assign(cstr);
         DBG(", DPush: %p", _DSEARCH(&lookupstr));
         _DPUSH(_DSEARCH(&lookupstr));
+        HADOP;
         break;
       }
       case opcodes::DLOOKUPSYM: {
-        DBG("Symbol: %u, Jump: %d", *(1 + loc), symbols[*(1 + loc)]);
-        const char * cstr = (const char *) (codes + symbols[*(++loc)] + 2); // Need 2 to skip symbol name and type
+        DBG("Symbol: %u, Jump: %d", OP, symbols[OP]);
+        const char * cstr = (const char *) (codes + symbols[OP] + 2); // Need 2 to skip symbol name and type
         DBG(", String: %s", cstr);
         lookupstr.assign(cstr);
         DBG(", DPush: %p", _DSEARCH(&lookupstr));
         _DPUSH(_DSEARCH(&lookupstr));
+        HADOP;
         break;
       }
       case opcodes::DLOOKUPNR: {
         DBG("Symbol: %u", *(1 + loc));
-        char * cstr = (/*unsigned*/ char *) (codes + *(++loc));
+        char * cstr = (/*unsigned*/ char *) (codes + OP);
         DBG(", String: %s", cstr);
         lookupstr.assign(cstr);
         DBG(", DPush: %p", _DSEARCHNR(&lookupstr));
         _DPUSH(_DSEARCHNR(&lookupstr));
+        HADOP;
         break;
       }
       case opcodes::DLOOKUPNRSYM: {
-        DBG("Symbol: %u, Jump: %d", *(1 + loc), symbols[*(1 + loc)]);
-        const char * cstr = (const char *) (codes + symbols[*(++loc)] + 2); // Need 2 to skip symbol name and type
+        DBG("Symbol: %u, Jump: %d", OP, symbols[OP]);
+        const char * cstr = (const char *) (codes + symbols[OP] + 2); // Need 2 to skip symbol name and type
         DBG(", String: %s", cstr);
         lookupstr.assign(cstr);
         DBG(", DPush: %p", _DSEARCHNR(&lookupstr));
         _DPUSH(_DSEARCHNR(&lookupstr));
+        HADOP;
         break;
       }
       case opcodes::DLOOKUPA: {
@@ -278,14 +293,15 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
       
       /** Unknown ----------------------------------------------------------- */
       case opcodes::CALLEXT:
-        DBG("NOT IMPLEMENTED %d\n", *(++loc));
+        DBG("NOT IMPLEMENTED %d\n", OP);
+        HADOP;
         break;
       case opcodes::NOOP:
         DBG("Jump: %d", length + 1);
         JUMP(length + 1);
         break;
       default:
-        DBG("UNKNOWN 0x%02x\n", *loc);
+        DBG("UNKNOWN 0x%02x\n", CODE);
         break;
     }
     DBGFOOT;
