@@ -32,21 +32,25 @@
 #define _PACK4A(a, k, i) a[k] = _PACKI(i, 24); _PACK3A(a, k + 1, i);
 #define _UNPACKI(i, n) (i << n)
 #define _UNPACK1A(a, k) _UNPACKI(a[k], 0)
-#define _UNPACK2A(a, k) _UNPACKI(a[k], 8) + _UNPACK1A(a, k + 1)
-#define _UNPACK3A(a, k) _UNPACKI(a[k], 16) + _UNPACK2A(a, k + 1)
-#define _UNPACK4A(a, k) _UNPACKI(a[k], 24) + _UNPACK3A(a, k + 1)
+#define _UNPACK2A(a, k) (_UNPACKI(a[k], 8) + _UNPACK1A(a, k + 1))
+#define _UNPACK3A(a, k) (_UNPACKI(a[k], 16) + _UNPACK2A(a, k + 1))
+#define _UNPACK4A(a, k) (_UNPACKI(a[k], 24) + _UNPACK3A(a, k + 1))
 
 #define _COPERANDSIZE 1
+#define _COPERANDPACKFN _PACK1FN
+#define _COPERANDPACKA _PACK1A
+#define _COPERANDUNPACKA _UNPACK1A
+
 #define _CPUSH(vect, code) vect.push_back(code)
 #define _CPUSHOP(vect, code, operand) \
     do { \
       vect.push_back(code); \
-      vect.push_back(operand); \
+      _COPERANDPACKFN(vect.push_back, operand); \
     } while(0)
 #define _CSET(vect, index, code) vect[index] = code
-#define _CSETOP(vect, index, code) vect[index] = code
+#define _CSETOP(vect, index, code) _COPERANDPACKA(vect, index, code)
 #define _CLEN(vect) vect.size()
-#define _CLENP(vect) _CLEN(vect) - 1
+#define _CLENP(vect) _CLEN(vect) - _COPERANDSIZE
 
 namespace mustache {
 
