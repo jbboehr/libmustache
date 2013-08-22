@@ -2,14 +2,14 @@
 #include "vm.hpp"
 
 #define JUMP(pos) loc = codes + pos
-#define SKIP ++loc; if( Compiler::hasOperand(*loc) ) ++loc
+#define SKIP ++loc; if( Compiler::hasOperand(*loc) ) loc += _COPERANDSIZE
 #define RUN loc = codes + length + 1
 #define LOC loc - codes
 #define LLOC loc - sloc
 #define RLOC sloc - codes
 #define CODE (*loc)
-#define OP (*(1 + loc))
-#define HADOP ++loc;
+#define OP _COPERANDUNPACKA(loc, 1)
+#define HADOP loc += _COPERANDSIZE;
 
 #define _EPUSH(v) stack[stackSize++] = v
 #define _EPOP stack[--stackSize]
