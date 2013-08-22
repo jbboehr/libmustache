@@ -44,6 +44,9 @@
       vect.push_back(operand); \
     } while(0)
 #define _CSET(vect, index, code) vect[index] = code
+#define _CSETOP(vect, index, code) vect[index] = code
+#define _CLEN(vect) vect.size()
+#define _CLENP(vect) _CLEN(vect) - 1
 
 namespace mustache {
 

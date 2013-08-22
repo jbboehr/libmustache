@@ -192,27 +192,27 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       // If context empty, jump right to end
       _CPUSH(sym->code, opcodes::DIF_EMPTY);
       _CPUSHOP(sym->code, opcodes::JUMPL, 0x00);
-      size_t ifemptyoppos = sym->code.size() - 1;
+      size_t ifemptyoppos = _CLENP(sym->code);
       
       // If array, jump to the array loop
       _CPUSH(sym->code, opcodes::DIF_ARRAY);
       _CPUSHOP(sym->code, opcodes::JUMPL, 0x00);
-      size_t ifarrayoppos = sym->code.size() - 1;
+      size_t ifarrayoppos = _CLENP(sym->code);
       
       // If not array, just call then jump to end
       _CPUSHOP(sym->code, opcodes::CALLSYM, childrenSym->name);
       _CPUSHOP(sym->code, opcodes::JUMPL, 0x00);
-      size_t ifnotarrayoppos = sym->code.size() - 1;
+      size_t ifnotarrayoppos = _CLENP(sym->code);
       
       // Do the array looping code
-      _CSET(sym->code, ifarrayoppos, sym->code.size());
+      _CSETOP(sym->code, ifarrayoppos, _CLEN(sym->code));
       _CPUSH(sym->code, opcodes::DARRSIZE);
       _CPUSHOP(sym->code, opcodes::PUSH, 0x00);
-      size_t ifarrayinoppos = sym->code.size();
+      size_t ifarrayinoppos = _CLEN(sym->code); // not a typo
       
       _CPUSH(sym->code, opcodes::IF_GE);
       _CPUSHOP(sym->code, opcodes::JUMPL, 0x00);
-      size_t ifarrayendoppos = sym->code.size() - 1;
+      size_t ifarrayendoppos = _CLENP(sym->code);
       
       _CPUSH(sym->code, opcodes::DLOOKUPA);
       
@@ -223,12 +223,12 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       _CPUSH(sym->code, opcodes::INCR);
       _CPUSHOP(sym->code, opcodes::JUMPL, ifarrayinoppos);
       
-      _CSET(sym->code, ifarrayendoppos, sym->code.size());
+      _CSETOP(sym->code, ifarrayendoppos, _CLEN(sym->code));
       _CPUSH(sym->code, opcodes::POP);
       _CPUSH(sym->code, opcodes::POP);
       
-      _CSET(sym->code, ifemptyoppos, sym->code.size());
-      _CSET(sym->code, ifnotarrayoppos, sym->code.size());
+      _CSETOP(sym->code, ifemptyoppos, _CLEN(sym->code));
+      _CSETOP(sym->code, ifnotarrayoppos, _CLEN(sym->code));
       
       // Pop the context shifts
       this->_makeLookupEnd(num, sym);
@@ -246,7 +246,7 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
       
       _CPUSH(sym->code, opcodes::DIF_NOTEMPTY);
       _CPUSHOP(sym->code, opcodes::JUMPL, 0x00);
-      size_t ifemptyoppos = sym->code.size() - 1;
+      size_t ifemptyoppos = _CLENP(sym->code);
       
       if( node->children.size() > 0 ) {
         Node::Children::iterator it;
@@ -260,7 +260,7 @@ void Compiler::_compile(Node * node, CompilerSymbol * sym)
         }
       }
       
-      _CSET(sym->code, ifemptyoppos, sym->code.size());
+      _CSETOP(sym->code, ifemptyoppos, _CLEN(sym->code));
       
       // Pop the context shifts
       this->_makeLookupEnd(num, sym);
