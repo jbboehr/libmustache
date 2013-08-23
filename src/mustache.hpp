@@ -23,8 +23,8 @@
 #include "vm.hpp"
 
 
-#define LIBMUSTACHE_VERSION "0.1.0"
-#define LIBMUSTACHE_VERSION_INT 100
+#define LIBMUSTACHE_VERSION "0.2.0"
+#define LIBMUSTACHE_VERSION_INT 200
 
 extern "C" const char * mustache_version();
 extern "C" int mustache_version_int();
