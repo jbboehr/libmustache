@@ -36,11 +36,33 @@
 #define _UNPACK3A(a, k) (_UNPACKI(a[k], 16) + _UNPACK2A(a, k + 1))
 #define _UNPACK4A(a, k) (_UNPACKI(a[k], 24) + _UNPACK3A(a, k + 1))
 
+#if VM_OP_SIZE == 1
+typedef uint8_t _C_OP_TYPE;
+#define _C_OP_SIZE 1
+#define _C_OP_PACKFN _PACK1FN
+#define _C_OP_PACKA _PACK1A
+#define _C_OP_UNPACKA _UNPACK1A
+#elif VM_OP_SIZE == 2
 typedef uint16_t _C_OP_TYPE;
 #define _C_OP_SIZE 2
 #define _C_OP_PACKFN _PACK2FN
 #define _C_OP_PACKA _PACK2A
 #define _C_OP_UNPACKA _UNPACK2A
+#elif VM_OP_SIZE == 3
+typedef uint32_t _C_OP_TYPE;
+#define _C_OP_SIZE 3
+#define _C_OP_PACKFN _PACK3FN
+#define _C_OP_PACKA _PACK3A
+#define _C_OP_UNPACKA _UNPACK3A
+#elif VM_OP_SIZE == 4
+typedef uint32_t _C_OP_TYPE;
+#define _C_OP_SIZE 4
+#define _C_OP_PACKFN _PACK4FN
+#define _C_OP_PACKA _PACK4A
+#define _C_OP_UNPACKA _UNPACK4A
+#else
+#error "Invalid operand size"
+#endif
 
 #define _CPUSH(vect, code) vect.push_back(code)
 #define _CPUSHOP(vect, code, operand) \

@@ -62,6 +62,7 @@ static mustache::Data * data;
 static int detectFileType(char * filename);
 static std::string getFileContents(const char *filename);
 static void showUsage();
+static void showVersion();
 
 int main( int argc, char * argv[] )
 {
@@ -70,7 +71,7 @@ int main( int argc, char * argv[] )
   int numopt = 0;
   opterr = 0;
   
-  while( (curopt = getopt(argc, argv, "hceprd:o:t:n:l:")) != -1 ) {
+  while( (curopt = getopt(argc, argv, "hceprvd:o:t:n:l:")) != -1 ) {
     numopt++;
     switch( curopt ) {
       case 'c':
@@ -84,6 +85,10 @@ int main( int argc, char * argv[] )
         break;
       case 'r':
         printReadable = 1;
+        break;
+      case 'v':
+        showVersion();
+        goto error;
         break;
         
       case 'd':
@@ -349,4 +354,27 @@ static void showUsage()
   fprintf(stdout, "yaml ");
 #endif
   fprintf(stdout, "\n");
+}
+
+static void showVersion()
+{
+  fprintf(stdout, "mustache %s\n", mustache_version());
+  fprintf(stdout, "Operand Size: %d\n", _C_OP_SIZE);
+#ifdef HAVE_LIBJSON
+  fprintf(stdout, "JSON support: libjson\n");
+#elif HAVE_LIBJANSSON
+  fprintf(stdout, "JSON support: jansson\n");
+#else
+  fprintf(stdout, "JSON support: none\n");
+#endif
+#ifdef HAVE_LIBYAML
+  fprintf(stdout, "YAML support: libyaml\n");
+#else
+  fprintf(stdout, "JSON support: none\n");
+#endif
+#ifdef HAVE_CXX11
+  fprintf(stdout, "C++11 support: enabled\n");
+#else
+  fprintf(stdout, "C++11 support: disabled\n");
+#endif
 }

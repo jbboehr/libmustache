@@ -38,6 +38,13 @@ AS_IF([test "x$enable_gprof" = "xyes"], [
   CXXFLAGS="$CXXFLAGS -pg"
 ])
 
+# operand size
+AC_ARG_VAR(VM_OP_SIZE, [The VM operand size in bytes])
+AS_IF([test "x$VM_OP_SIZE" == "x"], [
+  VM_OP_SIZE=2
+])
+AC_DEFINE_UNQUOTED([VM_OP_SIZE], $VM_OP_SIZE, [Size of the VM operands])
+
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_LIBTOOL
