@@ -36,21 +36,22 @@
 #define _UNPACK3A(a, k) (_UNPACKI(a[k], 16) + _UNPACK2A(a, k + 1))
 #define _UNPACK4A(a, k) (_UNPACKI(a[k], 24) + _UNPACK3A(a, k + 1))
 
-#define _COPERANDSIZE 1
-#define _COPERANDPACKFN _PACK1FN
-#define _COPERANDPACKA _PACK1A
-#define _COPERANDUNPACKA _UNPACK1A
+typedef uint16_t _C_OP_TYPE;
+#define _C_OP_SIZE 2
+#define _C_OP_PACKFN _PACK2FN
+#define _C_OP_PACKA _PACK2A
+#define _C_OP_UNPACKA _UNPACK2A
 
 #define _CPUSH(vect, code) vect.push_back(code)
 #define _CPUSHOP(vect, code, operand) \
     do { \
       vect.push_back(code); \
-      _COPERANDPACKFN(vect.push_back, operand); \
+      _C_OP_PACKFN(vect.push_back, operand); \
     } while(0)
 #define _CSET(vect, index, code) vect[index] = code
-#define _CSETOP(vect, index, code) _COPERANDPACKA(vect, index, code)
+#define _CSETOP(vect, index, code) _C_OP_PACKA(vect, index, code)
 #define _CLEN(vect) vect.size()
-#define _CLENP(vect) _CLEN(vect) - _COPERANDSIZE
+#define _CLENP(vect) _CLEN(vect) - _C_OP_SIZE
 
 namespace mustache {
 
@@ -297,7 +298,7 @@ public:
     this->codes = codes;
     this->readHeader();
   };
-  int next(uint8_t * code, uint8_t * operand);
+  int next(uint8_t * code, _C_OP_TYPE * operand);
   void readHeader();
 };
 

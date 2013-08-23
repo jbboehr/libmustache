@@ -6,7 +6,7 @@
 namespace mustache {
 
 
-int CompilerState::next(uint8_t * code, uint8_t * operand) {
+int CompilerState::next(uint8_t * code, _C_OP_TYPE * operand) {
     if( this->pos >= this->codes->size() ) {
       return this->state = CompilerStates::END;
     } else if( this->pos == 0 ) {
@@ -14,21 +14,22 @@ int CompilerState::next(uint8_t * code, uint8_t * operand) {
     }
     this->spos = this->pos;
     uint8_t * current = &((*this->codes)[this->pos]);
-    uint8_t * next = &((*this->codes)[this->pos + 1]);
+    //uint8_t * next = &((*this->codes)[this->pos + 1]);
+    _C_OP_TYPE next = _C_OP_UNPACKA((*this->codes), this->pos + 1);
     switch( this->state ) {
       case CompilerStates::NOOP:
         if( *current == opcodes::FUNCTION ) {
           this->state = CompilerStates::SYMBOL;
           this->nextState = CompilerStates::FUNCTION;
           *code = *current;
-          *operand = *next;
-          this->pos++; // Skip operand
+          *operand = next;
+          this->pos += _C_OP_SIZE; // Skip operand
         } else if( *current == opcodes::STRING ) {
           this->state = CompilerStates::SYMBOL;
           this->nextState = CompilerStates::STRING;
           *code = *current;
-          *operand = *next;
-          this->pos++; // Skip operand
+          *operand = next;
+          this->pos += _C_OP_SIZE; // Skip operand
         } else {
           this->state = CompilerStates::NOOP;
           *code = *current;
@@ -38,10 +39,10 @@ int CompilerState::next(uint8_t * code, uint8_t * operand) {
         break;
       case CompilerStates::SYMBOL:
         *code = *current;
-        *operand = *next;
+        *operand = next;
         this->state = this->nextState;
         if( this->state == CompilerStates::FUNCTION ) {
-          this->pos++;
+          this->pos += _C_OP_SIZE;
         }
         this->lpos = 0;
         break;
@@ -51,7 +52,7 @@ int CompilerState::next(uint8_t * code, uint8_t * operand) {
         if( *current == opcodes::NOOP ) {
           this->state = CompilerStates::NOOP;
         }
-        this->lpos++;
+        this->lpos += 1;
         break;
       case CompilerStates::FUNCTION:
         if( *current == opcodes::NOOP ) {
@@ -60,9 +61,9 @@ int CompilerState::next(uint8_t * code, uint8_t * operand) {
           *operand = 0;
         } else if( true == Compiler::hasOperand(*current) ) {
           *code = *current;
-          *operand = *next;
-          this->pos++;
-          this->lpos++;
+          *operand = next;
+          this->pos += _C_OP_SIZE; // Skip operand
+          this->lpos += _C_OP_SIZE;
         } else {
           *code = *current;
           *operand = 0;
@@ -373,8 +374,9 @@ std::vector<uint8_t> * Compiler::_serialize(CompilerSymbol * main)
   uint32_t * table = new uint32_t[symbols.size()];
   for( it = symbols.begin() ; it != symbols.end(); it++ ) {
     table[(*it)->name] = codes->size();
-    codes->push_back((*it)->type);
-    codes->push_back((*it)->name);
+    _CPUSHOP((*codes), (*it)->type, (*it)->name);
+//    codes->push_back((*it)->type);
+//    codes->push_back((*it)->name);
     codes->insert(codes->end(), (*it)->code.begin(), (*it)->code.end());
     codes->push_back(0);
   }
@@ -482,7 +484,7 @@ std::string * Compiler::print(std::vector<uint8_t> * codes)
   
   // Print symbols
   uint8_t current = 0;
-  uint8_t operand = 0;
+  _C_OP_TYPE operand = 0;
   while( statec->next(&current, &operand) != CompilerStates::END ) {
     switch( statec->state ) {
       case CompilerStates::NOOP:
