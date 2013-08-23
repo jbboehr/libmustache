@@ -1,6 +1,6 @@
 
 AC_PREREQ([2.60])
-AC_INIT([mustache], [0.1.0], [jbboehr@gmail.com])
+AC_INIT([mustache], [0.2.0], [jbboehr@gmail.com])
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_SRCDIR([src/mustache.cpp])
