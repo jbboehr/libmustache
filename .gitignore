@@ -2,6 +2,7 @@
 *~
 *.o
 *.a
+*.trs
 .libs
 .deps
 .dirstamp
@@ -45,6 +46,7 @@ src/mustache_config.h
 test/spec/test_spec
 test/test_utils
 test_coverage
+/build/
 
 # distros
 *.tar.gz
