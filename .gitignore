@@ -53,3 +53,9 @@ test_coverage
 *.tgz
 *.tar
 *.zip
+
+
+# debian
+debian/libmustache-dev/
+debian/libmustache1/
+debian/tmp/
