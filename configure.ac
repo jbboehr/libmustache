@@ -9,7 +9,8 @@ AC_CONFIG_AUX_DIR([build])
 
 AM_INIT_AUTOMAKE([1.10 foreign])
 
-m4_include(m4/ax_cxx_compile_stdcxx_11.m4)
+#m4_include(m4/ax_cxx_compile_stdcxx_11.m4)
+#m4_include(m4/stl_hash.m4)
 
 AC_SUBST([VERSION_INT], [1])
 
@@ -79,6 +80,9 @@ AC_CHECK_HEADERS(yaml.h)
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_INT32_T
 AC_TYPE_LONG_LONG_INT
+
+# Checks for hash libraries
+AC_CXX_STL_HASH
 
 # Checks for library functions.
 

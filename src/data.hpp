@@ -12,11 +12,7 @@
 #include <string>
 #include <vector>
 
-#ifdef HAVE_CXX11
-#include <unordered_map>
-#else
-#include <map>
-#endif
+#include HASH_MAP_H
 
 #include "exception.hpp"
 
@@ -32,11 +28,7 @@ class Data {
   public:
     typedef std::auto_ptr<Data> Ptr;
     typedef std::string String;
-#ifdef HAVE_CXX11
-    typedef std::unordered_map<std::string,Data *> Map;
-#else
-    typedef std::map<std::string,Data *> Map;
-#endif
+    typedef HASH_NAMESPACE::HASH_MAP_CLASS<std::string,Data *> Map;
     typedef std::list<Data *> List;
     typedef Data * Array;
     
