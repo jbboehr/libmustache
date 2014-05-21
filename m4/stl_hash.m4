@@ -61,8 +61,11 @@ AC_DEFUN([AC_CXX_STL_HASH],
    for location in ext/map map; do
      for namespace in __gnu_cxx "" std stdext; do
        if test -z "$ac_cv_cxx_hash_map"; then
-         AC_TRY_COMPILE([#include <$location>],
-                        [${namespace}::map<int, int> t],
+         AC_COMPILE_IFELSE([
+		AC_LANG_PROGRAM(
+			[[#include <$location>]],
+                        [[${namespace}::map<int, int> t]]
+		)],
                         [ac_cv_cxx_hash_map="<$location>";
                          ac_cv_cxx_hash_namespace="$namespace";
                          ac_cv_cxx_hash_map_class="map";])
