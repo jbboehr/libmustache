@@ -2,7 +2,9 @@
 AC_PREREQ([2.60])
 AC_INIT([mustache], [0.2.1], [jbboehr@gmail.com])
 
-AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_HEADER(config.h)
+AX_PREFIX_CONFIG_H(src/mustache_config.h)
+
 AC_CONFIG_SRCDIR([src/mustache.cpp])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build])

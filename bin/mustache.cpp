@@ -1,7 +1,7 @@
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+//#ifdef HAVE_CONFIG_H
+#include "mustache_config.h"
+//#endif
 
 #include <ctype.h>
 #include <stdio.h>
@@ -347,10 +347,10 @@ static void showUsage()
   fprintf(stdout, "\n");
   fprintf(stdout, "Supported data formats:\n");
   fprintf(stdout, "    ");
-#if defined(HAVE_LIBJSON) || defined(HAVE_LIBJANSSON)
+#if defined(MUSTACHE_HAVE_LIBJSON) || defined(MUSTACHE_HAVE_LIBJANSSON)
   fprintf(stdout, "json ");
 #endif
-#ifdef HAVE_LIBYAML
+#ifdef MUSTACHE_HAVE_LIBYAML
   fprintf(stdout, "yaml ");
 #endif
   fprintf(stdout, "\n");
@@ -360,19 +360,19 @@ static void showVersion()
 {
   fprintf(stdout, "mustache %s\n", mustache_version());
   fprintf(stdout, "Operand Size: %d\n", _C_OP_SIZE);
-#ifdef HAVE_LIBJSON
+#ifdef MUSTACHE_HAVE_LIBJSON
   fprintf(stdout, "JSON support: libjson\n");
-#elif HAVE_LIBJANSSON
+#elif MUSTACHE_HAVE_LIBJANSSON
   fprintf(stdout, "JSON support: jansson\n");
 #else
   fprintf(stdout, "JSON support: none\n");
 #endif
-#ifdef HAVE_LIBYAML
+#ifdef MUSTACHE_HAVE_LIBYAML
   fprintf(stdout, "YAML support: libyaml\n");
 #else
   fprintf(stdout, "JSON support: none\n");
 #endif
-#ifdef HAVE_CXX11
+#ifdef MUSTACHE_HAVE_CXX11
   fprintf(stdout, "C++11 support: enabled\n");
 #else
   fprintf(stdout, "C++11 support: disabled\n");

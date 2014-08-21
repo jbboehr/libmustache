@@ -2,9 +2,9 @@
 #ifndef MUSTACHE_COMPILER_HPP
 #define MUSTACHE_COMPILER_HPP
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+//#ifdef HAVE_CONFIG_H
+#include "mustache_config.h"
+//#endif
 
 #include <cstdio>
 #include <cstdlib>
@@ -36,25 +36,25 @@
 #define _UNPACK3A(a, k) (_UNPACKI(a[k], 16) + _UNPACK2A(a, k + 1))
 #define _UNPACK4A(a, k) (_UNPACKI(a[k], 24) + _UNPACK3A(a, k + 1))
 
-#if VM_OP_SIZE == 1
+#if MUSTACHE_VM_OP_SIZE == 1
 typedef uint8_t _C_OP_TYPE;
 #define _C_OP_SIZE 1
 #define _C_OP_PACKFN _PACK1FN
 #define _C_OP_PACKA _PACK1A
 #define _C_OP_UNPACKA _UNPACK1A
-#elif VM_OP_SIZE == 2 || !defined(VM_OP_SIZE)
+#elif MUSTACHE_VM_OP_SIZE == 2 || !defined(MUSTACHE_VM_OP_SIZE)
 typedef uint16_t _C_OP_TYPE;
 #define _C_OP_SIZE 2
 #define _C_OP_PACKFN _PACK2FN
 #define _C_OP_PACKA _PACK2A
 #define _C_OP_UNPACKA _UNPACK2A
-#elif VM_OP_SIZE == 3
+#elif MUSTACHE_VM_OP_SIZE == 3
 typedef uint32_t _C_OP_TYPE;
 #define _C_OP_SIZE 3
 #define _C_OP_PACKFN _PACK3FN
 #define _C_OP_PACKA _PACK3A
 #define _C_OP_UNPACKA _UNPACK3A
-#elif VM_OP_SIZE == 4
+#elif MUSTACHE_VM_OP_SIZE == 4
 typedef uint32_t _C_OP_TYPE;
 #define _C_OP_SIZE 4
 #define _C_OP_PACKFN _PACK4FN

@@ -2,9 +2,9 @@
 #ifndef MUSTACHE_DATA_HPP
 #define MUSTACHE_DATA_HPP
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+//#ifdef HAVE_CONFIG_H
+#include "mustache_config.h"
+//#endif
 
 #include <list>
 #include <memory>
@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include HASH_MAP_H
+#include MUSTACHE_HASH_MAP_H
 
 #include "exception.hpp"
 
@@ -28,7 +28,7 @@ class Data {
   public:
     typedef std::auto_ptr<Data> Ptr;
     typedef std::string String;
-    typedef HASH_NAMESPACE::HASH_MAP_CLASS<std::string,Data *> Map;
+    typedef MUSTACHE_HASH_NAMESPACE::MUSTACHE_HASH_MAP_CLASS<std::string,Data *> Map;
     typedef std::list<Data *> List;
     typedef Data * Array;
     

@@ -525,7 +525,7 @@ void Compiler::bufferToVector(uint8_t * buffer, size_t length, std::vector<uint8
 {
   std::vector<uint8_t> * vect = *vector = new std::vector<uint8_t>;
   vect->resize(length);
-#ifdef HAVE_CXX11
+#ifdef MUSTACHE_HAVE_CXX11
   memcpy(vect->data(), buffer, length);
 #else
   int i = 0;
@@ -568,7 +568,7 @@ void Compiler::vectorToBuffer(std::vector<uint8_t> * vector, uint8_t ** buffer, 
 {
   size_t len = *length = vector->size();
   uint8_t * buf = *buffer = (uint8_t *) malloc(sizeof(uint8_t) * len);
-#ifdef HAVE_CXX11
+#ifdef MUSTACHE_HAVE_CXX11
   memcpy(buf, vector->data(), len);
 #else
   int i = 0;
