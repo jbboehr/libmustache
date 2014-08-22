@@ -2,9 +2,9 @@
 #ifndef MUSTACHE_VM_HPP
 #define MUSTACHE_VM_HPP
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+//#ifdef HAVE_CONFIG_H
+#include "mustache_config.h"
+//#endif
 
 #include <cstring>
 #include <memory>

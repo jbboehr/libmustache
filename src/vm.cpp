@@ -43,7 +43,7 @@ std::string * VM::execute(uint8_t * codes, size_t length, Data * data)
 
 void VM::execute(std::vector<uint8_t> * codes, Data * data, std::string * output)
 {
-#ifdef HAVE_CXX11
+#ifdef MUSTACHE_HAVE_CXX11
   execute(codes->data(), codes->size(), data, output);
 #else
   uint8_t * codes_buf = NULL;

@@ -1,16 +1,16 @@
 
 #include "data.hpp"
 
-#ifdef HAVE_LIBYAML
+#ifdef MUSTACHE_HAVE_LIBYAML
 #include "yaml.h"
 #endif
 
-#if defined(HAVE_LIBJSON)
+#if defined(MUSTACHE_HAVE_LIBJSON)
 #include "json/json.h"
 //#include "json/json_inttypes.h"
 #include "json/json_object.h"
 #include "json/json_tokener.h"
-#elif defined(HAVE_LIBJANSSON)
+#elif defined(MUSTACHE_HAVE_LIBJANSSON)
 #include "jansson.h"
 #endif
 
@@ -145,7 +145,7 @@ Data * DataStack::searchnr(std::string * key)
 
 // Data integrations
 
-#if defined(HAVE_LIBJSON)
+#if defined(MUSTACHE_HAVE_LIBJSON)
 static void _createFromJSON(Data * data, struct json_object * object)
 {
   Data * child = NULL;
@@ -211,7 +211,7 @@ Data * Data::createFromJSON(const char * string)
   json_object_put(result);
   return data;
 }
-#elif defined(HAVE_LIBJANNSON)
+#elif defined(MUSTACHE_HAVE_LIBJANNSON)
 Data * Data::createFromJSON(const char * string)
 {
   throw Exception("JSON support using libjannson not implemented");
@@ -223,7 +223,7 @@ Data * Data::createFromJSON(const char * string)
 }
 #endif
 
-#if defined(HAVE_LIBYAML)
+#if defined(MUSTACHE_HAVE_LIBYAML)
 static void _createFromYAML(Data * data, yaml_document_t * document, yaml_node_t * node)
 {
   Data * child = NULL;
