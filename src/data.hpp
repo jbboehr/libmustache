@@ -125,14 +125,16 @@ class DataStack {
     }
     
     //! Pop an element off the top of the stack
-    void pop_back() {
+    Data * pop_back() {
 #ifdef MUSTACHE_DATA_STACK_CHECKED
       if( _size <= 0 ) {
         return;
       }
 #endif
+      Data * v = back();
       _size--;
       _stack[_size] = NULL;
+      return v;
     };
     
     //! Get the top of the stack

@@ -16,11 +16,11 @@
 #define _ETOP stack[stackSize - 1]
 #define _ETOP1 stack[stackSize - 2]
 
-#define _DPUSH(v) dataStack[dataStackSize++] = v
-#define _DPOP dataStack[--dataStackSize]
-#define _DTOP dataStack[dataStackSize - 1]
-#define _DSEARCH(v) this->search(dataStackSize, v)
-#define _DSEARCHNR(v) this->searchnr(dataStackSize, v)
+#define _DPUSH(v) this->dataStack.push_back(v)
+#define _DPOP this->dataStack.pop_back()
+#define _DTOP this->dataStack.back()
+#define _DSEARCH(v) this->dataStack.search(v)
+#define _DSEARCHNR(v) this->dataStack.searchnr(v)
 
 #ifdef DEBUG
 #define DBGHEAD printf("%03ld: %03ld: %-8s\t", LOC, LLOC, Compiler::opcodeName(*loc))
@@ -62,8 +62,6 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
   register uint32_t * symbols = NULL;
   register uint32_t * stack = this->stack;
   register uint32_t stackSize = 0;
-  register Data ** dataStack = this->dataStack;
-  register uint32_t dataStackSize = 0;
   
   // Clear the output buffer
   outputBuffer.clear();
@@ -314,45 +312,14 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
   free(symbols);
 }
 
-Data * VM::search(uint32_t dataStackSize, std::string * key)
+Data * VM::search(std::string * key)
 {
-  // Resolve up the data stack
-  Data * ref = NULL;
-  Data::Map::iterator d_it;
-  Data ** _stackPos = this->dataStack + dataStackSize - 1;
-  int i;
-  for( i = 0; i < dataStackSize; i++, _stackPos-- ) {
-    if( (*_stackPos) == NULL ) continue;
-    if( (*_stackPos)->type != Data::TypeMap ) continue;
-    
-    d_it = (*_stackPos)->data.find(*key);
-    if( d_it != (*_stackPos)->data.end() ) {
-      ref = d_it->second;
-      if( ref != NULL ) {
-        break;
-      }
-    }
-  }
-  return ref;
+  return this->dataStack.search(key);
 }
 
-Data * VM::searchnr(uint32_t dataStackSize, std::string * key)
+Data * VM::searchnr(std::string * key)
 {
-  Data * back = this->dataStack[dataStackSize - 1];
-  if( back == NULL || back->type != Data::TypeMap ) {
-    return NULL;
-  }
-  
-  Data * ref = NULL;
-  Data::Map::iterator d_it = back->data.find(*key);
-  if( d_it != back->data.end() ) {
-    ref = d_it->second;
-    if( ref != NULL ) {
-      return ref;
-    }
-  }
-  
-  return NULL;
+  return this->dataStack.searchnr(key);
 }
 
 }

@@ -20,6 +20,10 @@
 namespace mustache {
 
 
+class ExecutionStack {
+
+};
+
 /**
  * The virtual machine
  */
@@ -29,7 +33,7 @@ private:
   uint32_t stack[127];
   
   //! Data stack
-  Data * dataStack[127];
+  DataStack dataStack;
   
   //! String for doing map lookups
   std::string lookupstr;
@@ -38,10 +42,10 @@ private:
   std::string outputBuffer;
   
   //! Search the data stack
-  Data * search(uint32_t dataStackSize, std::string * key);
+  Data * search(std::string * key);
   
   //! Search the data stack without traversing up it
-  Data * searchnr(uint32_t dataStackSize, std::string * key);
+  Data * searchnr(std::string * key);
   
 public:
   VM() {
