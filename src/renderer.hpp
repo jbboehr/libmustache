@@ -28,7 +28,7 @@ class Renderer {
     Data * _data;
     
     //! The data stack
-    DataStack * _stack;
+    Stack<Data *> * _stack;
     
     //! Partials
     Node::Partials * _partials;

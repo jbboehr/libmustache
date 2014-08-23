@@ -13,12 +13,12 @@
 
 #include "node.hpp"
 #include "data.hpp"
+#include "stack.hpp"
 #include "compiler.hpp"
 #include "utils.hpp"
 
 
 namespace mustache {
-
 
 /**
  * The virtual machine
@@ -26,10 +26,10 @@ namespace mustache {
 class VM {
 private:
   //! Execution stack
-  uint32_t stack[127];
+  Stack<uint32_t, 127> stack;
   
   //! Data stack
-  Data * dataStack[127];
+  Stack<Data *> dataStack;
   
   //! String for doing map lookups
   std::string lookupstr;
@@ -38,10 +38,10 @@ private:
   std::string outputBuffer;
   
   //! Search the data stack
-  Data * search(uint32_t dataStackSize, std::string * key);
+  Data * search(std::string * key);
   
   //! Search the data stack without traversing up it
-  Data * searchnr(uint32_t dataStackSize, std::string * key);
+  Data * searchnr(std::string * key);
   
 public:
   VM() {
