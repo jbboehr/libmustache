@@ -1,13 +1,17 @@
 
+#include <stdio.h>
+
 #include "mustache.hpp"
 
 
 const char * mustache_version() {
-  return LIBMUSTACHE_VERSION;
+  return MUSTACHE_PACKAGE_VERSION;
 }
 
 int mustache_version_int() {
-  return LIBMUSTACHE_VERSION_INT;
+  int maj = 0, min = 0, rev = 0;
+  sscanf(MUSTACHE_PACKAGE_VERSION, "%d.%d.%d", &maj, &min, &rev);
+  return (rev + (100 * min) + (10000 * maj));
 }
 
 
