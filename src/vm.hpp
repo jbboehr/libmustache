@@ -13,16 +13,12 @@
 
 #include "node.hpp"
 #include "data.hpp"
+#include "stack.hpp"
 #include "compiler.hpp"
 #include "utils.hpp"
 
 
 namespace mustache {
-
-
-class ExecutionStack {
-
-};
 
 /**
  * The virtual machine
@@ -30,10 +26,10 @@ class ExecutionStack {
 class VM {
 private:
   //! Execution stack
-  uint32_t stack[127];
+  Stack<uint32_t, 127> stack;
   
   //! Data stack
-  DataStack dataStack;
+  Stack<Data *> dataStack;
   
   //! String for doing map lookups
   std::string lookupstr;

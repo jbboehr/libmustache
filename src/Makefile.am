@@ -9,6 +9,7 @@ mustacheinclude_HEADERS = \
 	mustache.hpp \
 	node.hpp \
 	renderer.hpp \
+	stack.hpp \
 	tokenizer.hpp \
 	utils.hpp \
 	compiler.hpp \
@@ -26,6 +27,7 @@ libmustache_la_SOURCES = \
 	node.hpp \
 	renderer.cpp \
 	renderer.hpp \
+	stack.hpp \
 	tokenizer.cpp \
 	tokenizer.hpp \
 	utils.cpp \

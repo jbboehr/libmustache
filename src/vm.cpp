@@ -11,16 +11,16 @@
 #define OP _C_OP_UNPACKA(loc, 1)
 #define HADOP loc += _C_OP_SIZE;
 
-#define _EPUSH(v) stack[stackSize++] = v
-#define _EPOP stack[--stackSize]
-#define _ETOP stack[stackSize - 1]
-#define _ETOP1 stack[stackSize - 2]
+#define _EPUSH(v) this->stack.push_back(v)
+#define _EPOP this->stack.pop_back()
+#define _ETOP this->stack.back()
+#define _ETOP1 this->stack.backOffset(1)
 
 #define _DPUSH(v) this->dataStack.push_back(v)
 #define _DPOP this->dataStack.pop_back()
 #define _DTOP this->dataStack.back()
-#define _DSEARCH(v) this->dataStack.search(v)
-#define _DSEARCHNR(v) this->dataStack.searchnr(v)
+#define _DSEARCH(v) searchStack(&this->dataStack, v)
+#define _DSEARCHNR(v) searchStackNR(&this->dataStack, v)
 
 #ifdef DEBUG
 #define DBGHEAD printf("%03ld: %03ld: %-8s\t", LOC, LLOC, Compiler::opcodeName(*loc))
@@ -60,8 +60,6 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
   register uint8_t * end = codes + length;
   register uint8_t * sloc = loc;
   register uint32_t * symbols = NULL;
-  register uint32_t * stack = this->stack;
-  register uint32_t stackSize = 0;
   
   // Clear the output buffer
   outputBuffer.clear();
@@ -146,7 +144,7 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
         break;
       case opcodes::INCR:
         DBG("%lu+1", _ETOP);
-        _ETOP++;
+        _EPUSH(_EPOP + 1);
         break;
       case opcodes::IF_GE:
         DBG("%ld >= %ld", _ETOP, _ETOP1);
@@ -314,12 +312,12 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
 
 Data * VM::search(std::string * key)
 {
-  return this->dataStack.search(key);
+  searchStack(&this->dataStack, key);
 }
 
 Data * VM::searchnr(std::string * key)
 {
-  return this->dataStack.searchnr(key);
+  searchStackNR(&this->dataStack, key);
 }
 
 }
