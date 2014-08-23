@@ -43,7 +43,7 @@ Data::~Data()
         children.clear();
       }
     case Data::TypeArray:
-      delete[] array;
+      //delete[] array;
       break;
   }
 }
@@ -63,7 +63,7 @@ void Data::init(Data::Type type, int size) {
       // Do nothing
       break;
     case Data::TypeArray:
-      this->array = new Data[size];
+      this->array.reserve(size);
       break;
   }
 };
@@ -184,12 +184,12 @@ static void _createFromJSON(Data * data, struct json_object * object)
     case json_type_array: {
       int len = json_object_array_length(object);
       data->init(Data::TypeArray, len);
-      child = data->array;
+      //child = data->array;
       
       struct json_object * array_item;
       for( int i = 0; i < len; i++, child++ ) {
-        array_item = json_object_array_get_idx(object, i);
-        _createFromJSON(child, array_item);
+        //array_item = json_object_array_get_idx(object, i);
+        //_createFromJSON(child, array_item);
       }
       break;
     }
@@ -254,12 +254,12 @@ static void _createFromYAML(Data * data, yaml_document_t * document, yaml_node_t
     case YAML_SEQUENCE_NODE: {
       int len = (node->data.sequence.items.top - node->data.sequence.items.start);
       data->init(Data::TypeArray, len);
-      child = data->array;
+      //child = data->array;
       
       yaml_node_item_t * item;
       for( item = node->data.sequence.items.start; item < node->data.sequence.items.top; item++, child++) {
-        yaml_node_t * valueNode = yaml_document_get_node(document, *item);
-        _createFromYAML(child, document, valueNode);
+        //yaml_node_t * valueNode = yaml_document_get_node(document, *item);
+        //_createFromYAML(child, document, valueNode);
       }
       break;
     }

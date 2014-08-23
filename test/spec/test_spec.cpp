@@ -4,10 +4,29 @@
 std::list<MustacheSpecTest *> tests;
 int execNum = 1;
 
+void handler(int sig) {
+  void *array[10];
+  size_t size;
+
+  // get void*'s for all entries on the stack
+  size = backtrace(array, 10);
+
+  // print out all the frames to stderr
+  fprintf(stderr, "Error: signal %d:\n", sig);
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  exit(1);
+}
+
 int main( int argc, char * argv[] )
 {
   char * directory = NULL;
+
+  // install our handler
+  //signal(SIGSEGV, handler);
   
+  // disable buffering
+  setbuf(stdout, NULL);
+
   if( argc >= 2 ) {
     directory = argv[1];
   }
@@ -227,10 +246,14 @@ void mustache_spec_parse_data(yaml_document_t * document, yaml_node_t * node, mu
     yaml_node_item_t * item;
     int nItems = node->data.sequence.items.top - node->data.sequence.items.start;
     data->init(mustache::Data::TypeArray, nItems);
+    int i = 0;
     for( item = node->data.sequence.items.start; item < node->data.sequence.items.top; item ++) {
+      mustache::Data * child = new mustache::Data();
+      data->array.push_back(child);
       yaml_node_t * valueNode = yaml_document_get_node(document, *item);
-      mustache_spec_parse_data(document, valueNode, &data->array[item - node->data.sequence.items.start]);
+      mustache_spec_parse_data(document, valueNode, child);
     }
+    data->length = data->array.size();
   } else if( node->type == YAML_SCALAR_NODE ) {
     char * keyValue = reinterpret_cast<char *>(node->data.scalar.value);
     if( strcmp(keyValue, "0") == 0 ||

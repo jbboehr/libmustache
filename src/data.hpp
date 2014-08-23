@@ -30,7 +30,7 @@ class Data {
     typedef std::string String;
     typedef MUSTACHE_HASH_NAMESPACE::MUSTACHE_HASH_MAP_CLASS<std::string,Data *> Map;
     typedef std::list<Data *> List;
-    typedef Data * Array;
+    typedef std::vector<Data *> Array;
     
     //! Enum of the different supported data types
     enum Type { 

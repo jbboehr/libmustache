@@ -210,8 +210,8 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
         break;
       }
       case opcodes::DLOOKUPA: {
-        DBG("Index: %lu, DPush: %p", _ETOP, _DTOP->array + _ETOP);
-        _DPUSH(_DTOP->array + _ETOP);
+        DBG("Index: %lu, DPush: %p", _ETOP, _DTOP->array[_ETOP]);
+        _DPUSH(_DTOP->array[_ETOP]);
         break;
       }
       case opcodes::DARRSIZE:
@@ -319,8 +319,8 @@ Data * VM::search(uint32_t dataStackSize, std::string * key)
   // Resolve up the data stack
   Data * ref = NULL;
   Data::Map::iterator d_it;
-  register Data ** _stackPos = this->dataStack + dataStackSize - 1;
-  register int i;
+  Data ** _stackPos = this->dataStack + dataStackSize - 1;
+  int i;
   for( i = 0; i < dataStackSize; i++, _stackPos-- ) {
     if( (*_stackPos) == NULL ) continue;
     if( (*_stackPos)->type != Data::TypeMap ) continue;

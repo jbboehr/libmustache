@@ -146,7 +146,6 @@ void Renderer::_renderNode(Node * node)
       
     case Node::TypeSection:
       if( !valIsEmpty ) {
-        int ArrayPos = 0;
         switch( val->type ) {
           default:
           case Data::TypeString:
@@ -155,7 +154,6 @@ void Renderer::_renderNode(Node * node)
             }
             break;
           case Data::TypeList:
-            // Numeric array/list
             for( Data::List::iterator childrenIt = val->children.begin() ; childrenIt != val->children.end(); childrenIt++ ) {
               _stack->push_back(*childrenIt);
               for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
@@ -165,13 +163,13 @@ void Renderer::_renderNode(Node * node)
             }
             break;
           case Data::TypeArray:
-            for( Data::Array ArrayPtr = val->array; ArrayPos < val->length; ArrayPos++, ArrayPtr++ ) {
-              _stack->push_back(ArrayPtr);
-              for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
-                _renderNode(*it);
+              for( Data::Array::iterator childrenIt = val->array.begin() ; childrenIt != val->array.end(); childrenIt++ ) {
+                _stack->push_back(*childrenIt);
+                for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
+                  _renderNode(*it);
+                }
+                _stack->pop_back();
               }
-              _stack->pop_back();
-            }
             break;
           case Data::TypeMap:
             // Associate array/map
