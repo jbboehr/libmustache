@@ -57,5 +57,8 @@ test_coverage
 
 # debian
 debian/libmustache-dev/
-debian/libmustache1/
+debian/libmustache3/
+debian/*.substvars
+debian/*.debhelper
+debian/*.log
 debian/tmp/

@@ -1,7 +1,7 @@
 Source: libmustache
 Priority: extra
 Maintainer: John Boehr <jbboehr@gmail.com>
-Build-Depends: debhelper (>= 8.0.0)
+Build-Depends: debhelper (>= 8.0.0), automake, autoconf, dh-autoreconf, libjson0-dev, libyaml-dev, check, libtool, m4
 Standards-Version: 3.9.2
 Section: libs
 Homepage: https://github.com/jbboehr/libmustache
@@ -11,13 +11,13 @@ Vcs-Browser: https://github.com/jbboehr/libmustache
 Package: libmustache-dev
 Section: libdevel
 Architecture: any
-Depends: libmustache1 (= ${binary:Version})
-Description: <insert up to 60 chars description>
- <insert long description, indented with spaces>
+Depends: libmustache3 (= ${binary:Version})
+Description: Mustache library for C++ (development)
+ Mustache templating library for C++
 
-Package: libmustache1
+Package: libmustache3
 Section: libs
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: <insert up to 60 chars description>
- <insert long description, indented with spaces>
+Description: Mustache library for C++ (library)
+ Mustache templating library for C++
