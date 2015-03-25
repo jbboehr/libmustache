@@ -64,7 +64,8 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
   // Clear the output buffer
   outputBuffer.clear();
   
-  // Push the initial data onto the data stack
+  // Clear the stack and push the initial data onto the data stack
+  this->dataStack.clear();
   _DPUSH(data);
   
   // Read the symbol table
