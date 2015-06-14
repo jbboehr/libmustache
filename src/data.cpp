@@ -151,6 +151,7 @@ Data * searchStackNR(Stack<Data *> * stack, std::string * key)
 static void _createFromJSON(Data * data, struct json_object * object)
 {
   Data * child = NULL;
+  int cindex = 0;
   
   switch( json_object_get_type(object) ) {
     case json_type_null:
@@ -186,12 +187,12 @@ static void _createFromJSON(Data * data, struct json_object * object)
     case json_type_array: {
       int len = json_object_array_length(object);
       data->init(Data::TypeArray, len);
-      //child = data->array;
       
       struct json_object * array_item;
-      for( int i = 0; i < len; i++, child++ ) {
-        //array_item = json_object_array_get_idx(object, i);
-        //_createFromJSON(child, array_item);
+      for( int i = 0; i < len; i++, cindex++ ) {
+        array_item = json_object_array_get_idx(object, i);
+        data->array[cindex] = child = new Data();
+        _createFromJSON(child, array_item);
       }
       break;
     }
@@ -229,6 +230,7 @@ Data * Data::createFromJSON(const char * string)
 static void _createFromYAML(Data * data, yaml_document_t * document, yaml_node_t * node)
 {
   Data * child = NULL;
+  int cindex = 0;
   
   switch( node->type ) {
     case YAML_SCALAR_NODE: {
@@ -256,12 +258,12 @@ static void _createFromYAML(Data * data, yaml_document_t * document, yaml_node_t
     case YAML_SEQUENCE_NODE: {
       int len = (node->data.sequence.items.top - node->data.sequence.items.start);
       data->init(Data::TypeArray, len);
-      //child = data->array;
       
       yaml_node_item_t * item;
-      for( item = node->data.sequence.items.start; item < node->data.sequence.items.top; item++, child++) {
-        //yaml_node_t * valueNode = yaml_document_get_node(document, *item);
-        //_createFromYAML(child, document, valueNode);
+      for( item = node->data.sequence.items.start; item < node->data.sequence.items.top; item++, cindex++) {
+        yaml_node_t * valueNode = yaml_document_get_node(document, *item);
+        data->array[cindex] = child = new Data();
+        _createFromYAML(child, document, valueNode);
       }
       break;
     }
@@ -280,7 +282,9 @@ Data * Data::createFromYAML(const char * string)
   const unsigned char * input = reinterpret_cast<const unsigned char *>(string);
   
   yaml_parser_set_input_string(&parser, input, strlen(string));
-  yaml_parser_load(&parser, &document);
+  if( 0 == yaml_parser_load(&parser, &document) ) {
+    throw Exception("Failed to parse yaml document");
+  }
   
   Data * data = new Data();
   data->type = Data::TypeNone;
