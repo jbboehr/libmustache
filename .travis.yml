@@ -3,14 +3,18 @@ language: cpp
 compiler:
   - gcc
 
-before_install:
-  - git submodule update --init --recursive
-
-script:
-  - autoreconf --install
-  - ./configure
-  - make test
-
 branches:
   only:
     - master
+
+sudo: false
+
+before_install:
+  - git submodule update --init --recursive
+
+install:
+  - autoreconf -fiv
+  - ./configure --prefix=$HOME/build
+
+script:
+  - make all test install
