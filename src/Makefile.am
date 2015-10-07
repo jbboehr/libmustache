@@ -4,6 +4,7 @@
 # include_HEADERS = mustache.hpp mustache_config.h
 mustacheincludedir = $(includedir)/mustache
 mustacheinclude_HEADERS = \
+	lambda.hpp \
 	data.hpp \
 	exception.hpp \
 	mustache.hpp \
@@ -18,6 +19,8 @@ mustacheinclude_HEADERS = \
 
 lib_LTLIBRARIES = libmustache.la
 libmustache_la_SOURCES = \
+	lambda.cpp \
+	lambda.hpp \
 	data.cpp \
 	data.hpp \
 	exception.hpp \

@@ -63,7 +63,7 @@ class Tokenizer {
     bool getEscapeByDefault();
     
     //! Tokenizes the given string template
-    void tokenize(std::string * tmpl, Node * root);
+    void tokenize(std::string * tmpl, Node * root, bool escapeOutput = false);
 };
 
 
