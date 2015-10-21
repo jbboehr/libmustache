@@ -46,7 +46,7 @@ bool Tokenizer::getEscapeByDefault() {
   return _escapeByDefault;
 }
 
-void Tokenizer::tokenize(std::string * tmpl, Node * root)
+void Tokenizer::tokenize(std::string * tmpl, Node * root, bool escapeOutput)
 {
   std::string stop(_stopSequence);
   std::string start(_startSequence);
@@ -214,6 +214,12 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
             node = &(root->partials[buffer]);
           } else {
             node = new Node(currentType, buffer, currentFlags);
+
+            if( currentType == Node::TypeSection ) {
+              node->startSequence = new std::string(start);
+              node->stopSequence = new std::string(stop);
+            }
+
             nodeStack.back()->children.push_back(node);
           }
           // Push/pop stack
@@ -273,7 +279,12 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root)
   } else if( buffer.length() > 0 ) {
     node = new Node();
     node->type = Node::TypeOutput;
-    node->data = new std::string(buffer);
+    if( escapeOutput ) {
+      node->data = new std::string();
+      htmlspecialchars_append(&buffer, node->data);
+    } else {
+      node->data = new std::string(buffer);
+    }
     nodeStack.back()->children.push_back(node);
     buffer.clear();
   }

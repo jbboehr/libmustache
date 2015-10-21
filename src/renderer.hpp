@@ -9,6 +9,7 @@
 #include "data.hpp"
 #include "exception.hpp"
 #include "node.hpp"
+#include "tokenizer.hpp"
 #include "utils.hpp"
 
 namespace mustache {
@@ -79,6 +80,9 @@ class Renderer {
     
     //! Renders using the stored variables
     void render();
+
+    //! Renders the given node to the given output using the stored variables
+    void renderForLambda(Node * node, std::string * output);
 };
 
 

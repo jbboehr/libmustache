@@ -29,6 +29,32 @@ Node::~Node()
   children.clear();
   
   // Child should not be freed
+
+  if( startSequence != NULL ) {
+    delete startSequence;
+  }
+
+  if( stopSequence != NULL ) {
+    delete stopSequence;
+  }
+}
+
+std::string Node::children_to_template_string(const std::string& start, const std::string& stop)
+{
+  std::string template_string;
+
+  if( children.size() > 0 ) {
+    Node::Children::iterator it;
+    for( it = children.begin() ; it != children.end(); it++ ) {
+      if( (*it)->type == Node::TypeStop ) {
+        continue;
+      }
+
+      template_string.append((*it)->to_template_string(start, stop));
+    }
+  }
+
+  return template_string;
 }
 
 void Node::setData(const std::string& data)
@@ -144,6 +170,64 @@ std::vector<uint8_t> * Node::serialize()
   //retr.push_back(0xf8);
   
   return ret;
+}
+
+std::string Node::to_template_string(const std::string& start, const std::string& stop)
+{
+  std::string template_string;
+
+  switch( type ) {
+    case Node::TypeComment:
+      template_string.append(start);
+      template_string.append("!");
+      template_string.append(*data);
+      template_string.append(stop);
+      break;
+    case Node::TypeOutput:
+      template_string.assign(*data);
+      break;
+    case Node::TypePartial:
+      template_string.append(start);
+      template_string.append(">");
+      template_string.append(*data);
+      template_string.append(stop);
+      break;
+    case Node::TypeNegate:
+    case Node::TypeSection:
+    case Node::TypeStop:
+    case Node::TypeVariable:
+      template_string.append(start);
+
+      if( type == Node::TypeVariable && !(flags & Node::FlagEscape) ) {
+        template_string.append("&");
+      }
+
+      switch( type ) {
+        case Node::TypeNegate:
+          template_string.append("^");
+          break;
+        case Node::TypeSection:
+          template_string.append("#");
+          break;
+        case Node::TypeStop:
+          template_string.append("/");
+          break;
+      }
+
+      template_string.append(*data);
+
+      template_string.append(stop);
+    case Node::TypeRoot: // a root node only has children, so start here
+      if( children.size() > 0 ) {
+        Node::Children::iterator it;
+        for( it = children.begin() ; it != children.end(); it++ ) {
+          template_string.append((*it)->to_template_string(start, stop));
+        }
+      }
+      break;
+  }
+
+  return template_string;
 }
 
 Node * Node::unserialize(std::vector<uint8_t>& serial, size_t offset, size_t * vpos)

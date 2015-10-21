@@ -81,6 +81,12 @@ class Node {
     
     //! Internal partials
     Node::Partials partials;
+
+    //! The start sequence value for this node's children (used when rendering lambdas as sections, so only needed if this node is a section)
+    std::string * startSequence;
+
+    //! The stop sequence value for this node's children (used when rendering lambdas as sections, so only needed if this node is a section)
+    std::string * stopSequence;
     
     //! Constructor
     Node() : 
@@ -88,24 +94,32 @@ class Node {
         data(NULL),
         dataParts(NULL),
         flags(Node::FlagNone), 
-        child(NULL) {};
+        child(NULL),
+        startSequence(NULL),
+        stopSequence(NULL) {};
     Node(Node::Type type, const std::string& data, int flags = 0) :
         type(type),
         dataParts(NULL), 
         flags(flags), 
-        child(NULL) {
+        child(NULL),
+        startSequence(NULL),
+        stopSequence(NULL) {
       setData(data);
     };
         
     
     //! Destructor
     ~Node();
+
+    std::string children_to_template_string(const std::string& start, const std::string& stop);
     
     //! Set data
     void setData(const std::string& data);
     
     //! Serialize
     std::vector<uint8_t> * serialize();
+
+    std::string to_template_string(const std::string& start, const std::string& stop);
     
     //! Unserialize
     static Node * unserialize(std::vector<uint8_t> & serial, size_t offset, size_t * vpos);

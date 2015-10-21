@@ -15,6 +15,7 @@
 #include MUSTACHE_HASH_MAP_H
 
 #include "exception.hpp"
+#include "lambda.hpp"
 #include "stack.hpp"
 
 namespace mustache {
@@ -39,7 +40,8 @@ class Data {
       TypeString = 1,
       TypeList = 2,
       TypeMap = 3,
-      TypeArray = 4
+      TypeArray = 4,
+      TypeLambda = 5
     };
     
     //! The data type
@@ -59,12 +61,16 @@ class Data {
     
     //! The current array value (array)
     Data::Array array;
+
+    //! The curent lambda value
+    Lambda * lambda;
     
     //! Constructor
     Data() : 
         type(Data::TypeNone),
-        val(NULL) {};
-    Data(Data::Type type, int size) : val(NULL) {
+        val(NULL),
+        lambda(NULL) {};
+    Data(Data::Type type, int size) : val(NULL), lambda(NULL) {
       init(type, size);
     };
     

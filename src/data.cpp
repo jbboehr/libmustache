@@ -45,6 +45,9 @@ Data::~Data()
     case Data::TypeArray:
       //delete[] array;
       break;
+    case Data::TypeLambda:
+      delete lambda;
+      break;
   }
 }
 
@@ -64,6 +67,9 @@ void Data::init(Data::Type type, int size) {
       break;
     case Data::TypeArray:
       this->array.reserve(size);
+      break;
+    case Data::TypeLambda:
+      // Do nothing
       break;
   }
 };
@@ -93,6 +99,11 @@ int Data::isEmpty()
       break;
     case Data::TypeArray:
       if( length <= 0 ) {
+        ret = 1;
+      }
+      break;
+    case Data::TypeLambda:
+      if( lambda == NULL ) {
         ret = 1;
       }
       break;

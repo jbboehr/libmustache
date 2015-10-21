@@ -57,7 +57,7 @@ void Renderer::render()
     throw Exception("Empty data");
   }
   
-  // Reserver minimum length (if not already set)
+  // Reserve minimum length (if not already set)
   if( _output->capacity() <= 0 ) {
     _output->reserve(Renderer::outputBufferLength);
   }
@@ -74,6 +74,27 @@ void Renderer::render()
   
   // Clear?
   //clear();
+}
+
+void Renderer::renderForLambda(Node * node, std::string * output)
+{
+  // Check node and data
+  if( _node == NULL ) {
+    throw Exception("Empty tree");
+  }
+
+  std::string * parentOutput = _output; // Swap out existing buffer
+  _output = output;
+
+  // Reserve minimum length (if not already set)
+  if( _output->capacity() <= 0 ) {
+    _output->reserve(Renderer::outputBufferLength);
+  }
+
+  // Render
+  _renderNode(node);
+
+  _output = parentOutput; // Put back original buffer
 }
 
 void Renderer::_renderNode(Node * node)
@@ -126,11 +147,25 @@ void Renderer::_renderNode(Node * node)
       
     case Node::TypeTag:
     case Node::TypeVariable:
-      if( !valIsEmpty && val->type == Data::TypeString ) {
-        if( node->flags & Node::FlagEscape ) {
-          htmlspecialchars_append(val->val, _output);
-        } else {
-          _output->append(*val->val);
+      if( !valIsEmpty) {
+        switch( val->type ) {
+          case Data::TypeString:
+            if( node->flags & Node::FlagEscape ) {
+              htmlspecialchars_append(val->val, _output);
+            } else {
+              _output->append(*val->val);
+            }
+            break;
+          case Data::TypeLambda:
+            std::string invoked = val->lambda->invoke();
+
+            Tokenizer tokenizer;
+            Node nodeFromLambda;
+
+            tokenizer.tokenize(&invoked, &nodeFromLambda, node->flags & Node::FlagEscape);
+
+            _renderNode(&nodeFromLambda);
+            break;
         }
       }
       break;
@@ -178,6 +213,19 @@ void Renderer::_renderNode(Node * node)
               _renderNode(*it);
             }
             _stack->pop_back();
+            break;
+          case Data::TypeLambda:
+            std::string text = node->children_to_template_string(*node->startSequence, *node->stopSequence);
+            std::string invoked = val->lambda->invoke(&text, this);
+
+            Tokenizer tokenizer;
+            Node nodeFromLambda;
+
+            tokenizer.setStartSequence(*node->startSequence);
+            tokenizer.setStopSequence(*node->stopSequence);
+            tokenizer.tokenize(&invoked, &nodeFromLambda, node->flags & Node::FlagEscape);
+
+            _renderNode(&nodeFromLambda);
             break;
         }
       }
