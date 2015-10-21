@@ -9,7 +9,7 @@ AC_CONFIG_SRCDIR([src/mustache.cpp])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build])
 
-AM_INIT_AUTOMAKE([1.10 foreign])
+AM_INIT_AUTOMAKE([1.10 foreign subdir-objects])
 
 #m4_include(m4/ax_cxx_compile_stdcxx_11.m4)
 #m4_include(m4/stl_hash.m4)
