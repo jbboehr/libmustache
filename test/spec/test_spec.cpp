@@ -1,8 +1,10 @@
 
 #include "test_spec.hpp"
+#include "../fixtures/lambdas.hpp"
 
 std::list<MustacheSpecTest *> tests;
 int execNum = 1;
+static const char * currentSuite;
 
 void handler(int sig) {
   void *array[10];
@@ -56,11 +58,13 @@ int main( int argc, char * argv[] )
     if( ent->d_name[0] == '.' ) continue;
     if( strlen(ent->d_name) < 5 ) continue;
     if( strcmp(ent->d_name + strlen(ent->d_name) - 4, ".yml") != 0 ) continue;
-    if( *(ent->d_name) == '~' ) continue; // Ignore lambdas
+    //if( *(ent->d_name) == '~' ) continue; // Ignore lambdas
     if( nFiles >= MAX_TEST_FILES ) continue;
-    
-    // Make filename
+
     char * file = ent->d_name;
+    currentSuite = file;
+
+    // Make filename
     std::string fileName;
     fileName += directory;
     fileName += '/';
@@ -93,13 +97,16 @@ int main( int argc, char * argv[] )
   std::list<MustacheSpecTest *>::iterator it = tests.begin();
   int nPassed = 0;
   int nFailed = 0;
+  int nSkipped = 0;
   for( ; it != tests.end(); ++it ) {
     if( (*it)->passed() ) {
       nPassed++;
     } else {
       nFailed++;
     }
-    if( (*it)->compiled_passed() ) {
+    if( (*it)->compiled_skipped ) {
+      nSkipped++;
+    } else if( (*it)->compiled_passed() ) {
       nPassed++;
     } else {
       nFailed++;
@@ -107,6 +114,7 @@ int main( int argc, char * argv[] )
   }
   int total = nPassed + nFailed;
   std::cout << nPassed << " passed, "
+            << nSkipped << " skipped, "
             << nFailed << " failed of "
             << total << " tests\n";
   return (nFailed > 0 ? 1 : 0);
@@ -202,13 +210,16 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
   mustache::Mustache mustache;
   mustache::Compiler compiler;
   mustache::VM vm;
+  bool isLambdaSuite = 0 == strcmp(currentSuite, "~lambdas.yml");
   
+  // Load lambdas?
+  if( isLambdaSuite ) {
+	  load_lambdas_into_test_data(&test->data, test->name);
+  }
+
   // Tokenize
   mustache::Node root;
   mustache.tokenize(&test->tmpl, &root);
-  
-  // Compile
-  mustache::Compiler::vectorToBuffer(compiler.compile(&root, &test->partials), &test->compiled, &test->compiled_length);
   
   // Execute the test
   for( int i = 0; i < execNum; i++ ) {
@@ -216,10 +227,17 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
     mustache.render(&root, &test->data, &test->partials, &test->output);
   }
   
-  // Execute the test in VM mode
-  for( int i = 0; i < execNum; i++ ) {
-    test->compiled_output.clear();
-    vm.execute(test->compiled, test->compiled_length, &test->data, &test->compiled_output);
+  if( isLambdaSuite ) {
+	  test->compiled_skipped = true;
+  } else {
+	  // Compile
+	  mustache::Compiler::vectorToBuffer(compiler.compile(&root, &test->partials), &test->compiled, &test->compiled_length);
+
+	  // Execute the test in VM mode
+	  for( int i = 0; i < execNum; i++ ) {
+		test->compiled_output.clear();
+		vm.execute(test->compiled, test->compiled_length, &test->data, &test->compiled_output);
+	  }
   }
   
   // Output result

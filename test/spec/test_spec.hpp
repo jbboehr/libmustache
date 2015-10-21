@@ -41,8 +41,9 @@ class MustacheSpecTest {
     size_t compiled_length;
     std::string compiled_output;
     int _compiled_passed;
+    bool compiled_skipped;
     
-    MustacheSpecTest() : _passed(-1), _compiled_passed(-1) {};
+    MustacheSpecTest() : _passed(-1), _compiled_passed(-1), compiled_skipped(false) {};
     bool passed() {
       if( -1 == _passed ) {
         std::string strippedExpected = expected;
@@ -80,14 +81,20 @@ class MustacheSpecTest {
         std::cout << "Expected: " << expected << "\n";
         std::cout << "Output: " << output << "\n";
       }
-      bool _compiled_passed = compiled_passed();
-      std::cout << name << " (compiled) ... " 
-                << (_compiled_passed ? "PASSED" : "FAILED")
-                << "\n";
-      if( !_compiled_passed ) {
-        std::cout << "Expected: " << expected << "\n";
-        std::cout << "Output: " << compiled_output << "\n";
-        std::cout << "Code: " << "\n" << *mustache::Compiler::print(compiled, compiled_length) << "\n";
+      if( !compiled_skipped ) {
+		  bool _compiled_passed = compiled_passed();
+		  std::cout << name << " (compiled) ... "
+					<< (_compiled_passed ? "PASSED" : "FAILED")
+					<< "\n";
+		  if( !_compiled_passed ) {
+			std::cout << "Expected: " << expected << "\n";
+			std::cout << "Output: " << compiled_output << "\n";
+			std::cout << "Code: " << "\n" << *mustache::Compiler::print(compiled, compiled_length) << "\n";
+		  }
+      } else {
+		  std::cout << name << " (compiled) ... "
+					<< "SKIPPED"
+					<< "\n";
       }
     }
     std::string toString() {
