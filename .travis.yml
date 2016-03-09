@@ -3,11 +3,14 @@ language: cpp
 compiler:
   - gcc
 
+dist: trusty
+
+sudo: required
+
 branches:
   only:
     - master
-
-sudo: false
+    - travis
 
 before_install:
   - git submodule update --init --recursive
