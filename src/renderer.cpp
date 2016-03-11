@@ -260,7 +260,7 @@ Data * Renderer::_lookup(Node * node)
 {
   Data * data = _stack->back();
   
-  if( data->type == Data::TypeString ) {
+  if( data->type == Data::TypeString || data->type == Data::TypeLambda ) {
     // Simple
     if( node->data->compare(".") == 0 ) {
       return data;

@@ -43,7 +43,13 @@ Data::~Data()
         children.clear();
       }
     case Data::TypeArray:
-      //delete[] array;
+      if( array.size() > 0 ) {
+        Data::Array::iterator arrayIt;
+        for ( arrayIt = array.begin() ; arrayIt != array.end(); arrayIt++ ) {
+          delete *arrayIt;
+        }
+        array.clear();
+      }
       break;
     case Data::TypeLambda:
       delete lambda;
