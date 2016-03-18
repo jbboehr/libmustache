@@ -1,6 +1,6 @@
 
 SUBDIRS = spec
-EXTRA_DIST = run
+#EXTRA_DIST = run
 
 check_PROGRAMS = test_utils
 
@@ -10,7 +10,7 @@ TESTS = test_utils spec/test_spec
 TESTS_ENVIRONMENT = \
 	top_srcdir=$(top_srcdir) \
 	top_builddir=$(top_builddir) \
-	mustache_spec_dir=$(top_srcdir)/spec/specs
+	mustache_spec_dir=@MUSTACHE_SPEC_DIR@
 
 clean-local:
 	rm -rf logs

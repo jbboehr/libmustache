@@ -1,5 +1,5 @@
 
-EXTRA_DIST = Readme.md
+EXTRA_DIST = README.md
 SUBDIRS = doc src bin test
 
 pkgconfigdir = $(libdir)/pkgconfig
