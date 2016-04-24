@@ -1,6 +1,6 @@
 
 AC_PREREQ([2.60])
-AC_INIT([mustache], [0.4.1], [jbboehr@gmail.com])
+AC_INIT([mustache], [0.4.2], [jbboehr@gmail.com])
 
 AC_CONFIG_HEADER(config.h)
 AX_PREFIX_CONFIG_H(src/mustache_config.h)
