@@ -33,8 +33,6 @@ class Tokenizer {
     bool _escapeByDefault;
     
   public:
-    typedef std::auto_ptr<Tokenizer> Ptr;
-    
     //! Constructor
     Tokenizer() : _startSequence("{{"), _stopSequence("}}"), _escapeByDefault(true) {};
     

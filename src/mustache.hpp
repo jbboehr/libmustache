@@ -38,8 +38,6 @@ namespace mustache {
 class Mustache {
   private:
   public:
-    typedef std::auto_ptr<Mustache> Ptr;
-    
     //! Tokenizer
     Tokenizer tokenizer;
     

@@ -28,7 +28,6 @@ namespace mustache {
 */
 class Data {
   public:
-    typedef std::auto_ptr<Data> Ptr;
     typedef std::string String;
     typedef MUSTACHE_HASH_NAMESPACE::MUSTACHE_HASH_MAP_CLASS<std::string,Data *> Map;
     typedef std::list<Data *> List;

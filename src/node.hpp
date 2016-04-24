@@ -19,7 +19,6 @@ namespace mustache {
 */
 class Node {
   public:
-    typedef std::auto_ptr<Node> Ptr;
     typedef std::vector<Node *> Children;
     typedef std::map<std::string,std::string> RawPartials;
     typedef std::map<std::string,Node> Partials;
