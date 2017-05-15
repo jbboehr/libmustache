@@ -6,26 +6,10 @@ std::list<MustacheSpecTest *> tests;
 int execNum = 1;
 static const char * currentSuite;
 
-void handler(int sig) {
-  void *array[10];
-  size_t size;
-
-  // get void*'s for all entries on the stack
-  size = backtrace(array, 10);
-
-  // print out all the frames to stderr
-  fprintf(stderr, "Error: signal %d:\n", sig);
-  backtrace_symbols_fd(array, size, STDERR_FILENO);
-  exit(1);
-}
-
 int main( int argc, char * argv[] )
 {
   char * directory = NULL;
 
-  // install our handler
-  //signal(SIGSEGV, handler);
-  
   // disable buffering
   setbuf(stdout, NULL);
 

@@ -6,10 +6,7 @@
 #define MAX_TEST_FILES 50
 
 #include <stdio.h>
-#include <execinfo.h>
-#include <signal.h>
 #include <stdlib.h>
-#include <unistd.h>
 
 #include <dirent.h>
 #include <yaml.h>
