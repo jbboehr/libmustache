@@ -19,6 +19,9 @@ int main( int argc, char * argv[] )
   if( directory == NULL ) {
     directory = getenv("mustache_spec_dir");
   }
+  if( directory == NULL && argc >= 2 ) {
+    directory  = argv[1];
+  }
   if( directory == NULL ) {
     std::cerr << "Requires at least one argument or that MUSTACHE_SPEC_DIR be set the the environment\n";
     return 1;
