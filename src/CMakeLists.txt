@@ -37,3 +37,6 @@ install(TARGETS mustache mustache_static
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib)
+
+install(FILES ${HEADERS} DESTINATION include/mustache)
+install(EXPORT check DESTINATION cmake)
