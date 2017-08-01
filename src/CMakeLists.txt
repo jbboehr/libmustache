@@ -1,4 +1,6 @@
 
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
 set(SOURCE_FILES
         compiler.cpp
         data.cpp
@@ -17,7 +19,7 @@ set(HEADERS
         exception.hpp
         lambda.hpp
         mustache.hpp
-        mustache_config.h
+        ${CMAKE_CURRENT_BINARY_DIR}/mustache_config.h
         node.hpp
         renderer.hpp
         stack.hpp
@@ -27,5 +29,11 @@ set(HEADERS
 
 link_libraries(${LIBYAML} ${LIBJSON})
 
-add_library(mustache ${SOURCE_FILES} ${HEADERS})
+add_library(mustache SHARED ${SOURCE_FILES} ${HEADERS})
+add_library(mustache_static STATIC ${SOURCE_FILES} ${HEADERS})
 
+install(TARGETS mustache mustache_static
+  EXPORT mustache
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib)

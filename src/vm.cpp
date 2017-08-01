@@ -313,12 +313,12 @@ void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * outp
 
 Data * VM::search(std::string * key)
 {
-  searchStack(&this->dataStack, key);
+  return searchStack(&this->dataStack, key);
 }
 
 Data * VM::searchnr(std::string * key)
 {
-  searchStackNR(&this->dataStack, key);
+  return searchStackNR(&this->dataStack, key);
 }
 
 }
