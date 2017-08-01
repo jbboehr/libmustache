@@ -62,7 +62,7 @@ build_script:
     
     git clone https://github.com/skandhurkat/Getopt-for-Visual-Studio.git
     
-    copy /Y Getopt-for-Visual-Studio\getopt.h \output\include\
+    copy /Y Getopt-for-Visual-Studio\getopt.h output\include\
 # libmustache
 - cmd: >-
     cd C:\projects\libmustache
