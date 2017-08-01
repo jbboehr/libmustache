@@ -60,9 +60,16 @@ build_script:
 - cmd: >-
     cd C:\projects
     
-    git clone https://github.com/skandhurkat/Getopt-for-Visual-Studio.git
+    git clone https://github.com/jbboehr/Getopt-for-Visual-Studio.git
     
     copy /Y Getopt-for-Visual-Studio\getopt.h output\include\
+# dirent.h
+- cmd: >-
+    cd C:\projects
+    
+    git clone https://github.com/jbboehr/dirent.git
+    
+    copy /Y dirent\include\dirent.h output\include
 # libmustache
 - cmd: >-
     cd C:\projects\libmustache
