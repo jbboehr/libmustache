@@ -35,8 +35,8 @@ build_script:
     cmake -DCMAKE_INSTALL_PREFIX=\projects\output ..
     
     nmake
-	
-	nmake install
+    
+    nmake install
 # libyaml
 - cmd: >-
     cd C:\projects
@@ -52,8 +52,8 @@ build_script:
     cmake -DCMAKE_INSTALL_PREFIX=\projects\output ..
     
     nmake
-	
-	nmake install
+    
+    nmake install
 # libmustache
 - cmd: >-
     cd C:\projects\libmustache
