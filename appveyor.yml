@@ -32,7 +32,7 @@ build_script:
     
     cd build
     
-    cmake -DCMAKE_INSTALL_PREFIX=\projects\output ..
+    cmake -G "NMake Makefiles" -DCMAKE_INSTALL_PREFIX=\projects\output ..
     
     nmake
     
@@ -49,7 +49,7 @@ build_script:
     
     cd build
     
-    cmake -DCMAKE_INSTALL_PREFIX=\projects\output ..
+    cmake -G "NMake Makefiles" -DCMAKE_INSTALL_PREFIX=\projects\output ..
     
     nmake
     
@@ -62,7 +62,7 @@ build_script:
     
     cd build
     
-    cmake -G "NMake Makefiles" -D CMAKE_INSTALL_PREFIX=..\artifacts ..
+    cmake -G "NMake Makefiles" -DCMAKE_INSTALL_PREFIX=..\artifacts ..
     
     nmake
     
