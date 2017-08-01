@@ -56,6 +56,13 @@ build_script:
     copy /Y *.lib \projects\output\lib\
     
     copy /Y ..\include\yaml.h \projects\output\include\
+# getopt.h
+- cmd: >-
+    cd C:\projects
+    
+    git clone https://github.com/skandhurkat/Getopt-for-Visual-Studio.git
+    
+    copy /Y Getopt-for-Visual-Studio\getopt.h \output\include\
 # libmustache
 - cmd: >-
     cd C:\projects\libmustache
@@ -63,6 +70,10 @@ build_script:
     mkdir build
     
     cd build
+    
+    SET LIBYAML_PATH=\projects\output
+    
+    SET LIBJSON_PATH=\projects\output
     
     cmake -G "NMake Makefiles" -DCMAKE_INSTALL_PREFIX=..\artifacts ..
     
