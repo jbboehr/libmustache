@@ -39,4 +39,4 @@ install(TARGETS mustache mustache_static
   ARCHIVE DESTINATION lib)
 
 install(FILES ${HEADERS} DESTINATION include/mustache)
-install(EXPORT check DESTINATION cmake)
+install(EXPORT mustache DESTINATION cmake)
