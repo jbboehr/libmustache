@@ -54,8 +54,8 @@ build_script:
     nmake
     
     copy /Y *.lib \projects\output\lib\
-	
-	copy /Y ..\include\yaml.h \projects\output\include\
+    
+    copy /Y ..\include\yaml.h \projects\output\include\
 # libmustache
 - cmd: >-
     cd C:\projects\libmustache
