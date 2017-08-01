@@ -74,6 +74,8 @@ build_script:
 - cmd: >-
     cd C:\projects\libmustache
     
+    git submodule update --init
+    
     mkdir build
     
     cd build
