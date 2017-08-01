@@ -1,0 +1,73 @@
+version: '{branch}.{build}'
+branches:
+  only:
+  - master
+  - appveyor
+  - w32
+
+image:
+#- Visual Studio 2015
+- Visual Studio 2017
+
+platform:
+- x86
+- x64
+
+install:
+- cmd: cinst wget
+- cmd: >-
+    "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat" %PLATFORM%
+
+build_script:
+# json-c
+- cmd: >-
+    cd C:\projects
+    
+    git clone https://github.com/json-c/json-c.git
+    
+    cd json-c
+    
+    mkdir build
+    
+    cd build
+    
+    cmake -DCMAKE_INSTALL_PREFIX=\projects\output ..
+    
+    nmake all install
+# libyaml
+- cmd: >-
+    cd C:\projects
+    
+    git clone https://github.com/yaml/libyaml
+    
+    cd libyaml
+    
+    mkdir build
+    
+    cd build
+    
+    cmake -DCMAKE_INSTALL_PREFIX=\projects\output ..
+    
+    nmake all install
+
+# libmustache
+- cmd: >-
+    cd C:\projects\libmustache
+    
+    mkdir build
+    
+    cd build
+    
+    cmake -G "NMake Makefiles" -D CMAKE_INSTALL_PREFIX=\projects\output ..
+    
+    nmake
+    
+    nmake install
+
+test_script:
+- cmd: nmake test
+
+artifacts:
+  - path: output
+    name: master
+    type: zip
