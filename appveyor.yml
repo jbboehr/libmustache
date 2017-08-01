@@ -24,7 +24,7 @@ build_script:
 - cmd: >-
     cd C:\projects
     
-    git clone https://github.com/json-c/json-c.git
+    git clone -b windows https://github.com/jbboehr/json-c.git
     
     cd json-c
     
