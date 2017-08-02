@@ -10,8 +10,6 @@
 //#include "json/json_inttypes.h"
 #include "json/json_object.h"
 #include "json/json_tokener.h"
-#elif defined(MUSTACHE_HAVE_LIBJANSSON)
-#include "jansson.h"
 #endif
 
 #include "stdio.h"
@@ -230,11 +228,6 @@ Data * Data::createFromJSON(const char * string)
   _createFromJSON(data, result);
   json_object_put(result);
   return data;
-}
-#elif defined(MUSTACHE_HAVE_LIBJANNSON)
-Data * Data::createFromJSON(const char * string)
-{
-  throw Exception("JSON support using libjannson not implemented");
 }
 #else
 Data * Data::createFromJSON(const char * string)

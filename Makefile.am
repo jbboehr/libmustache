@@ -1,6 +1,6 @@
 
 EXTRA_DIST = README.md
-SUBDIRS = doc src bin test
+SUBDIRS = doc src bin tests
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = mustache.pc
@@ -9,40 +9,40 @@ ACLOCAL_AMFLAGS = -I m4
 
 
 standard: all
-	./bin/mustache -e -t test/fixtures/standard.mustache -d test/fixtures/standard.yml
+	./bin/mustache -e -t tests/fixtures/standard.mustache -d tests/fixtures/standard.yml
 	
 standardc: all
-	./bin/mustache -c -t test/fixtures/standard.mustache -o test/fixtures/standard.bin
+	./bin/mustache -c -t tests/fixtures/standard.mustache -o tests/fixtures/standard.bin
 
 standardr: all
-	./bin/mustache -c -r -t test/fixtures/complex.mustache -o test/fixtures/standard.log
-	cat test/fixtures/standard.log
+	./bin/mustache -c -r -t tests/fixtures/complex.mustache -o tests/fixtures/standard.log
+	cat tests/fixtures/standard.log
 
 standardce: all standardc
-	./bin/mustache -e -t test/fixtures/standard.bin -d test/fixtures/standard.yml
+	./bin/mustache -e -t tests/fixtures/standard.bin -d tests/fixtures/standard.yml
 
 standardcr: all standardc
-	./bin/mustache -p -t test/fixtures/standard.bin -r
+	./bin/mustache -p -t tests/fixtures/standard.bin -r
 
 complexc: all
-	./bin/mustache -c -t test/fixtures/complex.mustache -o test/fixtures/complex.bin
+	./bin/mustache -c -t tests/fixtures/complex.mustache -o tests/fixtures/complex.bin
 
 complexr: all
-	./bin/mustache -c -r -t test/fixtures/complex.mustache -o test/fixtures/complex.log
-	cat test/fixtures/complex.log
+	./bin/mustache -c -r -t tests/fixtures/complex.mustache -o tests/fixtures/complex.log
+	cat tests/fixtures/complex.log
 
 complexce: all complexc
-	./bin/mustache -e -t test/fixtures/complex.bin -d test/fixtures/complex.yml
+	./bin/mustache -e -t tests/fixtures/complex.bin -d tests/fixtures/complex.yml
 
 deepc: all
-	./bin/mustache -c -t test/fixtures/deep.mustache -o test/fixtures/deep.bin
+	./bin/mustache -c -t tests/fixtures/deep.mustache -o tests/fixtures/deep.bin
 
 deepr: all
-	./bin/mustache -c -r -t test/fixtures/deep.mustache -o test/fixtures/deep.log
-	cat test/fixtures/deep.log
+	./bin/mustache -c -r -t tests/fixtures/deep.mustache -o tests/fixtures/deep.log
+	cat tests/fixtures/deep.log
 
 deepce: all deepc
-	./bin/mustache -e -t test/fixtures/deep.bin -d test/fixtures/deep.yml
+	./bin/mustache -e -t tests/fixtures/deep.bin -d tests/fixtures/deep.yml
 	
 if GCC
 # These flags are gcc specific
@@ -79,9 +79,9 @@ if GPROF
 clean-local:: profile-clean
 	
 profile: test
-	rm test/gmon.out
-	EXEC_NUM=10000 test/spec/test_spec spec/specs
-	gprof test/spec/test_spec gmon.out > gprof.out
+	rm tests/gmon.out
+	EXEC_NUM=10000 tests/spec/test_spec spec/specs
+	gprof tests/spec/test_spec gmon.out > gprof.out
 
 profile-clean:
 	find . -name 'gmon.out' -delete

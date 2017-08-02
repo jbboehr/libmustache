@@ -112,7 +112,6 @@ AC_CONFIG_FILES([
         doc/Makefile
         src/Makefile
         bin/Makefile
-        test/Makefile
-        test/spec/Makefile
+        tests/Makefile
 ])
 AC_OUTPUT

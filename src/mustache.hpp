@@ -2,9 +2,7 @@
 #ifndef MUSTACHE_HPP
 #define MUSTACHE_HPP
 
-//#ifdef HAVE_CONFIG_H
 #include "mustache_config.h"
-//#endif
 
 #include <stdint.h>
 #include <iostream>

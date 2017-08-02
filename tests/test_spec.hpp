@@ -1,7 +1,5 @@
 
-//#ifdef HAVE_CONFIG_H
-#include <mustache_config.h>
-//#endif
+#include "mustache_config.h"
 
 #define MAX_TEST_FILES 50
 

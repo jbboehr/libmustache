@@ -1,12 +1,10 @@
 
-SUBDIRS = spec
-#EXTRA_DIST = run
+check_PROGRAMS = test_spec test_utils
 
-check_PROGRAMS = test_utils
-
+test_spec_SOURCES = test_spec.cpp test_spec.hpp ./fixtures/lambdas.cpp ./fixtures/lambdas.hpp
 test_utils_SOURCES = test_utils.cpp
 
-TESTS = test_utils spec/test_spec
+TESTS = test_spec test_utils
 TESTS_ENVIRONMENT = \
 	top_srcdir=$(top_srcdir) \
 	top_builddir=$(top_builddir) \

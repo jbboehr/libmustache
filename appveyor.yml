@@ -1,0 +1,99 @@
+version: '{branch}.{build}'
+branches:
+  only:
+  - master
+  - appveyor
+  - w32
+  - windows
+
+image:
+#- Visual Studio 2015
+- Visual Studio 2017
+
+platform:
+- x86
+- x64
+
+install:
+- cmd: cinst wget
+- cmd: >-
+    "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat" %PLATFORM%
+
+build_script:
+# json-c
+- cmd: >-
+    cd C:\projects
+    
+    git clone -b windows https://github.com/jbboehr/json-c.git
+    
+    cd json-c
+    
+    mkdir build
+    
+    cd build
+    
+    cmake -G "NMake Makefiles" -DCMAKE_INSTALL_PREFIX=\projects\output ..
+    
+    nmake
+    
+    nmake install
+# libyaml
+- cmd: >-
+    cd C:\projects
+    
+    git clone https://github.com/yaml/libyaml
+    
+    cd libyaml
+    
+    mkdir build
+    
+    cd build
+    
+    cmake -G "NMake Makefiles" -DCMAKE_INSTALL_PREFIX=\projects\output ..
+    
+    nmake
+    
+    copy /Y *.lib \projects\output\lib\
+    
+    copy /Y ..\include\yaml.h \projects\output\include\
+# getopt.h
+- cmd: >-
+    cd C:\projects
+    
+    git clone https://github.com/jbboehr/Getopt-for-Visual-Studio.git
+    
+    copy /Y Getopt-for-Visual-Studio\getopt.h output\include\
+# dirent.h
+- cmd: >-
+    cd C:\projects
+    
+    git clone https://github.com/jbboehr/dirent.git
+    
+    copy /Y dirent\include\dirent.h output\include
+# libmustache
+- cmd: >-
+    cd C:\projects\libmustache
+    
+    git submodule update --init
+    
+    mkdir build
+    
+    cd build
+    
+    SET LIBYAML_PATH=\projects\output
+    
+    SET LIBJSON_PATH=\projects\output
+    
+    cmake -G "NMake Makefiles" -DCMAKE_INSTALL_PREFIX=..\artifacts ..
+    
+    nmake
+    
+    nmake install
+
+test_script:
+- cmd: nmake test
+
+artifacts:
+  - path: artifacts
+    name: master
+    type: zip
