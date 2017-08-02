@@ -1,6 +1,6 @@
 
 #include "test_spec.hpp"
-#include "../fixtures/lambdas.hpp"
+#include "./fixtures/lambdas.hpp"
 
 std::list<MustacheSpecTest *> tests;
 int execNum = 1;
