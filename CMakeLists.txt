@@ -6,8 +6,6 @@ set(MUSTACHE_VERSION_MINOR "4")
 set(MUSTACHE_VERSION_PATCH "3")
 set(MUSTACHE_PACKAGE_VERSION ${MUSTACHE_VERSION_MAJOR}.${MUSTACHE_VERSION_MINOR}.${MUSTACHE_VERSION_PATCH})
 
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 include_directories(../output/include)
@@ -22,14 +20,13 @@ option(MUSTACHE_ENABLE_TESTS
 find_library(LIBJSON NAME json-c HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../output/lib ENV LIBJSON_PATH)
 
 if(WIN32)
-add_definitions(-DYAML_DECLARE_STATIC=1)
+add_definitions(-DYAML_DECLARE_STATIC=1 -D_CRT_SECURE_NO_WARNINGS=1)
 find_library(LIBYAML NAME yaml_static HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../output/lib ENV LIBYAML_PATH)
 else()
 find_library(LIBYAML NAME yaml HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../output/lib ENV LIBYAML_PATH)
 endif(WIN32)
 
-# generate config.h and mustache_config.h
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+# generate mustache_config.h
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/cmake/mustache_config.h.in ${CMAKE_CURRENT_BINARY_DIR}/src/mustache_config.h)
 add_definitions(-DHAVE_CONFIG_H)
 

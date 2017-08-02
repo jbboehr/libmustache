@@ -2,9 +2,7 @@
 #ifndef MUSTACHE_COMPILER_HPP
 #define MUSTACHE_COMPILER_HPP
 
-//#ifdef HAVE_CONFIG_H
 #include "mustache_config.h"
-//#endif
 
 #include <cstdio>
 #include <cstdlib>
