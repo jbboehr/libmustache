@@ -162,9 +162,6 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root, bool escapeOutput)
           case '>':
             currentType = Node::TypePartial;
             break;
-          case '<':
-            currentType = Node::TypeInlinePartial;
-            break;
           case '=':
             if( buffer.at(buffer.length()-1) != '=' ) {
               std::ostringstream oss;
@@ -208,20 +205,14 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root, bool escapeOutput)
               currentFlags = currentFlags ^ Node::FlagEscape;
             }
           }
-          // Create node
-          if( currentType == Node::TypeInlinePartial ) { 
-            root->partials.insert(std::make_pair(buffer, mustache::Node(Node::TypeRoot, buffer, currentFlags)));
-            node = &(root->partials[buffer]);
-          } else {
-            node = new Node(currentType, buffer, currentFlags);
+          node = new Node(currentType, buffer, currentFlags);
 
-            if( currentType == Node::TypeSection ) {
-              node->startSequence = new std::string(start);
-              node->stopSequence = new std::string(stop);
-            }
-
-            nodeStack.back()->children.push_back(node);
+          if( currentType == Node::TypeSection ) {
+            node->startSequence = new std::string(start);
+            node->stopSequence = new std::string(stop);
           }
+
+          nodeStack.back()->children.push_back(node);
           // Push/pop stack
           if( currentType & Node::TypeHasChildren ) {
             nodeStack.push_back(node);
