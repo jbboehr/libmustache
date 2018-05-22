@@ -124,7 +124,7 @@ Data * searchStack(Stack<Data *> * stack, std::string * key)
   // Resolve up the data stack
   Data * ref = NULL;
   Data::Map::iterator d_it;
-  register int i;
+  int i;
   Data ** _stackPos = stack->end();
   for( i = 0; i < stack->size(); i++, _stackPos-- ) {
     if( (*_stackPos) == NULL ) continue;

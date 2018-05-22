@@ -53,28 +53,28 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root, bool escapeOutput)
   std::string buffer;
   buffer.reserve(100); // Reserver 100 chars
   
-  register unsigned int tmplL = tmpl->length();
-  register const char * chr = tmpl->c_str();
+  unsigned int tmplL = tmpl->length();
+  const char * chr = tmpl->c_str();
   
-  register char startC = start.at(0);
-  register int startL = start.length();
+  char startC = start.at(0);
+  int startL = start.length();
   
-  register char stopC = stop.at(0);
-  register int stopL = stop.length();
-  register int tmpStopL = stopL;
+  char stopC = stop.at(0);
+  int stopL = stop.length();
+  int tmpStopL = stopL;
   
-  register int pos = 0;
-  register int skipUntil = -1;
-  register int lineNo = 1;
-  register int charNo = 0;
+  int pos = 0;
+  int skipUntil = -1;
+  int lineNo = 1;
+  int charNo = 0;
   
-  register int inTag = 0;
-  register int inTripleTag = 0;
-  register int skip = 0;
-  register int startCharNo = 0;
-  register int startLineNo = 0;
-  register Node::Type currentType = Node::TypeNone;
-  register int currentFlags = Node::FlagNone;
+  int inTag = 0;
+  int inTripleTag = 0;
+  int skip = 0;
+  int startCharNo = 0;
+  int startLineNo = 0;
+  Node::Type currentType = Node::TypeNone;
+  int currentFlags = Node::FlagNone;
   
   //Node::Stack nodeStack;
   NodeStack nodeStack;
