@@ -56,10 +56,10 @@ void VM::execute(std::vector<uint8_t> * codes, Data * data, std::string * output
 
 void VM::execute(uint8_t * codes, size_t length, Data * data, std::string * output)
 {
-  register uint8_t * loc = codes;
-  register uint8_t * end = codes + length;
-  register uint8_t * sloc = loc;
-  register uint32_t * symbols = NULL;
+  uint8_t * loc = codes;
+  uint8_t * end = codes + length;
+  uint8_t * sloc = loc;
+  uint32_t * symbols = NULL;
   
   // Clear the output buffer
   outputBuffer.clear();

@@ -289,7 +289,7 @@ Data * Renderer::_lookup(Node * node)
   // Resolve up the data stack
   Data * ref = NULL;
   Data::Map::iterator d_it;
-  register int i;
+  int i;
   Data ** _stackPos = _stack->end();
   for( i = 0; i < _stack->size(); i++, _stackPos-- ) {
     if( (*_stackPos)->type == Data::TypeMap ) {
