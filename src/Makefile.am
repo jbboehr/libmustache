@@ -38,4 +38,4 @@ libmustache_la_SOURCES = \
 # https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 libmustache_la_LDFLAGS = \
 	-no-undefined \
-	-version-info 4:0:0
+	-version-info 5:0:0

@@ -1,6 +1,6 @@
 
 AC_PREREQ([2.60])
-AC_INIT([mustache], [0.4.4], [jbboehr@gmail.com])
+AC_INIT([mustache], [0.5.0], [jbboehr@gmail.com])
 
 AC_CONFIG_HEADER(config.h)
 AX_PREFIX_CONFIG_H(src/mustache_config.h)
@@ -53,13 +53,6 @@ AS_IF([test "x$with_mustache_spec" != "xno"], [
     AC_MSG_FAILURE([mustache spec missing (--without-mustache-spec to disable)])
   ])
 ])
-
-# operand size
-AC_ARG_VAR(VM_OP_SIZE, [The VM operand size in bytes])
-AS_IF([test "x$VM_OP_SIZE" == "x"], [
-  VM_OP_SIZE=2
-])
-AC_DEFINE_UNQUOTED([VM_OP_SIZE], $VM_OP_SIZE, [Size of the VM operands])
 
 # Checks for programs.
 AC_PROG_CXX
