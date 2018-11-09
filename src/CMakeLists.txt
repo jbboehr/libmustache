@@ -2,7 +2,6 @@
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 set(SOURCE_FILES
-        compiler.cpp
         data.cpp
         lambda.cpp
         mustache.cpp
@@ -10,11 +9,9 @@ set(SOURCE_FILES
         renderer.cpp
         stack.cpp
         tokenizer.cpp
-        utils.cpp
-        vm.cpp)
+        utils.cpp)
 
 set(HEADERS
-        compiler.hpp
         data.hpp
         exception.hpp
         lambda.hpp
@@ -24,8 +21,7 @@ set(HEADERS
         renderer.hpp
         stack.hpp
         tokenizer.hpp
-        utils.hpp
-        vm.hpp)
+        utils.hpp)
 
 link_libraries(${LIBYAML} ${LIBJSON})
 
