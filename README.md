@@ -9,26 +9,17 @@ C++ implementation of [Mustache](https://mustache.github.com/) intended mainly f
 
 ## Installation
 
-#### Linux
+#### Linux/OSX
 
-For Ubuntu LTS, the library is available in a [PPA](https://launchpad.net/~jbboehr/+archive/ubuntu/mustache), or via source:
+You will need `autoconf`, `automake`, `make` and a C++ compiler.
 
 ``` sh
-sudo apt-get install git-core build-essential autoconf automake
 git clone git://github.com/jbboehr/libmustache.git --recursive
 cd libmustache
 autoreconf -fiv
 ./configure
 make
 sudo make install
-```
-
-#### OSX
-
-You can install using [Homebrew](http://brew.sh/) via the [PHP brew repository](https://github.com/Homebrew/homebrew-php).
-
-``` sh
-brew install libmustache
 ```
 
 
