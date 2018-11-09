@@ -13,8 +13,6 @@ mustacheinclude_HEADERS = \
 	stack.hpp \
 	tokenizer.hpp \
 	utils.hpp \
-	compiler.hpp \
-	vm.hpp \
 	mustache_config.h
 
 lib_LTLIBRARIES = libmustache.la
@@ -35,10 +33,6 @@ libmustache_la_SOURCES = \
 	tokenizer.hpp \
 	utils.cpp \
 	utils.hpp \
-	compiler.cpp \
-	compiler.hpp \
-	vm.cpp \
-	vm.hpp \
 	mustache_config.h
 
 # https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
