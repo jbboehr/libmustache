@@ -43,10 +43,12 @@ doc/html
 libmustache_test.info
 nbproject
 src/mustache_config.h
-test/spec/test_spec
-test/test_utils
+tests/test_spec
+tests/test_misc
+tests/test_utils
 test_coverage
 /build/
+/result
 
 # distros
 *.tar.gz

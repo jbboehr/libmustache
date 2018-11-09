@@ -18,14 +18,8 @@
 #include <vector>
 
 #include "mustache.hpp"
-#include "compiler.hpp"
 #include "exception.hpp"
-#include "vm.hpp"
 #include "utils.hpp"
-
-#define MUSTACHE_BIN_MODE_COMPILE 1
-#define MUSTACHE_BIN_MODE_EXECUTE 2
-#define MUSTACHE_BIN_MODE_PRINT 3
 
 #define MUSTACHE_BIN_INPUT_UNKNOWN 0
 #define MUSTACHE_BIN_INPUT_JSON 1
@@ -44,7 +38,6 @@ static int inputDataFileType = 0;
 static std::string inputData;
 
 static char * inputTemplateFileName = NULL;
-static int inputTemplateFileType = 0;
 static std::string inputTemplate;
 
 static char * outputFileName = NULL;
@@ -55,8 +48,6 @@ static std::map<std::string, std::string> partialFiles;
 std::map<std::string, std::string>::iterator pf_it;
 
 static mustache::Mustache must;
-static mustache::Compiler compiler;
-static mustache::VM vm;
 static mustache::Node node;
 static mustache::Node::Partials partials;
 static mustache::Data * data;
@@ -73,25 +64,15 @@ int main( int argc, char * argv[] )
   int numopt = 0;
   opterr = 0;
   
-  while( (curopt = getopt(argc, argv, "hceprvd:o:t:n:l:")) != -1 ) {
+  while( (curopt = getopt(argc, argv, "hrvd:o:t:n:l:")) != -1 ) {
     numopt++;
     switch( curopt ) {
-      case 'c':
-        mode = MUSTACHE_BIN_MODE_COMPILE;
-        break;
-      case 'e':
-        mode = MUSTACHE_BIN_MODE_EXECUTE;
-        break;
-      case 'p':
-        mode = MUSTACHE_BIN_MODE_PRINT;
-        break;
       case 'r':
         printReadable = 1;
         break;
       case 'v':
         showVersion();
-        goto error;
-        break;
+        return 0;
         
       case 'd':
         inputDataFileName = optarg;
@@ -111,7 +92,7 @@ int main( int argc, char * argv[] )
         mustache::explode("=", optargstr, &optargparts);
         if( optargparts.size() < 2 ) {
           fprintf(stderr, "Must specify a partial name and file in the format <name>=<file>\n");
-          goto error;
+          return 1;
         }
         partialFiles.insert(std::make_pair(optargparts[0], optargparts[1]));
         break;
@@ -132,19 +113,8 @@ int main( int argc, char * argv[] )
         error = 1;
       case 'h':
         showUsage();
-        goto error;
-        break;
+        return 0;
     }
-  }
-  
-  // Must specify a mode
-  if( mode != MUSTACHE_BIN_MODE_COMPILE && 
-      mode != MUSTACHE_BIN_MODE_EXECUTE &&
-      mode != MUSTACHE_BIN_MODE_PRINT ) {
-    error = 1;
-    fprintf(stderr, "Must specify either -c (compile) or -e (execute) or -p (print)\n");
-    showUsage();
-    goto error;
   }
   
   // Must have input file
@@ -152,11 +122,10 @@ int main( int argc, char * argv[] )
     error = 1;
     fprintf(stderr, "Must specify an input template file with option -t\n");
     showUsage();
-    goto error;
+    return 1;
   }
   
   // Detect input types
-  inputTemplateFileType = detectFileType(inputTemplateFileName);
   inputDataFileType = detectFileType(inputDataFileName);
   
   // Read input file
@@ -168,7 +137,7 @@ int main( int argc, char * argv[] )
       partialFiles[pf_it->first] = getFileContents(pf_it->second.c_str());
     } catch( int e ) {
       fprintf(stderr, "Error reading partial: %s. Code: %d\n", pf_it->first.c_str(), e);
-      goto error;
+      return 1;
     }
   }
   
@@ -180,107 +149,47 @@ int main( int argc, char * argv[] )
     outputStream = &outputFileStream;
   }
   
-  // Execute mode
-  if( mode == MUSTACHE_BIN_MODE_EXECUTE ) {
-    // Tokenize
-    if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE ) {
-      must.tokenize(&inputTemplate, &node);
-    }
-    
-    // Tokenize partials
-    for( pf_it = partialFiles.begin(); pf_it != partialFiles.end(); pf_it++ ) {
-      mustache::Node node;
-      partials.insert(std::make_pair(pf_it->first, node));
-      must.tokenize(&pf_it->second, &(partials[pf_it->first]));
-    }
-    
-    // Get input data
-    if( inputDataFileName != NULL ) {
-      inputData = getFileContents(inputDataFileName);
-    }
-    
-    // Process data
-    try {
-      if( inputData.length() ) {
-        if( inputDataFileType == MUSTACHE_BIN_INPUT_JSON ) {
-          data = mustache::Data::createFromJSON(inputData.c_str());
-        } else if( inputDataFileType == MUSTACHE_BIN_INPUT_YAML ) {
-          data = mustache::Data::createFromYAML(inputData.c_str());
-        }
-      }
-    } catch( mustache::Exception& e ) {
-      error = 1;
-      fprintf(stderr, "%s\n", e.what());
-      goto error;
-    }
-    
-    // Render
-    std::string * output = new std::string;
-    int i;
-    if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE ) {
-      for( i = 0; i < number; i++ ) {
-        output->clear();
-        must.render(&node, data, &partials, output);
-      }
-    } else if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE_BIN ) {
-      uint8_t * codes = NULL;
-      size_t length = 0;
-      mustache::Compiler::stringToBuffer(&inputTemplate, &codes, &length);
-      for( i = 0; i < number; i++ ) {
-        output->clear();
-        vm.execute(codes, length, data, output);
-      }
-      free(codes);
-    }
-    
-    // Output
-    *outputStream << *output;
-    
-  } else if( mode == MUSTACHE_BIN_MODE_COMPILE ) {
-    // Tokenize
-    if( inputTemplateFileType == MUSTACHE_BIN_INPUT_MUSTACHE ) {
-      must.tokenize(&inputTemplate, &node);
-    }
-    
-    // Tokenize partials
-    for( pf_it = partialFiles.begin(); pf_it != partialFiles.end(); pf_it++ ) {
-      mustache::Node node;
-      partials.insert(std::make_pair(pf_it->first, node));
-      must.tokenize(&pf_it->second, &(partials[pf_it->first]));
-    }
-    
-    // Compile
-    std::vector<uint8_t> * codes = compiler.compile(&node, &partials);
-    
-    // Output
-    if( codes != NULL ) {
-      if( printReadable ) {
-        std::string * out = compiler.print(codes);
-        *outputStream << *out;
-        delete out;
-      } else {
-        char buf[101];
-        std::vector<uint8_t>::iterator it;
-        for( it = codes->begin(); it != codes->end(); it++ ) {
-          *outputStream << *it;
-        }
+  // Tokenize
+  must.tokenize(&inputTemplate, &node);
+  
+  // Tokenize partials
+  for( pf_it = partialFiles.begin(); pf_it != partialFiles.end(); pf_it++ ) {
+    mustache::Node node;
+    partials.insert(std::make_pair(pf_it->first, node));
+    must.tokenize(&pf_it->second, &(partials[pf_it->first]));
+  }
+  
+  // Get input data
+  if( inputDataFileName != NULL ) {
+    inputData = getFileContents(inputDataFileName);
+  }
+
+  std::string * output = new std::string;
+  
+  // Process data
+  try {
+    if( inputData.length() ) {
+      if( inputDataFileType == MUSTACHE_BIN_INPUT_JSON ) {
+        data = mustache::Data::createFromJSON(inputData.c_str());
+      } else if( inputDataFileType == MUSTACHE_BIN_INPUT_YAML ) {
+        data = mustache::Data::createFromYAML(inputData.c_str());
       }
     }
-    
-  } else if( mode == MUSTACHE_BIN_MODE_PRINT ) {
-    
-    std::vector<uint8_t> * codes;
-    mustache::Compiler::stringToVector(&inputTemplate, &codes);
-    std::string * output = compiler.print(codes);
-    
-    // Output
-    *outputStream << *output;
-    
-  } else {
+  } catch( mustache::Exception& e ) {
     error = 1;
-    fprintf(stderr, "Invalid mode\n");
+    fprintf(stderr, "%s\n", e.what());
     goto error;
   }
+  
+  // Render
+  int i;
+  for( i = 0; i < number; i++ ) {
+    output->clear();
+    must.render(&node, data, &partials, output);
+  }
+  
+  // Output
+  *outputStream << *output;
   
 error:
   if( outputFileStream.is_open() ) {
@@ -309,8 +218,6 @@ static int detectFileType(char * filename)
     return MUSTACHE_BIN_INPUT_YAML;
   } else if( strcmp(ext, ".mustache") == 0 ) {
     return MUSTACHE_BIN_INPUT_MUSTACHE;
-  } else if( strcmp(ext, ".bin") == 0 ) {
-    return MUSTACHE_BIN_INPUT_MUSTACHE_BIN;
   } else {
     return MUSTACHE_BIN_INPUT_UNKNOWN;
   }
@@ -361,7 +268,6 @@ static void showUsage()
 static void showVersion()
 {
   fprintf(stdout, "mustache %s\n", mustache_version());
-  fprintf(stdout, "Operand Size: %d\n", _C_OP_SIZE);
 #ifdef MUSTACHE_HAVE_LIBJSON
   fprintf(stdout, "JSON support: libjson\n");
 #elif MUSTACHE_HAVE_LIBJANSSON
