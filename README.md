@@ -22,6 +22,12 @@ make
 sudo make install
 ```
 
+#### Nix/NixOS
+
+``` sh
+nix-env -i -f https://github.com/jbboehr/libmustache/archive/master.tar.gz
+```
+
 
 ## Credits
 
