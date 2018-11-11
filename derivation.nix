@@ -1,13 +1,21 @@
 { stdenv, fetchurl, pkgconfig, glib, autoconf, automake, json_c, 
-  libyaml, libtool, m4, mustache_spec, autoreconfHook, libstdcxx5 }:
+  libyaml, libtool, m4, mustache_spec, autoreconfHook, libstdcxx5,
+  libmustacheVersion ? null,
+  libmustacheSrc ? null,
+  libmustacheSha256 ? null
+}:
+
+let 
+  orDefault = x: y: (if (!isNull x) then x else y);
+in
 
 stdenv.mkDerivation rec {
-  name = "libmustache-0.4.4";
-
-  src = fetchurl {
-    url = https://github.com/jbboehr/libmustache/archive/v0.4.4.tar.gz;
-    sha256 = "05089w08n24jx7hgs6h1j50jh53yavc7l9bgy02iygx14ajznb86";
-  };
+  name = "libmustache-${version}";
+  version = orDefault libmustacheVersion "v0.5.0";
+  src = orDefault libmustacheSrc (fetchurl {
+    url = "https://github.com/jbboehr/libmustache/archive/${version}.tar.gz";
+    sha256 = orDefault libmustacheSha256 "1afa6654dz7j6hsnhyzdciy4rjccdif6fjivhxxrjwbm8pxxx4gz";
+  });
 
   enableParallelBuilding = true;
   buildInputs = [ glib json_c libyaml stdenv.cc.cc.lib ];

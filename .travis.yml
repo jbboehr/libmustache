@@ -1,23 +1,24 @@
-language: cpp
-
-compiler:
-  - gcc
-
-dist: trusty
-
-sudo: required
 
 branches:
   only:
     - master
     - travis
+    - ci
 
-before_install:
-  - git submodule update --init --recursive
+env:
+  secure: "Za4dEQhtuBkMmBTJ2as2EoNYfh4Ef24ITrDtZQ2g50gbid31JR4dqIkZ9RAHiwhNDATrAT5EycD3caSh6qo2ZgkFINyWlYT0aQgk3013VqJT2N57YwS8CCC3EUIpFepWr0B/N4AWF9q4torzsr2PKUYnYoGIvieH3PcvvDbUmE0="
 
-install:
-  - autoreconf -fiv
-  - ./configure --prefix=$HOME/build
+matrix:
+  include:
+    - language: nix
+      before_install: nix-env -iA cachix -f https://github.com/NixOS/nixpkgs/tarball/889c72032f8595fcd7542c6032c208f6b8033db6
+      script: nix-build --argstr libmustacheVersion $TRAVIS_BRANCH --arg libmustacheSrc `pwd` | cachix push jbboehr-ci
 
-script:
-  - make all test install
+    - language: cpp
+      compiler: clang
+      before_install: git submodule update --init --recursive && autoreconf -fiv
+
+    - language: cpp
+      compiler: gcc
+      before_install: git submodule update --init --recursive && autoreconf -fiv
+
