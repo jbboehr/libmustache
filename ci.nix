@@ -22,32 +22,12 @@ in
 builtins.mapAttrs (k: _v:
   let
     path = builtins.fetchTarball {
-       url = https://github.com/NixOS/nixpkgs/archive/release-19.03.tar.gz;
-       name = "nixpkgs-19.03";
+       url = https://github.com/NixOS/nixpkgs/archive/release-20.03.tar.gz;
+       name = "nixpkgs-20.03";
     };
     pkgs = import (path) { system = k; };
   in
   pkgs.recurseIntoAttrs {
-    n1809 = let
-        path = builtins.fetchTarball {
-           url = https://github.com/NixOS/nixpkgs/archive/release-18.09.tar.gz;
-           name = "nixpkgs-18.09";
-        };
-        pkgs = import (path) { system = k; };
-    in generateLibmustacheTestsForPlatform2  {
-      inherit pkgs;
-    };
-
-    n1903 = let
-        path = builtins.fetchTarball {
-           url = https://github.com/NixOS/nixpkgs/archive/release-19.03.tar.gz;
-           name = "nixpkgs-19.03";
-        };
-        pkgs = import (path) { system = k; };
-    in generateLibmustacheTestsForPlatform2  {
-      inherit pkgs;
-    };
-
     n1909 = let
         path = builtins.fetchTarball {
            url = https://github.com/NixOS/nixpkgs/archive/release-19.09.tar.gz;
@@ -55,6 +35,10 @@ builtins.mapAttrs (k: _v:
         };
         pkgs = import (path) { system = k; };
     in generateLibmustacheTestsForPlatform2 {
+      inherit pkgs;
+    };
+
+    n2003 = generateLibmustacheTestsForPlatform2 {
       inherit pkgs;
     };
 
