@@ -1,7 +1,7 @@
 
-bin_PROGRAMS = mustache
+bin_PROGRAMS = mustachec
 
-mustache_SOURCES = mustache.cpp
+mustachec_SOURCES = mustache.cpp
 
 AM_CPPFLAGS = -I$(top_builddir)/src -I$(top_srcdir)/src
 AM_LDFLAGS = -static  # for speed and Valgrind

@@ -35,6 +35,8 @@ libmustache_la_SOURCES = \
 	utils.hpp \
 	mustache_config.h
 
+libmustache_la_LIBADD = $(JSON_LIBS) $(YAML_LIBS)
+
 # https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 libmustache_la_LDFLAGS = \
 	-no-undefined \

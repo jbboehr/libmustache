@@ -23,16 +23,14 @@ set(HEADERS
         tokenizer.hpp
         utils.hpp)
 
-link_libraries(${LIBYAML} ${LIBJSON})
-
 add_library(mustache SHARED ${SOURCE_FILES} ${HEADERS})
 add_library(mustache_static STATIC ${SOURCE_FILES} ${HEADERS})
 
 install(TARGETS mustache mustache_static
   EXPORT mustache
-  RUNTIME DESTINATION bin
-  LIBRARY DESTINATION lib
-  ARCHIVE DESTINATION lib)
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
-install(FILES ${HEADERS} DESTINATION include/mustache)
-install(EXPORT mustache DESTINATION cmake)
+install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mustache)
+install(EXPORT mustache DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cmake)

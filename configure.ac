@@ -62,11 +62,12 @@ AX_CXX_COMPILE_STDCXX_11
 
 # Checks for libraries.
 AC_CHECK_LIB(jansson, json_equal)
-AC_CHECK_LIB(json, json_tokener_new)
-AC_CHECK_LIB(yaml, yaml_get_version_string)
 AS_IF([test "x$enable_gcov" = "xyes"], [
   AC_CHECK_LIB(gcov, main)
 ])
+
+PKG_CHECK_MODULES(JSON, [json-c], [AC_DEFINE([MUSTACHE_HAVE_LIBJSON], [1], [Defined if json-c is enabled])], [AC_MSG_WARN([json-c not found])])
+PKG_CHECK_MODULES(YAML, [yaml-0.1], [AC_DEFINE([MUSTACHE_HAVE_LIBYAML], [1], [Defined if libyaml is enabled])], [AC_MSG_WARN([libyaml not found])])
 
 # Checks for header files.
 AC_CHECK_HEADERS(cstdlib)

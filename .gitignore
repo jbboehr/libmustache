@@ -6,6 +6,7 @@
 .libs
 .deps
 .dirstamp
+.idea
 Makefile
 Makefile.in
 aclocal.m4
@@ -38,7 +39,7 @@ stamp-h1
 *.bin
 
 # specific
-bin/mustache
+bin/mustachec
 doc/html
 libmustache_test.info
 nbproject
@@ -48,14 +49,12 @@ tests/test_misc
 tests/test_utils
 test_coverage
 /build/
-/result
 
 # distros
 *.tar.gz
 *.tgz
 *.tar
 *.zip
-
 
 # debian
 debian/autoreconf.*
@@ -65,3 +64,6 @@ debian/*.substvars
 debian/*.debhelper
 debian/*.log
 debian/tmp/
+
+# nix
+/result*

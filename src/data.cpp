@@ -6,10 +6,9 @@
 #endif
 
 #if defined(MUSTACHE_HAVE_LIBJSON)
-#include "json/json.h"
-//#include "json/json_inttypes.h"
-#include "json/json_object.h"
-#include "json/json_tokener.h"
+#include "json.h"
+#include "json_object.h"
+#include "json_tokener.h"
 #endif
 
 #include "stdio.h"
