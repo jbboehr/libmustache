@@ -43,14 +43,17 @@ AS_IF([test "x$enable_gprof" = "xyes"], [
 
 # mustache-spec
 AC_ARG_WITH([mustache-spec],
-	[AS_HELP_STRING([--with-mustache-spec=SPEC_LOCATION], [location to find mustache specification @<:@default=./spec/specs@>:@])],
-	[], [with_mustache_spec=`pwd`/spec/specs])
+  [AS_HELP_STRING([--with-mustache-spec=SPEC_LOCATION], [location to find mustache specification @<:@default=./spec/specs@>:@])])
 
 AS_IF([test "x$with_mustache_spec" != "xno"], [
-  AC_CHECK_FILE([$with_mustache_spec/comments.yml], [
-    AC_SUBST([MUSTACHE_SPEC_DIR], [$with_mustache_spec])
+  AS_IF([test "x$with_mustache_spec" != "x"], [
+    AC_CHECK_FILE([$with_mustache_spec/comments.yml], [
+      AC_SUBST([MUSTACHE_SPEC_DIR], [$with_mustache_spec])
+    ], [
+      AC_MSG_FAILURE([mustache spec missing (--without-mustache-spec to disable)])
+    ])
   ], [
-    AC_MSG_FAILURE([mustache spec missing (--without-mustache-spec to disable)])
+    AC_SUBST([MUSTACHE_SPEC_DIR], ['$(top_srcdir)/spec/specs'])
   ])
 ])
 

@@ -1,5 +1,6 @@
 
 # EXTRA_DIST = mustache.def
+CLEANFILES = mustache_config.h
 
 # include_HEADERS = mustache.hpp mustache_config.h
 mustacheincludedir = $(includedir)/mustache
