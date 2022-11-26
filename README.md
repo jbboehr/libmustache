@@ -1,7 +1,7 @@
 # libmustache
 
 [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)](LICENSE.md)
-[![GitHub Linux Build Status](https://github.com/jbboehr/libmustache/workflows/linux/badge.svg)](https://github.com/jbboehr/libmustache/actions?query=workflow%3Alinux)
+[![GitHub CI Build Status](https://github.com/jbboehr/libmustache/workflows/ci/badge.svg)](https://github.com/jbboehr/libmustache/actions?query=workflow%3Aci)
 [![Appveyor Build status](https://ci.appveyor.com/api/projects/status/1bwyjyo1cel03b2r?svg=true)](https://ci.appveyor.com/project/jbboehr/libmustache)
 
 C++ implementation of [Mustache](https://mustache.github.com/) intended mainly for use as a [PHP extension](https://github.com/jbboehr/php-mustache).

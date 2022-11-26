@@ -1,4 +1,4 @@
-name: linux
+name: ci
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
       - master
 
 jobs:
-  build:
+  linux:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
