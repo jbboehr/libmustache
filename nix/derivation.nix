@@ -47,10 +47,10 @@ stdenv.mkDerivation rec {
     ;
 
   postInstall = ''
-      patchelf --set-rpath "${stdenv.lib.makeLibraryPath buildInputs}:$out/lib" $out/bin/mustachec
+      patchelf --set-rpath "${lib.makeLibraryPath buildInputs}:$out/lib" $out/bin/mustachec
     '';
 
-  meta = with stdenv.lib; {
+  meta = with lib; {
     description = "C++ implementation of mustache";
     homepage = https://github.com/jbboehr/libmustache;
     license = "MIT";
