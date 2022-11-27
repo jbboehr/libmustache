@@ -31,4 +31,3 @@ pkgs.callPackage ./nix/derivation.nix {
   inherit mustache_spec libmustacheVersion libmustacheSrc libmustacheSha256;
   inherit checkSupport cmakeSupport debugSupport;
 }
-
