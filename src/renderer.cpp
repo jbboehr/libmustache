@@ -184,9 +184,11 @@ void Renderer::_renderNode(Node * node)
         switch( val->type ) {
           default:
           case Data::TypeString:
+            _stack->push_back(val);
             for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
               _renderNode(*it);
             }
+            _stack->pop_back();
             break;
           case Data::TypeList:
             for( Data::List::iterator childrenIt = val->children.begin() ; childrenIt != val->children.end(); childrenIt++ ) {
