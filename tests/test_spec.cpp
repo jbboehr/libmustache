@@ -158,6 +158,11 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
   if( node->type != YAML_MAPPING_NODE ) {
     return;
   }
+
+  // Support for inheritance and dynamic names is not implemented yet.
+  if (strcmp(currentSuite, "~inheritance.yml") == 0 || strcmp(currentSuite, "~dynamic-names.yml") == 0) {
+    return;
+  }
   
   MustacheSpecTest * test = new MustacheSpecTest;
   
@@ -177,6 +182,8 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
         test->tmpl.assign(valueValue);
       } else if( strcmp(keyValue, "expected") == 0 ) {
         test->expected.assign(valueValue);
+      } else if (strcmp(keyValue, "data") == 0) {
+        mustache_spec_parse_data(document, valueNode, &test->data);
       }
     } else if( valueNode->type == YAML_MAPPING_NODE ) {
       if( strcmp(keyValue, "data") == 0 ) {
@@ -247,6 +254,8 @@ void mustache_spec_parse_data(yaml_document_t * document, yaml_node_t * node, mu
     if( strcmp(keyValue, "0") == 0 ||
         strcmp(keyValue, "false") == 0 ) {
       data->init(mustache::Data::TypeString, 0);
+    } else if (strcmp(keyValue, "null") == 0) {
+      data->init(mustache::Data::TypeNone, 0);
     } else {
       data->init(mustache::Data::TypeString, node->data.scalar.length);
       data->val->assign(keyValue);

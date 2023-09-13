@@ -59,11 +59,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1669505557,
-        "narHash": "sha256-kYsxjpZruLDzJCT9wYFvUFQshHkQqF9jMeXu1ZTo6XU=",
+        "lastModified": 1694565180,
+        "narHash": "sha256-Yw/X6sLSJkD0gbba5icBeDezpzHGRGhAC1MT4z4RlDM=",
         "owner": "jbboehr",
         "repo": "mustache-spec",
-        "rev": "18cca097c306e8cbfd9f6a30f86a52f4c1d219e4",
+        "rev": "f2f334fd9660c154a125af1278f08aa4b14e8513",
         "type": "github"
       },
       "original": {
