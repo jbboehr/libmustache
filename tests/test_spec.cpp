@@ -254,6 +254,8 @@ void mustache_spec_parse_data(yaml_document_t * document, yaml_node_t * node, mu
     if( strcmp(keyValue, "0") == 0 ||
         strcmp(keyValue, "false") == 0 ) {
       data->init(mustache::Data::TypeString, 0);
+    } else if (strcmp(keyValue, "null") == 0) {
+      data->init(mustache::Data::TypeNone, 0);
     } else {
       data->init(mustache::Data::TypeString, node->data.scalar.length);
       data->val->assign(keyValue);

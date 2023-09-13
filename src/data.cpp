@@ -86,7 +86,7 @@ int Data::isEmpty()
       ret = 1;
       break;
     case Data::TypeString:
-      if( val == NULL || val->length() <= 0 || *val == "null" ) {
+      if( val == NULL || val->length() <= 0 ) {
         ret = 1;
       }
       break;
