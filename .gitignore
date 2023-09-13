@@ -5,6 +5,7 @@
 *.trs
 .libs
 .deps
+.direnv
 .dirstamp
 .idea
 Makefile
