@@ -8,6 +8,7 @@
 .direnv
 .dirstamp
 .idea
+.pre-commit-config.yaml
 Makefile
 Makefile.in
 aclocal.m4
