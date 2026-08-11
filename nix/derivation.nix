@@ -12,7 +12,6 @@
   glib,
   json_c,
   libyaml,
-  libstdcxx5,
   mustache_spec,
   gitignoreFilterWith,
   libmustacheSrc ? ../.,
