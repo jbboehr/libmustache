@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.18)
 
 project(mustache VERSION 0.5.0 LANGUAGES CXX)
 
-include(CTest)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
@@ -15,8 +14,14 @@ set(MUSTACHE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
 set(MUSTACHE_SPEC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/spec/specs" CACHE PATH
     "Path to the mustache specification suites")
 
-option(MUSTACHE_BUILD_CLI "Build the mustache command-line program" ON)
-option(MUSTACHE_ENABLE_TESTS "Build and register the test suite" ${BUILD_TESTING})
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    set(MUSTACHE_IS_TOP_LEVEL ON)
+else()
+    set(MUSTACHE_IS_TOP_LEVEL OFF)
+endif()
+
+option(MUSTACHE_BUILD_CLI "Build the mustache command-line program" ${MUSTACHE_IS_TOP_LEVEL})
+option(MUSTACHE_ENABLE_TESTS "Build and register the test suite" ${MUSTACHE_IS_TOP_LEVEL})
 option(MUSTACHE_ENABLE_HARDENING "Enable supported compiler and linker hardening" ON)
 option(MUSTACHE_ENABLE_ASSERTIONS "Enable standard-library runtime assertions" ON)
 option(MUSTACHE_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)

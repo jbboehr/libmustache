@@ -4,39 +4,120 @@
 [![GitHub CI Build Status](https://github.com/jbboehr/libmustache/workflows/ci/badge.svg)](https://github.com/jbboehr/libmustache/actions?query=workflow%3Aci)
 [![Appveyor Build status](https://ci.appveyor.com/api/projects/status/1bwyjyo1cel03b2r?svg=true)](https://ci.appveyor.com/project/jbboehr/libmustache)
 
-C++ implementation of [Mustache](https://mustache.github.com/) intended mainly for use as a [PHP extension](https://github.com/jbboehr/php-mustache).
+libmustache is a C++11 implementation of
+[Mustache](https://mustache.github.com/). It provides shared and static
+libraries plus the `mustachec` command-line renderer. It was originally written
+for [php-mustache](https://github.com/jbboehr/php-mustache), but can be consumed
+as an ordinary C++ library.
 
+## Requirements
 
-## Installation
+- A C++11 compiler
+- json-c
+- libyaml
+- CMake 3.18 or Autoconf 2.69 with Automake and Libtool
+- getopt on Windows when building `mustachec`
 
-#### Linux/OSX
+Clone the specification submodule when tests are required:
 
-You will need `autoconf`, `automake`, `make` and a C++ compiler.
-
-``` sh
-git clone git://github.com/jbboehr/libmustache.git --recursive
+```sh
+git clone --recurse-submodules https://github.com/jbboehr/libmustache.git
 cd libmustache
-autoreconf -fiv
-./configure
-make
+```
+
+## Build with CMake
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+cmake --install build --prefix /usr/local
+```
+
+Top-level builds enable the CLI and tests by default. When libmustache is added
+with `add_subdirectory()`, both default to off. They can always be controlled
+explicitly:
+
+```sh
+cmake -S . -B build \
+  -DMUSTACHE_BUILD_CLI=OFF \
+  -DMUSTACHE_ENABLE_TESTS=OFF
+```
+
+Installed CMake packages expose separate components. The shared component is
+the default and does not require dependency development packages at consume
+time:
+
+```cmake
+find_package(mustache 0.5 CONFIG REQUIRED)
+target_link_libraries(example PRIVATE mustache::mustache)
+```
+
+Static consumers request the static component, which also locates json-c and
+libyaml:
+
+```cmake
+find_package(mustache 0.5 CONFIG REQUIRED COMPONENTS static)
+target_link_libraries(example PRIVATE mustache::mustache_static)
+```
+
+## Build with Autotools
+
+```sh
+autoreconf --force --install --verbose
+mkdir build-autotools
+cd build-autotools
+../configure
+make --jobs="$(nproc)"
+make check
 sudo make install
 ```
 
-#### Nix/NixOS
+Use `--without-mustache-spec` when configuring a source tree without the
+specification submodule. `./configure --help` lists the hardening, sanitizer,
+coverage, and profiling options.
 
-``` sh
-nix-env -i -f https://github.com/jbboehr/libmustache/archive/master.tar.gz
+## Nix
+
+```sh
+nix build .#libmustache
+nix build .#libmustache-cmake
+nix flake check
+nix run .#mustachec -- -v
 ```
 
+The default Nix package uses Autotools; `libmustache-cmake` exercises the CMake
+packaging path.
+
+## Windows
+
+The repository contains a vcpkg manifest and is tested with Visual Studio 2022
+for both `x86-windows` and `x64-windows`:
+
+```bat
+cmake -S . -B build -A x64 ^
+  -DCMAKE_TOOLCHAIN_FILE=C:\path\to\vcpkg\scripts\buildsystems\vcpkg.cmake
+cmake --build build --config Release --parallel
+ctest --test-dir build -C Release --output-on-failure
+cmake --install build --config Release --prefix artifacts
+```
+
+## Command-line use
+
+```sh
+mustachec -t template.mustache -d data.json
+mustachec -t template.mustache -d data.yml
+mustachec -v
+```
+
+Run `mustachec -h` for the complete option list.
 
 ## Credits
 
 - [John Boehr](https://github.com/jbboehr)
 - [Adam Baratz](https://github.com/adambaratz)
-- [All Contributors](../../contributors)
-
+- [All contributors](https://github.com/jbboehr/libmustache/graphs/contributors)
 
 ## License
 
-The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
-
+libmustache is released under the [MIT License](LICENSE.md).

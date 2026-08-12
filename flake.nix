@@ -70,6 +70,12 @@
             actionlint.enable = true;
             alejandra.enable = true;
             shellcheck.enable = true;
+            version-consistency = {
+              enable = true;
+              name = "version consistency";
+              entry = "./scripts/check-version-consistency.sh";
+              pass_filenames = false;
+            };
           };
         };
       in rec {

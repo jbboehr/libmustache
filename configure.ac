@@ -114,7 +114,6 @@ AM_CONDITIONAL([GPROF], [test "x$enable_gprof" = "xyes"])
 AC_CONFIG_FILES([
     mustache.pc
     Makefile
-    doc/Makefile
     src/Makefile
     bin/Makefile
     tests/Makefile

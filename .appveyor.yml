@@ -15,7 +15,10 @@ environment:
       VCPKG_DEFAULT_TRIPLET: x64-windows
 
 install:
-  - vcpkg install --triplet %VCPKG_DEFAULT_TRIPLET%
+  - >-
+    vcpkg install
+    --triplet %VCPKG_DEFAULT_TRIPLET%
+    --x-install-root=%APPVEYOR_BUILD_FOLDER%\vcpkg_installed
 
 build_script:
   - >-
@@ -24,12 +27,38 @@ build_script:
     -DCMAKE_BUILD_TYPE=Release
     -DCMAKE_INSTALL_PREFIX=%APPVEYOR_BUILD_FOLDER%\artifacts
     -DCMAKE_TOOLCHAIN_FILE=C:\tools\vcpkg\scripts\buildsystems\vcpkg.cmake
+    -DVCPKG_INSTALLED_DIR=%APPVEYOR_BUILD_FOLDER%\vcpkg_installed
+    -DVCPKG_TARGET_TRIPLET=%VCPKG_DEFAULT_TRIPLET%
     -DVCPKG_MANIFEST_MODE=ON
   - cmake --build build --config Release --parallel
   - cmake --install build --config Release
+  - copy /Y vcpkg_installed\%VCPKG_DEFAULT_TRIPLET%\bin\*.dll artifacts\bin\
 
 test_script:
   - ctest --test-dir build -C Release --output-on-failure
+  - set PATH=%APPVEYOR_BUILD_FOLDER%\artifacts\bin;%PATH%
+  - artifacts\bin\mustachec.exe -v
+  - >-
+    cmake -S tests/cmake-consumer -B consumer-shared
+    -A %CMAKE_ARCH%
+    -DCMAKE_PREFIX_PATH=%APPVEYOR_BUILD_FOLDER%\artifacts
+    -DCMAKE_TOOLCHAIN_FILE=C:\tools\vcpkg\scripts\buildsystems\vcpkg.cmake
+    -DVCPKG_INSTALLED_DIR=%APPVEYOR_BUILD_FOLDER%\vcpkg_installed
+    -DVCPKG_TARGET_TRIPLET=%VCPKG_DEFAULT_TRIPLET%
+    -DVCPKG_MANIFEST_MODE=OFF
+  - cmake --build consumer-shared --config Release --parallel
+  - consumer-shared\Release\mustache_consumer.exe
+  - >-
+    cmake -S tests/cmake-consumer -B consumer-static
+    -A %CMAKE_ARCH%
+    -DCMAKE_PREFIX_PATH=%APPVEYOR_BUILD_FOLDER%\artifacts
+    -DCMAKE_TOOLCHAIN_FILE=C:\tools\vcpkg\scripts\buildsystems\vcpkg.cmake
+    -DVCPKG_INSTALLED_DIR=%APPVEYOR_BUILD_FOLDER%\vcpkg_installed
+    -DVCPKG_TARGET_TRIPLET=%VCPKG_DEFAULT_TRIPLET%
+    -DVCPKG_MANIFEST_MODE=OFF
+    -DMUSTACHE_CONSUMER_LINKAGE=static
+  - cmake --build consumer-static --config Release --parallel
+  - consumer-static\Release\mustache_consumer.exe
 
 artifacts:
   - path: artifacts

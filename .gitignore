@@ -43,7 +43,6 @@ stamp-h1
 
 # specific
 bin/mustachec
-doc/html
 libmustache_test.info
 nbproject
 src/mustache_config.h

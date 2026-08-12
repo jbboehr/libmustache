@@ -1,4 +1,4 @@
-SUBDIRS = doc src bin tests
+SUBDIRS = src bin tests
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = mustache.pc
@@ -18,12 +18,21 @@ EXTRA_DIST = \
 	flake.nix \
 	flake.lock \
 	nix/derivation.nix \
+	scripts/check-version-consistency.sh \
 	spec/specs \
 	tests/cmake-consumer/CMakeLists.txt \
 	tests/cmake-consumer/main.cpp \
+	tests/cmake-find-quiet/CMakeLists.txt \
+	tests/cmake-subproject/CMakeLists.txt \
+	tests/cmake-subproject/main.cpp \
 	vcpkg.json
 
-.PHONY: render-standard render-complex render-deep
+.PHONY: check-version render-standard render-complex render-deep
+
+check-local: check-version
+
+check-version:
+	$(SHELL) $(top_srcdir)/scripts/check-version-consistency.sh
 
 render-standard: all
 	./bin/mustachec -t $(top_srcdir)/tests/fixtures/standard.mustache -d $(top_srcdir)/tests/fixtures/standard.yml

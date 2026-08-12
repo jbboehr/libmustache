@@ -37,6 +37,24 @@ risks: [Repository review](repository-review-2026-08-11.md).
   execution, installed-package discovery, and downstream consumer execution.
   The validation used MSVC 19.44.35228.0, CMake 3.31.6-msvc6, and vcpkg
   2025-11-19 (`da1f056dc0775ac651bea7e3fbbf4066146a55f3`).
+- Installed CMake exports are component-aware. The default `shared` component
+  has no consume-time dependency-metadata requirement; the `static` component
+  locates json-c and libyaml while respecting `QUIET`, `REQUIRED`, and optional
+  component semantics.
+- CMake top-level builds retain the CLI and test defaults, while embedded
+  `add_subdirectory()` builds default both off. A dedicated fixture prevents
+  regressions in this policy.
+- Install checks compile and execute pkg-config, shared-CMake, and static-CMake
+  consumers. They also exercise dependency-free shared discovery and quiet
+  static-discovery failure.
+- AppVeyor tests installed shared and static consumers and assembles dependency
+  DLLs into the Windows artifact. GitHub Actions additionally covers macOS and
+  Autotools' sanitizer option.
+- The Nix derivation no longer duplicates propagated dependencies, and its
+  generated GitHub Actions matrix remains derived from the flake checks.
+- A release-metadata check keeps CMake, Autotools, Nix, vcpkg, consumer-test,
+  and ABI/soname versions aligned. The README now documents every supported
+  build path; the obsolete Doxygen configuration was removed.
 
 ## Remaining actionable work
 
@@ -59,46 +77,18 @@ Review and fix each class before enabling warnings-as-errors:
 - the `Data::~Data()` `TypeList` to `TypeArray` fallthrough;
 - `Node` member-initialization order;
 - incomplete enum switches in `Data`, `Node`, and `Renderer`;
-- signed/unsigned comparisons in tokenization and deserialization;
+- signed/unsigned comparisons and narrowing conversions in data parsing,
+  tokenization, deserialization, utilities, the CLI, and tests;
+- the MSVC `test_utils` format mismatch (`%lu` for a `size_t`; use `%zu` or
+  an explicitly matched type);
 - the intentional-looking but unannotated fallthrough in
   `Node::to_template_string`;
-- unused variables and parameters in the CLI, utilities, and tests.
+- shadowed names plus unused variables and parameters in the CLI, library, and
+  tests.
 
 The deserialization warnings must be handled together with full buffer-boundary
 validation. Merely changing integer types would leave the security issue
 described in the repository review unresolved.
-
-### 3. Improve installed CMake package failure semantics
-
-On non-MSVC systems, `mustacheConfig.cmake` uses required pkg-config lookups for
-both dependencies. This makes `find_package(mustache QUIET)` fail noisily, and
-consumers of only the shared target still need pkg-config and dependency
-development metadata because the shared and static targets are exported
-together.
-
-Evaluate either component-aware exports or separate shared/static package
-metadata. Dependency lookup failures should set `mustache_FOUND` and a useful
-`mustache_NOT_FOUND_MESSAGE` while respecting `QUIET` and `REQUIRED`.
-
-Imported-target `GLOBAL` scope is not, by itself, a fix: the exported Mustache
-targets have the same directory visibility as their dependency targets.
-
-### 4. Make CMake subproject behavior explicit
-
-`include(CTest)` creates the global `BUILD_TESTING` option, and
-`MUSTACHE_ENABLE_TESTS` currently inherits it. Decide and test whether embedding
-libmustache with `add_subdirectory()` should build its CLI and tests by default.
-A common policy is to default developer tools to on only when libmustache is the
-top-level project, while retaining explicit override options.
-
-### 5. Finish small Nix derivation cleanup
-
-- Confirm and remove the duplicate direct `buildInputs` entries when
-  `propagatedBuildInputs` already supplies json-c and libyaml.
-- Correct the visual indentation of the downstream consumer build commands.
-- Consider moving the GitHub Actions matrix under a conventional flake output if
-  eliminating the expected “unknown flake output `githubActions`” warning is
-  worth changing the workflow interface.
 
 ## Verified non-issues
 
@@ -111,3 +101,7 @@ top-level project, while retaining explicit override options.
 - The Visual Studio install places the DLL and CLI in `bin`, import and static
   libraries in `lib`, and produces consumable CMake exports for both Win32 and
   x64.
+- The top-level `githubActions` flake output and its corresponding schema
+  warning follow the current `nix-github-actions` upstream integration pattern;
+  hiding the matrix under an unrelated output would make the interface less
+  clear without improving the builds.

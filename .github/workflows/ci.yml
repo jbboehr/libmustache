@@ -19,6 +19,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  quality:
+    name: Build metadata consistency
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Check version and ABI metadata
+        run: ./scripts/check-version-consistency.sh
+
   autotools:
     name: Autotools (${{ matrix.os }}, ${{ matrix.compiler.name }})
     runs-on: ${{ matrix.os }}
@@ -136,14 +149,82 @@ jobs:
           ctest --test-dir build-cmake --output-on-failure
           cmake --install build-cmake
 
+          cmake -S tests/cmake-subproject -B build-subproject -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-subproject --parallel
+          build-subproject/mustache_subproject_consumer
+
       - name: Verify installed package
         run: |
           "$RUNNER_TEMP/libmustache/bin/mustachec" -v
-          cmake -S tests/cmake-consumer -B build-consumer -G Ninja \
+
+          cmake -S tests/cmake-consumer -B build-consumer-shared -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/libmustache"
-          cmake --build build-consumer --parallel
-          build-consumer/mustache_consumer
+          cmake --build build-consumer-shared --parallel
+          build-consumer-shared/mustache_consumer
+
+          cmake -S tests/cmake-consumer -B build-consumer-static -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/libmustache" \
+            -DMUSTACHE_CONSUMER_LINKAGE=static
+          cmake --build build-consumer-static --parallel
+          build-consumer-static/mustache_consumer
+
+          cmake -S tests/cmake-find-quiet -B build-find-quiet -G Ninja \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/libmustache"
+
+          export PKG_CONFIG_PATH="$RUNNER_TEMP/libmustache/lib/pkgconfig"
+          pkg_version=$(pkg-config --modversion mustache)
+          read -r -a pkg_config_flags <<< "$(pkg-config --cflags --libs mustache)"
+          "$CXX" tests/cmake-consumer/main.cpp \
+            "-DMUSTACHE_EXPECTED_VERSION=\"$pkg_version\"" \
+            "${pkg_config_flags[@]}" \
+            -o pkg-config-consumer
+          LD_LIBRARY_PATH="$RUNNER_TEMP/libmustache/lib" ./pkg-config-consumer
+
+  cmake-macos:
+    name: CMake (macOS, AppleClang)
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install dependencies
+        run: brew install json-c libyaml ninja pkg-config
+
+      - name: Configure, build, test, and install
+        run: |
+          cmake -S . -B build-cmake -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/libmustache"
+          cmake --build build-cmake --parallel
+          ctest --test-dir build-cmake --output-on-failure
+          cmake --install build-cmake
+
+      - name: Verify installed shared and static packages
+        run: |
+          "$RUNNER_TEMP/libmustache/bin/mustachec" -v
+
+          cmake -S tests/cmake-consumer -B build-consumer-shared -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/libmustache"
+          cmake --build build-consumer-shared --parallel
+          build-consumer-shared/mustache_consumer
+
+          cmake -S tests/cmake-consumer -B build-consumer-static -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/libmustache" \
+            -DMUSTACHE_CONSUMER_LINKAGE=static
+          cmake --build build-consumer-static --parallel
+          build-consumer-static/mustache_consumer
+
+          cmake -S tests/cmake-find-quiet -B build-find-quiet -G Ninja \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/libmustache"
 
   sanitizers:
     name: Sanitizers (${{ matrix.compiler.name }})
@@ -178,9 +259,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes \
             "${{ matrix.compiler.package }}" \
+            autoconf \
+            automake \
             cmake \
             libjson-c-dev \
+            libtool \
             libyaml-dev \
+            m4 \
+            make \
             ninja-build \
             pkg-config
 
@@ -191,6 +277,13 @@ jobs:
             -DMUSTACHE_ENABLE_SANITIZERS=ON
           cmake --build build-sanitized --parallel
           ctest --test-dir build-sanitized --output-on-failure
+
+          autoreconf --force --install --verbose
+          mkdir build-sanitized-autotools
+          cd build-sanitized-autotools
+          ../configure --enable-sanitizers
+          make --jobs="$(nproc)"
+          make check
 
   nix-matrix:
     name: Generate Nix matrix

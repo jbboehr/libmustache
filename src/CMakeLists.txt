@@ -53,8 +53,16 @@ if(NOT WIN32)
     set_target_properties(mustache_static PROPERTIES OUTPUT_NAME mustache)
 endif()
 
-install(TARGETS mustache mustache_static
-    EXPORT mustacheTargets
+install(TARGETS mustache
+    EXPORT mustacheSharedTargets
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
+
+install(TARGETS mustache_static
+    EXPORT mustacheStaticTargets
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -67,8 +75,14 @@ install(FILES
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/mustache"
 )
 
-install(EXPORT mustacheTargets
-    FILE mustacheTargets.cmake
+install(EXPORT mustacheSharedTargets
+    FILE mustacheSharedTargets.cmake
+    NAMESPACE mustache::
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/mustache"
+)
+
+install(EXPORT mustacheStaticTargets
+    FILE mustacheStaticTargets.cmake
     NAMESPACE mustache::
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/mustache"
 )

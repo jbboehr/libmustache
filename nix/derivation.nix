@@ -54,7 +54,6 @@ stdenv.mkDerivation (finalAttrs: {
   separateDebugInfo = debugSupport;
   dontStrip = sanitizerSupport;
 
-  buildInputs = [json_c libyaml];
   propagatedBuildInputs = [json_c libyaml];
   nativeBuildInputs =
     lib.optional checkSupport mustache_spec
@@ -63,6 +62,13 @@ stdenv.mkDerivation (finalAttrs: {
     ++ [pkg-config];
 
   doCheck = checkSupport;
+
+  # The Nix source filter intentionally excludes packaging metadata such as
+  # *.nix. Repository-level checks remain strict; packaged-source checks skip
+  # only manifests that are absent from that filtered source.
+  preCheck = lib.optionalString (!cmakeSupport) ''
+    export MUSTACHE_VERSION_CHECK_ALLOW_MISSING=1
+  '';
 
   configureFlags =
     [
@@ -102,23 +108,61 @@ stdenv.mkDerivation (finalAttrs: {
       rendered=$("$out/bin/mustachec" -t install-check.mustache -d install-check.json)
       test "$rendered" = "secure"
 
-      PKG_CONFIG_PATH="$dev/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" \
-        pkg-config --exact-version="${finalAttrs.version}" mustache
+      export PKG_CONFIG_PATH="$dev/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+      pkg-config --exact-version="${finalAttrs.version}" mustache
+      read -r -a pkg_config_flags <<< "$(pkg-config --cflags --libs mustache)"
+      pkg_config_consumer_flags=()
+      ${lib.optionalString sanitizerSupport ''
+        pkg_config_consumer_flags+=(
+          -fno-omit-frame-pointer
+          -fsanitize=address,undefined
+          -fno-sanitize-recover=all
+        )
+      ''}
+      "$CXX" "$src/tests/cmake-consumer/main.cpp" \
+        -DMUSTACHE_EXPECTED_VERSION='"${finalAttrs.version}"' \
+        "''${pkg_config_flags[@]}" \
+        "''${pkg_config_consumer_flags[@]}" \
+        -o pkg-config-consumer
+      LD_LIBRARY_PATH="$lib/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+        ./pkg-config-consumer
     ''
     + lib.optionalString cmakeSupport ''
       consumer_cmake_flags=()
+      subproject_cmake_flags=()
       ${lib.optionalString sanitizerSupport ''
         consumer_cmake_flags+=(
           '-DCMAKE_CXX_FLAGS=-fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all'
           '-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined -fno-sanitize-recover=all'
         )
+        subproject_cmake_flags+=(
+          -DMUSTACHE_ENABLE_SANITIZERS=ON
+        )
       ''}
-      cmake -S "$src/tests/cmake-consumer" -B consumer-build \
+      cmake -S "$src/tests/cmake-consumer" -B consumer-shared \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_PREFIX_PATH="$dev;$lib" \
         "''${consumer_cmake_flags[@]}"
-        cmake --build consumer-build --parallel
-        consumer-build/mustache_consumer
+      cmake --build consumer-shared --parallel
+      consumer-shared/mustache_consumer
+
+      cmake -S "$src/tests/cmake-consumer" -B consumer-static \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_PREFIX_PATH="$dev;$lib" \
+        -DMUSTACHE_CONSUMER_LINKAGE=static \
+        "''${consumer_cmake_flags[@]}"
+      cmake --build consumer-static --parallel
+      consumer-static/mustache_consumer
+
+      cmake -S "$src/tests/cmake-find-quiet" -B find-quiet \
+        -DCMAKE_PREFIX_PATH="$dev;$lib"
+
+      cmake -S "$src/tests/cmake-subproject" -B subproject-build \
+        -DCMAKE_BUILD_TYPE=Release \
+        "''${subproject_cmake_flags[@]}" \
+        "''${consumer_cmake_flags[@]}"
+      cmake --build subproject-build --parallel
+      subproject-build/mustache_subproject_consumer
     ''
     + ''
       runHook postInstallCheck

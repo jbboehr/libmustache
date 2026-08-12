@@ -1,7 +1,23 @@
 cmake_minimum_required(VERSION 3.15)
 project(mustache_consumer LANGUAGES CXX)
 
-find_package(mustache 0.5 CONFIG REQUIRED)
+set(MUSTACHE_CONSUMER_LINKAGE shared CACHE STRING
+    "Installed mustache component to consume (shared or static)")
+set_property(CACHE MUSTACHE_CONSUMER_LINKAGE PROPERTY STRINGS shared static)
+
+if(MUSTACHE_CONSUMER_LINKAGE STREQUAL "shared")
+    set(MUSTACHE_CONSUMER_TARGET mustache::mustache)
+elseif(MUSTACHE_CONSUMER_LINKAGE STREQUAL "static")
+    set(MUSTACHE_CONSUMER_TARGET mustache::mustache_static)
+else()
+    message(FATAL_ERROR
+        "MUSTACHE_CONSUMER_LINKAGE must be either shared or static")
+endif()
+
+find_package(mustache 0.5 CONFIG REQUIRED
+    COMPONENTS ${MUSTACHE_CONSUMER_LINKAGE})
 
 add_executable(mustache_consumer main.cpp)
-target_link_libraries(mustache_consumer PRIVATE mustache::mustache)
+target_compile_definitions(mustache_consumer PRIVATE
+    MUSTACHE_EXPECTED_VERSION="${mustache_VERSION}")
+target_link_libraries(mustache_consumer PRIVATE ${MUSTACHE_CONSUMER_TARGET})
