@@ -164,7 +164,7 @@ int main( int argc, char * argv[] )
     inputData = getFileContents(inputDataFileName);
   }
 
-  std::string * output = new std::string;
+  std::string output;
   
   // Process data
   try {
@@ -184,12 +184,12 @@ int main( int argc, char * argv[] )
   // Render
   int i;
   for( i = 0; i < number; i++ ) {
-    output->clear();
-    must.render(&node, data, &partials, output);
+    output.clear();
+    must.render(&node, data, &partials, &output);
   }
   
   // Output
-  *outputStream << *output;
+  *outputStream << output;
   
 error:
   if( outputFileStream.is_open() ) {

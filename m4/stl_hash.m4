@@ -14,8 +14,7 @@ m4_pattern_allow([AC_COMPILE_IFELSE])
 AC_DEFUN([AC_CXX_STL_HASH],
   [{
    AC_MSG_CHECKING(the location of hash_map)
-   AC_LANG_SAVE
-   AC_LANG_CPLUSPLUS
+   AC_LANG_PUSH([C++])
    ac_cv_cxx_hash_map=""
    # Try unordered_map, but not on gcc's before 4.2 -- I've
    # seen unexplainable unordered_map bugs with -O2 on older gcc's.
@@ -31,7 +30,7 @@ AC_DEFUN([AC_CXX_STL_HASH],
                    [stl_hash_old_gcc=yes])
    for location in unordered_map tr1/unordered_map; do
      for namespace in std std::tr1; do
-       if test -z "$ac_cv_cxx_hash_map" -a "$stl_hash_old_gcc" != yes; then
+       if test -z "$ac_cv_cxx_hash_map" && test "$stl_hash_old_gcc" != yes; then
          # Some older gcc's have a buggy tr1, so test a bit of code.
          AC_COMPILE_IFELSE([
 		AC_LANG_PROGRAM(
@@ -95,4 +94,5 @@ AC_DEFUN([AC_CXX_STL_HASH],
       AC_MSG_RESULT()
       AC_MSG_WARN([could not find an STL hash_map])
    fi
+   AC_LANG_POP([C++])
 }])

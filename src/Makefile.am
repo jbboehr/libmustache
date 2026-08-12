@@ -42,3 +42,7 @@ libmustache_la_LIBADD = $(JSON_LIBS) $(YAML_LIBS)
 libmustache_la_LDFLAGS = \
 	-no-undefined \
 	-version-info 5:0:0
+
+AM_CXXFLAGS = @MUSTACHE_CXXFLAGS@
+AM_CPPFLAGS = @MUSTACHE_CPPFLAGS@ $(JSON_CFLAGS) $(YAML_CFLAGS)
+AM_LDFLAGS = @MUSTACHE_LDFLAGS@

@@ -4,8 +4,8 @@
 #include <cstdlib>
 #include <cstdio>
 
+#include "mustache.hpp"
 #include "utils.hpp"
-#include "test_spec.hpp"
 
 int testGH46() {
   std::string tmpl = "a{{ <html> }}b";
@@ -33,4 +33,3 @@ int main( int argc, char * argv[] )
   ret += testGH46();
   return ret;
 }
-

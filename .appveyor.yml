@@ -1,50 +1,37 @@
-version: '{branch}.{build}'
+version: "{branch}.{build}"
+
 branches:
   only:
-  - master
-  - appveyor
-  - ci
+    - master
+    - develop
 
-image:
-- Visual Studio 2017
+image: Visual Studio 2022
 
 environment:
   matrix:
-  - platform: x86
-    VCPKG_DEFAULT_TRIPLET: x86-windows
-  - platform: x64
-    VCPKG_DEFAULT_TRIPLET: x64-windows
+    - CMAKE_ARCH: Win32
+      VCPKG_DEFAULT_TRIPLET: x86-windows
+    - CMAKE_ARCH: x64
+      VCPKG_DEFAULT_TRIPLET: x64-windows
 
 install:
-- cmd: cinst wget
-- cmd: >-
-    "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat" %PLATFORM%
-- vcpkg install json-c
-- vcpkg install libyaml
-- vcpkg install getopt
-- vcpkg install dirent
+  - vcpkg install --triplet %VCPKG_DEFAULT_TRIPLET%
 
 build_script:
-# libmustache
-- cmd: >-
-    cd C:\projects\libmustache
-    
-    git submodule update --init
-    
-    mkdir build
-    
-    cd build
-    
-    cmake -G "NMake Makefiles" -DCMAKE_INSTALL_PREFIX=..\artifacts -DCMAKE_TOOLCHAIN_FILE=c:/tools/vcpkg/scripts/buildsystems/vcpkg.cmake ..
-    
-    nmake
-    
-    nmake install
+  - >-
+    cmake -S . -B build
+    -A %CMAKE_ARCH%
+    -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_INSTALL_PREFIX=%APPVEYOR_BUILD_FOLDER%\artifacts
+    -DCMAKE_TOOLCHAIN_FILE=C:\tools\vcpkg\scripts\buildsystems\vcpkg.cmake
+    -DVCPKG_MANIFEST_MODE=ON
+  - cmake --build build --config Release --parallel
+  - cmake --install build --config Release
 
 test_script:
-- cmd: nmake test
+  - ctest --test-dir build -C Release --output-on-failure
 
 artifacts:
   - path: artifacts
-    name: master
+    name: libmustache
     type: zip

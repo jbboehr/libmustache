@@ -2,6 +2,12 @@
 #include "test_spec.hpp"
 #include "./fixtures/lambdas.hpp"
 
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <dirent.h>
+#endif
+
 std::list<MustacheSpecTest *> tests;
 int execNum = 1;
 static const char * currentSuite;
@@ -33,22 +39,44 @@ int main( int argc, char * argv[] )
     execNum = atoi(numStr);
   }
   
-  DIR * dir;
-  struct dirent * ent;
-  if( (dir = opendir(directory)) == NULL ) {
+  std::list<std::string> files;
+#ifdef _WIN32
+  struct _finddata_t findData;
+  std::string pattern(directory);
+  pattern += "\\*.yml";
+  intptr_t handle = _findfirst(pattern.c_str(), &findData);
+  if( handle == -1 ) {
     std::cerr << "Unable to open directory " << directory << std::endl;
     return 1;
   }
-  
-  int nFiles = 0;
+  do {
+    if( !(findData.attrib & _A_SUBDIR) ) {
+      files.push_back(findData.name);
+    }
+  } while( _findnext(handle, &findData) == 0 );
+  _findclose(handle);
+#else
+  DIR * dir = opendir(directory);
+  if( dir == NULL ) {
+    std::cerr << "Unable to open directory " << directory << std::endl;
+    return 1;
+  }
+  struct dirent * ent;
   while( (ent = readdir(dir)) != NULL ) {
-    if( ent->d_name[0] == '.' ) continue;
-    if( strlen(ent->d_name) < 5 ) continue;
-    if( strcmp(ent->d_name + strlen(ent->d_name) - 4, ".yml") != 0 ) continue;
-    //if( *(ent->d_name) == '~' ) continue; // Ignore lambdas
-    if( nFiles >= MAX_TEST_FILES ) continue;
+    files.push_back(ent->d_name);
+  }
+  closedir(dir);
+#endif
 
-    char * file = ent->d_name;
+  int nFiles = 0;
+  for( std::list<std::string>::const_iterator it = files.begin(); it != files.end(); ++it ) {
+    const char * file = it->c_str();
+    if( file[0] == '.' ) continue;
+    if( strlen(file) < 5 ) continue;
+    if( strcmp(file + strlen(file) - 4, ".yml") != 0 ) continue;
+    //if( file[0] == '~' ) continue; // Ignore lambdas
+    if( nFiles >= MAX_TEST_FILES ) continue;
+    nFiles++;
     currentSuite = file;
 
     // Make filename
@@ -76,10 +104,9 @@ int main( int argc, char * argv[] )
     // parse the file
     std::cout << fileName << "\n";
     parse_file(fileData, length);
+    delete[] fileData;
   }
-  closedir(dir);
-  
-  
+
   // Summarize
   std::list<MustacheSpecTest *>::iterator it = tests.begin();
   int nPassed = 0;
@@ -91,7 +118,9 @@ int main( int argc, char * argv[] )
     } else {
       nFailed++;
     }
+    delete *it;
   }
+  tests.clear();
   int total = nPassed + nFailed;
   std::cout << nPassed << " passed, "
             << nSkipped << " skipped, "
@@ -204,6 +233,7 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
 
   // This test isn't supported yet
   if (test->name == "Implicit Iterator - Array") {
+    delete test;
     return;
   }
 

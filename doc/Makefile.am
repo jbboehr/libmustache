@@ -1,6 +1,7 @@
+EXTRA_DIST = Doxyfile
 
 html:
 	doxygen Doxyfile
 
-clean:
-	rm -Rf html
+clean-local:
+	rm -rf html

@@ -1,114 +1,122 @@
-
-AC_PREREQ([2.60])
-AC_INIT([mustache], [0.5.0], [jbboehr@gmail.com])
-
-AC_CONFIG_HEADER(config.h)
-AX_PREFIX_CONFIG_H(src/mustache_config.h)
-
+AC_PREREQ([2.69])
+AC_INIT([mustache], [0.5.0], [jbboehr@gmail.com], [mustache], [https://github.com/jbboehr/libmustache])
 AC_CONFIG_SRCDIR([src/mustache.cpp])
-AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build])
+AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_HEADERS([config.h])
+AX_PREFIX_CONFIG_H([src/mustache_config.h])
 
-AM_INIT_AUTOMAKE([1.10 foreign subdir-objects])
+AM_INIT_AUTOMAKE([1.14 foreign subdir-objects parallel-tests])
+AM_SILENT_RULES([yes])
 
-#m4_include(m4/ax_cxx_compile_stdcxx_11.m4)
-#m4_include(m4/stl_hash.m4)
-
-AC_SUBST([VERSION_INT], [1])
-
-# debug
-AC_ARG_ENABLE([debug],
-    AS_HELP_STRING([--enable-debug], [Enable debug mode]))
-if test "x$enable_debug" == "xyes"; then
-    AC_DEFINE([DEBUG], [1], [Defined if debug functions requested])
-fi
-
-# gcov
-AC_ARG_ENABLE([gcov],
-    AS_HELP_STRING([--enable-gcov], [Enable gcov]))
-
-AS_IF([test "x$enable_gcov" = "xyes"], [
-  LDFLAGS="$LDFLAGS -lgcov"
-  CPPFLAGS="$CPPFLAGS -fprofile-arcs -ftest-coverage"
-])
-
-# gprof
-AC_ARG_ENABLE([gprof],
-    AS_HELP_STRING([--enable-gprof], [Enable gprof]))
-
-AS_IF([test "x$enable_gprof" = "xyes"], [
-  # LDFLAGS="$LDFLAGS -lc_p"
-  CXXFLAGS="$CXXFLAGS -pg"
-])
-
-# mustache-spec
-AC_ARG_WITH([mustache-spec],
-  [AS_HELP_STRING([--with-mustache-spec=SPEC_LOCATION], [location to find mustache specification @<:@default=./spec/specs@>:@])])
-
-AS_IF([test "x$with_mustache_spec" != "xno"], [
-  AS_IF([test "x$with_mustache_spec" != "x"], [
-    AC_CHECK_FILE([$with_mustache_spec/comments.yml], [
-      AC_SUBST([MUSTACHE_SPEC_DIR], [$with_mustache_spec])
-    ], [
-      AC_MSG_FAILURE([mustache spec missing (--without-mustache-spec to disable)])
-    ])
-  ], [
-    AC_SUBST([MUSTACHE_SPEC_DIR], ['$(top_srcdir)/spec/specs'])
-  ])
-])
-
-# Checks for programs.
+AC_CANONICAL_HOST
 AC_PROG_CXX
-AC_PROG_LIBTOOL
-AC_LANG(C++)
+AC_LANG([C++])
+LT_INIT
+PKG_PROG_PKG_CONFIG
 AX_CXX_COMPILE_STDCXX_11
 
-# Checks for libraries.
-AC_CHECK_LIB(jansson, json_equal)
-AS_IF([test "x$enable_gcov" = "xyes"], [
-  AC_CHECK_LIB(gcov, main)
+MUSTACHE_CXXFLAGS=
+MUSTACHE_CPPFLAGS=
+MUSTACHE_LDFLAGS=
+
+AC_ARG_ENABLE([debug],
+    [AS_HELP_STRING([--enable-debug], [enable debug mode])],
+    [], [enable_debug=no])
+AS_IF([test "x$enable_debug" = "xyes"], [
+    AC_DEFINE([DEBUG], [1], [Defined if debug functions are requested])
 ])
 
-PKG_CHECK_MODULES(JSON, [json-c], [AC_DEFINE([MUSTACHE_HAVE_LIBJSON], [1], [Defined if json-c is enabled])], [AC_MSG_WARN([json-c not found])])
-PKG_CHECK_MODULES(YAML, [yaml-0.1], [AC_DEFINE([MUSTACHE_HAVE_LIBYAML], [1], [Defined if libyaml is enabled])], [AC_MSG_WARN([libyaml not found])])
+AC_ARG_ENABLE([hardening],
+    [AS_HELP_STRING([--disable-hardening], [disable compiler and linker hardening])],
+    [], [enable_hardening=yes])
+AS_IF([test "x$GXX" = "xyes"], [
+    MUSTACHE_CXXFLAGS="$MUSTACHE_CXXFLAGS -Wall -Wextra -Wpedantic"
+    AS_IF([test "x$enable_hardening" = "xyes"], [
+        MUSTACHE_CXXFLAGS="$MUSTACHE_CXXFLAGS -fstack-protector-strong"
+        AS_CASE([$host_os], [linux*], [
+            AS_CASE([" $CPPFLAGS $CXXFLAGS "], [*_FORTIFY_SOURCE*], [], [
+                MUSTACHE_CPPFLAGS="$MUSTACHE_CPPFLAGS -D_FORTIFY_SOURCE=3"
+            ])
+            AS_CASE([" $CPPFLAGS $CXXFLAGS "], [*_GLIBCXX_ASSERTIONS*], [], [
+                MUSTACHE_CPPFLAGS="$MUSTACHE_CPPFLAGS -D_GLIBCXX_ASSERTIONS=1"
+            ])
+            MUSTACHE_LDFLAGS="$MUSTACHE_LDFLAGS -Wl,-z,relro -Wl,-z,now"
+        ])
+    ])
+])
 
-# Checks for header files.
-AC_CHECK_HEADERS(cstdlib)
-AC_CHECK_HEADERS(dirent.h)
-AC_CHECK_HEADERS(exception)
-AC_CHECK_HEADERS(iostream)
-AC_CHECK_HEADERS(fstream)
-AC_CHECK_HEADERS(list)
-AC_CHECK_HEADERS(map)
-AC_CHECK_HEADERS(memory)
-AC_CHECK_HEADERS(sstream)
-AC_CHECK_HEADERS(stack)
-AC_CHECK_HEADERS(stdexcept)
-AC_CHECK_HEADERS(string)
-AC_CHECK_HEADERS(utility)
-AC_CHECK_HEADERS(vector)
-AC_CHECK_HEADERS(yaml.h)
+AC_ARG_ENABLE([sanitizers],
+    [AS_HELP_STRING([--enable-sanitizers], [enable AddressSanitizer and UndefinedBehaviorSanitizer])],
+    [], [enable_sanitizers=no])
+AS_IF([test "x$enable_sanitizers" = "xyes"], [
+    AS_IF([test "x$GXX" != "xyes"], [
+        AC_MSG_ERROR([--enable-sanitizers requires a GCC-compatible C++ compiler])
+    ])
+    MUSTACHE_CXXFLAGS="$MUSTACHE_CXXFLAGS -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all"
+    MUSTACHE_LDFLAGS="$MUSTACHE_LDFLAGS -fsanitize=address,undefined -fno-sanitize-recover=all"
+])
 
-# Checks for typedefs, structures, and compiler characteristics.
+AC_ARG_ENABLE([gcov],
+    [AS_HELP_STRING([--enable-gcov], [enable gcov coverage instrumentation])],
+    [], [enable_gcov=no])
+AS_IF([test "x$enable_gcov" = "xyes"], [
+    MUSTACHE_CXXFLAGS="$MUSTACHE_CXXFLAGS --coverage"
+    MUSTACHE_LDFLAGS="$MUSTACHE_LDFLAGS --coverage"
+])
+
+AC_ARG_ENABLE([gprof],
+    [AS_HELP_STRING([--enable-gprof], [enable gprof instrumentation])],
+    [], [enable_gprof=no])
+AS_IF([test "x$enable_gprof" = "xyes"], [
+    MUSTACHE_CXXFLAGS="$MUSTACHE_CXXFLAGS -pg"
+    MUSTACHE_LDFLAGS="$MUSTACHE_LDFLAGS -pg"
+])
+
+AC_ARG_WITH([mustache-spec],
+    [AS_HELP_STRING([--with-mustache-spec=SPEC_LOCATION],
+        [location of the mustache specification @<:@default=./spec/specs@>:@])])
+AS_IF([test "x$with_mustache_spec" != "xno"], [
+    AS_IF([test -n "$with_mustache_spec"], [
+        AS_IF([test -f "$with_mustache_spec/comments.yml"], [
+            AC_SUBST([MUSTACHE_SPEC_DIR], [$with_mustache_spec])
+        ], [
+            AC_MSG_FAILURE([mustache spec missing (--without-mustache-spec to disable)])
+        ])
+    ], [
+        AC_SUBST([MUSTACHE_SPEC_DIR], ['$(top_srcdir)/spec/specs'])
+    ])
+])
+
+PKG_CHECK_MODULES([JSON], [json-c], [
+    AC_DEFINE([HAVE_LIBJSON], [1], [Defined if json-c is enabled])
+], [
+    AC_MSG_ERROR([json-c is required])
+])
+PKG_CHECK_MODULES([YAML], [yaml-0.1], [
+    AC_DEFINE([HAVE_LIBYAML], [1], [Defined if libyaml is enabled])
+], [
+    AC_MSG_ERROR([libyaml is required])
+])
+
+AC_CHECK_HEADERS([cstdlib dirent.h exception fstream iostream list map memory sstream stack stdexcept string utility vector yaml.h])
 AC_TYPE_INT32_T
 AC_TYPE_LONG_LONG_INT
-
-# Checks for hash libraries
 AC_CXX_STL_HASH
 
-# Checks for library functions.
+AC_SUBST([MUSTACHE_CXXFLAGS])
+AC_SUBST([MUSTACHE_CPPFLAGS])
+AC_SUBST([MUSTACHE_LDFLAGS])
 
-# Conditionals
-AM_CONDITIONAL([GCC], [test x$GCC = xyes])
-AM_CONDITIONAL([GCOV], [test x$enable_gcov = xyes])
-AM_CONDITIONAL([GPROF], [test x$enable_gprof = xyes])
+AM_CONDITIONAL([GCOV], [test "x$enable_gcov" = "xyes"])
+AM_CONDITIONAL([GPROF], [test "x$enable_gprof" = "xyes"])
 
 AC_CONFIG_FILES([
-        mustache.pc
-        Makefile
-        doc/Makefile
-        src/Makefile
-        bin/Makefile
-        tests/Makefile
+    mustache.pc
+    Makefile
+    doc/Makefile
+    src/Makefile
+    bin/Makefile
+    tests/Makefile
 ])
 AC_OUTPUT

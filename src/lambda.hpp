@@ -2,6 +2,8 @@
 #ifndef MUSTACHE_LAMBDA_HPP
 #define MUSTACHE_LAMBDA_HPP
 
+#include <string>
+
 namespace mustache {
 
 class Renderer;

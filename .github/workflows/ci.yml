@@ -1,89 +1,235 @@
 name: ci
 
 on:
-    push:
-        branches:
-            - master
-            - develop
-    pull_request:
-        branches:
-            - master
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - master
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-    linux:
-        runs-on: ${{ matrix.os }}
-        strategy:
-            matrix:
-                os: [ubuntu-20.04, ubuntu-22.04]
-                cpp-version: [gcc, clang]
-        steps:
-            - uses: actions/checkout@v3
-              with:
-                  submodules: recursive
-            - run: sudo apt-get install -y ${{ matrix.cpp-version }} -y autoconf automake libtool m4 make pkg-config libjson-c-dev libyaml-dev
-            - run: autoreconf -fiv
-            - run: ./configure
-            - run: make
-            - run: make check
-            - run: make distcheck
+  autotools:
+    name: Autotools (${{ matrix.os }}, ${{ matrix.compiler.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+        compiler:
+          - name: GCC
+            cc: gcc
+            cxx: g++
+            package: g++
+          - name: Clang
+            cc: clang
+            cxx: clang++
+            package: clang
+    env:
+      CC: ${{ matrix.compiler.cc }}
+      CXX: ${{ matrix.compiler.cxx }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          persist-credentials: false
 
-    nix-matrix:
-        runs-on: ubuntu-latest
-        outputs:
-            matrix: ${{ steps.set-matrix.outputs.matrix }}
-        steps:
-            - uses: actions/checkout@v4
-            - uses: cachix/install-nix-action@v27
-              with:
-                  extra_nix_config: "system-features = nixos-test benchmark big-parallel kvm"
-                  nix_path: nixpkgs=channel:nixos-24.05
-            - id: set-matrix
-              name: Generate Nix Matrix
-              run: |
-                  set -Eeu
-                  matrix="$(nix eval --json '.#githubActions.matrix')"
-                  echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            "${{ matrix.compiler.package }}" \
+            autoconf \
+            automake \
+            libjson-c-dev \
+            libtool \
+            libyaml-dev \
+            m4 \
+            make \
+            pkg-config
 
-    nix:
-        name: "nix (${{ matrix.name }})"
-        runs-on: ${{ matrix.os }}
-        needs: nix-matrix
-        strategy:
-            matrix: ${{fromJSON(needs.nix-matrix.outputs.matrix)}}
-        steps:
-            - uses: actions/checkout@v4
+      - name: Generate configure script
+        run: autoreconf --force --install --verbose
 
-            - name: Set Up Build Cache
-              uses: actions/cache@v4
-              id: nix-cache
-              with:
-                  path: /tmp/nix-store.nar
-                  key: nix-store.nar-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ matrix.attr }}
-                  restore-keys: |
-                      nix-store.nar-${{ runner.os }}-${{ hashFiles('flake.lock') }}-${{ matrix.attr }}
-                      nix-store.nar-${{ runner.os }}-${{ hashFiles('flake.lock') }}-
-                      nix-store.nar-${{ runner.os }}-
+      - name: Configure
+        run: |
+          mkdir build-autotools
+          cd build-autotools
+          ../configure --prefix="$RUNNER_TEMP/libmustache"
 
-            - uses: cachix/install-nix-action@v27
-              with:
-                  nix_path: nixpkgs=channel:nixos-24.05
-                  extra_nix_config: "system-features = nixos-test benchmark big-parallel kvm"
+      - name: Build and test
+        working-directory: build-autotools
+        run: |
+          make --jobs="$(nproc)"
+          make check
+          make install
 
-            - name: Import Nix Store Cache
-              if: "steps.nix-cache.outputs.cache-hit == 'true'"
-              run: |
-                  nix-store --import < /tmp/nix-store.nar
+      - name: Verify installed command
+        run: |
+          "$RUNNER_TEMP/libmustache/bin/mustachec" -v
+          rendered=$("$RUNNER_TEMP/libmustache/bin/mustachec" \
+            -t tests/fixtures/standard.mustache \
+            -d tests/fixtures/standard.json)
+          test -n "$rendered"
 
-            - run: nix build -L ".#${{ matrix.attr }}"
+      - name: Verify distribution archive
+        working-directory: build-autotools
+        run: make distcheck
 
-            - name: Export Nix Store Cache
-              shell: bash
-              # partially based on https://github.com/NixOS/nix/issues/1245#issuecomment-282586759
-              run: |
-                  drv="$(nix-store -qd "$(readlink result)")"
-                  drvRefs="$( echo "$drv" | xargs nix-store -q --references )"
-                  ( echo "$drvRefs" | grep '[.]drv$' | xargs nix-store -q --outputs ;
-                    echo "$drvRefs" | grep -v '[.]drv$' ) | \
-                      xargs nix-store -r | \
-                      xargs nix-store -qR |
-                      xargs nix-store --export > /tmp/nix-store.nar
+  cmake:
+    name: CMake (${{ matrix.compiler.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - name: GCC
+            cc: gcc
+            cxx: g++
+            package: g++
+          - name: Clang
+            cc: clang
+            cxx: clang++
+            package: clang
+    env:
+      CC: ${{ matrix.compiler.cc }}
+      CXX: ${{ matrix.compiler.cxx }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            "${{ matrix.compiler.package }}" \
+            cmake \
+            libjson-c-dev \
+            libyaml-dev \
+            ninja-build \
+            pkg-config
+
+      - name: Configure, build, and test
+        run: |
+          cmake -S . -B build-cmake -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/libmustache"
+          cmake --build build-cmake --parallel
+          ctest --test-dir build-cmake --output-on-failure
+          cmake --install build-cmake
+
+      - name: Verify installed package
+        run: |
+          "$RUNNER_TEMP/libmustache/bin/mustachec" -v
+          cmake -S tests/cmake-consumer -B build-consumer -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/libmustache"
+          cmake --build build-consumer --parallel
+          build-consumer/mustache_consumer
+
+  sanitizers:
+    name: Sanitizers (${{ matrix.compiler.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - name: GCC
+            cc: gcc
+            cxx: g++
+            package: g++
+          - name: Clang
+            cc: clang
+            cxx: clang++
+            package: clang
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      CC: ${{ matrix.compiler.cc }}
+      CXX: ${{ matrix.compiler.cxx }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            "${{ matrix.compiler.package }}" \
+            cmake \
+            libjson-c-dev \
+            libyaml-dev \
+            ninja-build \
+            pkg-config
+
+      - name: Build and test with sanitizers
+        run: |
+          cmake -S . -B build-sanitized -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DMUSTACHE_ENABLE_SANITIZERS=ON
+          cmake --build build-sanitized --parallel
+          ctest --test-dir build-sanitized --output-on-failure
+
+  nix-matrix:
+    name: Generate Nix matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+
+      - id: set-matrix
+        name: Generate matrix
+        run: |
+          set -Eeu
+          matrix=$(nix eval --json '.#githubActions.matrix')
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  nix:
+    name: Nix (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    needs: nix-matrix
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.nix-matrix.outputs.matrix) }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+
+      - name: Build check
+        run: nix build --print-build-logs ".#${{ matrix.attr }}"

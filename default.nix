@@ -17,13 +17,14 @@ in
         url = "https://github.com/jbboehr/mustache-spec/archive/${lock.nodes.mustache_spec.locked.rev}.tar.gz";
         sha256 = lock.nodes.mustache_spec.locked.narHash;
       })) {},
+    libmustacheSrc ? ./.,
     checkSupport ? true,
     cmakeSupport ? false,
     debugSupport ? false,
+    sanitizerSupport ? false,
   }:
     pkgs.callPackage ./nix/derivation.nix {
-      inherit stdenv;
-      inherit mustache_spec;
-      inherit checkSupport cmakeSupport debugSupport;
+      inherit stdenv mustache_spec libmustacheSrc;
+      inherit checkSupport cmakeSupport debugSupport sanitizerSupport;
       inherit gitignoreFilterWith;
     }

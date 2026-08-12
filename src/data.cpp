@@ -164,9 +164,6 @@ Data * searchStackNR(Stack<Data *> * stack, std::string * key)
 #if defined(MUSTACHE_HAVE_LIBJSON)
 static void _createFromJSON(Data * data, struct json_object * object)
 {
-  Data * child = NULL;
-  int cindex = 0;
-  
   switch( json_object_get_type(object) ) {
     case json_type_null:
       data->type = Data::TypeString;
@@ -192,9 +189,11 @@ static void _createFromJSON(Data * data, struct json_object * object)
       json_object_object_foreach(object, key, value)
       {
         ckey.assign(key);
-        child = new Data();
-        _createFromJSON(child, value);
-        data->data.insert(std::pair<std::string,Data *>(ckey,child));
+        std::unique_ptr<Data> ownedChild(new Data());
+        _createFromJSON(ownedChild.get(), value);
+        if( data->data.insert(std::make_pair(ckey, ownedChild.get())).second ) {
+          ownedChild.release();
+        }
       }
       break;
     }
@@ -203,11 +202,14 @@ static void _createFromJSON(Data * data, struct json_object * object)
       data->init(Data::TypeArray, len);
       
       struct json_object * array_item;
-      for( int i = 0; i < len; i++, cindex++ ) {
+      for( int i = 0; i < len; i++ ) {
         array_item = json_object_array_get_idx(object, i);
-        data->array[cindex] = child = new Data();
-        _createFromJSON(child, array_item);
+        std::unique_ptr<Data> ownedChild(new Data());
+        _createFromJSON(ownedChild.get(), array_item);
+        data->array.push_back(ownedChild.get());
+        ownedChild.release();
       }
+      data->length = static_cast<int>(data->array.size());
       break;
     }
     default: {
@@ -222,11 +224,15 @@ Data * Data::createFromJSON(const char * string)
   if( result == NULL ) {
     throw Exception("Invalid JSON data");
   }
-  Data * data = new Data();
-  data->type = Data::TypeNone;
-  _createFromJSON(data, result);
+  std::unique_ptr<Data> data(new Data());
+  try {
+    _createFromJSON(data.get(), result);
+  } catch( ... ) {
+    json_object_put(result);
+    throw;
+  }
   json_object_put(result);
-  return data;
+  return data.release();
 }
 #else
 Data * Data::createFromJSON(const char * string)
@@ -238,9 +244,6 @@ Data * Data::createFromJSON(const char * string)
 #if defined(MUSTACHE_HAVE_LIBYAML)
 static void _createFromYAML(Data * data, yaml_document_t * document, yaml_node_t * node)
 {
-  Data * child = NULL;
-  int cindex = 0;
-  
   switch( node->type ) {
     case YAML_SCALAR_NODE: {
       char * value = reinterpret_cast<char *>(node->data.scalar.value);
@@ -258,9 +261,11 @@ static void _createFromYAML(Data * data, yaml_document_t * document, yaml_node_t
         char * keyValue = reinterpret_cast<char *>(keyNode->data.scalar.value);
         
         ckey.assign(keyValue);
-        child = new Data();
-        _createFromYAML(child, document, valueNode);
-        data->data.insert(std::pair<std::string,Data *>(ckey,child));
+        std::unique_ptr<Data> ownedChild(new Data());
+        _createFromYAML(ownedChild.get(), document, valueNode);
+        if( data->data.insert(std::make_pair(ckey, ownedChild.get())).second ) {
+          ownedChild.release();
+        }
       }
       break;
     }
@@ -269,11 +274,14 @@ static void _createFromYAML(Data * data, yaml_document_t * document, yaml_node_t
       data->init(Data::TypeArray, len);
       
       yaml_node_item_t * item;
-      for( item = node->data.sequence.items.start; item < node->data.sequence.items.top; item++, cindex++) {
+      for( item = node->data.sequence.items.start; item < node->data.sequence.items.top; item++ ) {
         yaml_node_t * valueNode = yaml_document_get_node(document, *item);
-        data->array[cindex] = child = new Data();
-        _createFromYAML(child, document, valueNode);
+        std::unique_ptr<Data> ownedChild(new Data());
+        _createFromYAML(ownedChild.get(), document, valueNode);
+        data->array.push_back(ownedChild.get());
+        ownedChild.release();
       }
+      data->length = static_cast<int>(data->array.size());
       break;
     }
     default: {
@@ -286,23 +294,35 @@ Data * Data::createFromYAML(const char * string)
 {
   yaml_parser_t parser;
   yaml_document_t document;
-  yaml_parser_initialize(&parser);
+  if( yaml_parser_initialize(&parser) == 0 ) {
+    throw Exception("Failed to initialize yaml parser");
+  }
   
   const unsigned char * input = reinterpret_cast<const unsigned char *>(string);
   
   yaml_parser_set_input_string(&parser, input, strlen(string));
   if( 0 == yaml_parser_load(&parser, &document) ) {
+    yaml_parser_delete(&parser);
     throw Exception("Failed to parse yaml document");
   }
-  
-  Data * data = new Data();
-  data->type = Data::TypeNone;
-  _createFromYAML(data, &document, yaml_document_get_root_node(&document));
-  
+
+  std::unique_ptr<Data> data(new Data());
+  try {
+    yaml_node_t * root = yaml_document_get_root_node(&document);
+    if( root == NULL ) {
+      throw Exception("Empty yaml document");
+    }
+    _createFromYAML(data.get(), &document, root);
+  } catch( ... ) {
+    yaml_document_delete(&document);
+    yaml_parser_delete(&parser);
+    throw;
+  }
+
   yaml_document_delete(&document);
   yaml_parser_delete(&parser);
-  
-  return data;
+
+  return data.release();
 }
 #else
 Data * Data::createFromYAML(const char * string)

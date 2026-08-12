@@ -12,7 +12,11 @@ static void add_lambda(mustache::Lambda * lambda, mustache::Data * data)
 	child->type = mustache::Data::TypeLambda;
 	child->lambda = lambda;
 	if( data->type == mustache::Data::TypeMap ) {
-		data->data.erase("lambda");
+		mustache::Data::Map::iterator existing = data->data.find("lambda");
+		if( existing != data->data.end() ) {
+			delete existing->second;
+			data->data.erase(existing);
+		}
 		data->data.insert(std::pair<std::string,mustache::Data *>("lambda", child));
 	} else {
 		std::cerr << "Root data was not a map!" << std::endl;
@@ -60,7 +64,7 @@ std::string MultipleCallsLambda::invoke(std::string * text, mustache::Renderer *
 
 
 std::string SectionLambda::invoke() {
-	throw new mustache::Exception("This is a section lambda");
+	throw mustache::Exception("This is a section lambda");
 }
 
 std::string SectionLambda::invoke(std::string * text, mustache::Renderer * renderer) {
@@ -75,7 +79,7 @@ std::string SectionLambda::invoke(std::string * text, mustache::Renderer * rende
 
 
 std::string SectionExpansionLambda::invoke() {
-	throw new mustache::Exception("This is a section lambda");
+	throw mustache::Exception("This is a section lambda");
 }
 
 std::string SectionExpansionLambda::invoke(std::string * text, mustache::Renderer * renderer) {
@@ -88,7 +92,7 @@ std::string SectionExpansionLambda::invoke(std::string * text, mustache::Rendere
 
 
 std::string SectionAlternateDelimitersLambda::invoke() {
-	throw new mustache::Exception("This is a section lambda");
+	throw mustache::Exception("This is a section lambda");
 }
 
 std::string SectionAlternateDelimitersLambda::invoke(std::string * text, mustache::Renderer * renderer) {
@@ -101,7 +105,7 @@ std::string SectionAlternateDelimitersLambda::invoke(std::string * text, mustach
 
 
 std::string SectionMultipleCallsLambda::invoke() {
-	throw new mustache::Exception("This is a section lambda");
+	throw mustache::Exception("This is a section lambda");
 }
 
 std::string SectionMultipleCallsLambda::invoke(std::string * text, mustache::Renderer * renderer) {
@@ -111,4 +115,3 @@ std::string SectionMultipleCallsLambda::invoke(std::string * text, mustache::Ren
 	st << "__";
 	return st.str();
 }
-

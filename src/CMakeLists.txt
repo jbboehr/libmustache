@@ -1,36 +1,74 @@
+set(MUSTACHE_SOURCES
+    data.cpp
+    lambda.cpp
+    mustache.cpp
+    node.cpp
+    renderer.cpp
+    stack.cpp
+    tokenizer.cpp
+    utils.cpp
+)
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+set(MUSTACHE_PUBLIC_HEADERS
+    data.hpp
+    exception.hpp
+    lambda.hpp
+    mustache.hpp
+    node.hpp
+    renderer.hpp
+    stack.hpp
+    tokenizer.hpp
+    utils.hpp
+)
 
-set(SOURCE_FILES
-        data.cpp
-        lambda.cpp
-        mustache.cpp
-        node.cpp
-        renderer.cpp
-        stack.cpp
-        tokenizer.cpp
-        utils.cpp)
+function(mustache_configure_library target)
+    target_compile_features(${target} PUBLIC cxx_std_11)
+    target_include_directories(${target}
+        PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    )
+    target_link_libraries(${target}
+        PRIVATE
+            ${MUSTACHE_JSON_TARGET}
+            ${MUSTACHE_YAML_TARGET}
+    )
+    mustache_apply_build_options(${target})
+endfunction()
 
-set(HEADERS
-        data.hpp
-        exception.hpp
-        lambda.hpp
-        mustache.hpp
-        ${CMAKE_CURRENT_BINARY_DIR}/mustache_config.h
-        node.hpp
-        renderer.hpp
-        stack.hpp
-        tokenizer.hpp
-        utils.hpp)
+add_library(mustache SHARED ${MUSTACHE_SOURCES} ${MUSTACHE_PUBLIC_HEADERS})
+add_library(mustache::mustache ALIAS mustache)
+mustache_configure_library(mustache)
+set_target_properties(mustache PROPERTIES
+    VERSION "${MUSTACHE_ABI_VERSION}.0.0"
+    SOVERSION "${MUSTACHE_ABI_VERSION}"
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
+)
 
-add_library(mustache SHARED ${SOURCE_FILES} ${HEADERS})
-add_library(mustache_static STATIC ${SOURCE_FILES} ${HEADERS})
+add_library(mustache_static STATIC ${MUSTACHE_SOURCES} ${MUSTACHE_PUBLIC_HEADERS})
+add_library(mustache::mustache_static ALIAS mustache_static)
+mustache_configure_library(mustache_static)
+if(NOT WIN32)
+    set_target_properties(mustache_static PROPERTIES OUTPUT_NAME mustache)
+endif()
 
 install(TARGETS mustache mustache_static
-  EXPORT mustache
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    EXPORT mustacheTargets
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
 
-install(FILES ${HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mustache)
-install(EXPORT mustache DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cmake)
+install(FILES
+    ${MUSTACHE_PUBLIC_HEADERS}
+    "${CMAKE_CURRENT_BINARY_DIR}/mustache_config.h"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/mustache"
+)
+
+install(EXPORT mustacheTargets
+    FILE mustacheTargets.cmake
+    NAMESPACE mustache::
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/mustache"
+)

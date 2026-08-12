@@ -65,6 +65,7 @@ class Data {
     //! Constructor
     Data() : 
         type(Data::TypeNone),
+        length(0),
         val(NULL),
         lambda(NULL) {};
     Data(Data::Type type, int size) : val(NULL), lambda(NULL) {
@@ -108,5 +109,4 @@ class DataStack : Stack<Data *> {
 } // namespace Mustache
 
 #endif
-
 

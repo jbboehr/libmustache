@@ -1,5 +1,5 @@
 {
-  description = "libmustache";
+  description = "C++ implementation of Mustache templates";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
@@ -30,25 +30,20 @@
     mustache_spec,
     gitignore,
     pre-commit-hooks,
-    systems,
     nix-github-actions,
     ...
   }:
     flake-utils.lib.eachDefaultSystem (
       system: let
         pkgs = nixpkgs.legacyPackages.${system};
-        lib = pkgs.lib;
-        src' = gitignore.lib.gitignoreSource ./.;
-
-        src = pkgs.lib.cleanSourceWith {
+        src = gitignore.lib.gitignoreSource ./.;
+        packageSrc = pkgs.lib.cleanSourceWith {
           name = "libmustache-source";
-          src = src';
+          inherit src;
           filter = gitignore.lib.gitignoreFilterWith {
             basePath = ./.;
             extraRules = ''
               .clang-format
-              composer.json
-              composer.lock
               .editorconfig
               .envrc
               .gitattributes
@@ -61,8 +56,16 @@
           };
         };
 
+        makePackage = args:
+          pkgs.callPackage ./default.nix ({
+              mustache_spec = mustache_spec.packages.${system}.mustache-spec;
+              libmustacheSrc = packageSrc;
+              inherit (gitignore.lib) gitignoreFilterWith;
+            }
+            // args);
+
         pre-commit-check = pre-commit-hooks.lib.${system}.run {
-          src = src';
+          inherit src;
           hooks = {
             actionlint.enable = true;
             alejandra.enable = true;
@@ -70,38 +73,53 @@
           };
         };
       in rec {
-        packages = flake-utils.lib.flattenTree rec {
-          libmustache = pkgs.callPackage ./default.nix {
-            mustache_spec = mustache_spec.packages.${system}.mustache-spec;
-            inherit (gitignore.lib) gitignoreFilterWith;
-            cmakeSupport = false;
-          };
-          libmustache-cmake = pkgs.callPackage ./default.nix {
-            mustache_spec = mustache_spec.packages.${system}.mustache-spec;
-            inherit (gitignore.lib) gitignoreFilterWith;
-            cmakeSupport = true;
-          };
+        packages = rec {
+          libmustache = makePackage {cmakeSupport = false;};
+          libmustache-cmake = makePackage {cmakeSupport = true;};
           default = libmustache;
         };
 
-        checks = packages;
+        checks = {
+          inherit (packages) libmustache libmustache-cmake;
+          libmustache-sanitized = makePackage {
+            cmakeSupport = true;
+            debugSupport = true;
+            sanitizerSupport = true;
+          };
+          pre-commit = pre-commit-check;
+        };
+
+        apps = rec {
+          mustachec =
+            (flake-utils.lib.mkApp {
+              drv = packages.libmustache;
+              exePath = "/bin/mustachec";
+            })
+            // {inherit (packages.libmustache) meta;};
+          default = mustachec;
+        };
 
         devShells.default = pkgs.mkShell {
-          inputsFrom = [packages.default];
-          shellHook = ''
-            ${pre-commit-check.shellHook}
-          '';
+          inputsFrom = [packages.libmustache packages.libmustache-cmake];
+          shellHook = pre-commit-check.shellHook;
         };
 
         formatter = pkgs.alejandra;
       }
     )
     // {
-      # prolly gonna break at some point
       githubActions.matrix.include = let
-        cleanFn = v: v // {name = builtins.replaceStrings ["githubActions." "checks." "x86_64-linux."] ["" "" ""] v.attr;};
+        cleanName = value:
+          value
+          // {
+            name =
+              builtins.replaceStrings
+              ["githubActions." "checks." "x86_64-linux." "\""]
+              ["" "" "" ""]
+              value.attr;
+          };
       in
-        builtins.map cleanFn
+        builtins.map cleanName
         (nix-github-actions.lib.mkGithubMatrix {
           attrPrefix = "checks";
           checks = nixpkgs.lib.getAttrs ["x86_64-linux"] self.checks;

@@ -3,6 +3,7 @@
 #define MUSTACHE_STACK_HPP
 
 #include "mustache_config.h"
+#include "exception.hpp"
 
 namespace mustache {
 
