@@ -14,11 +14,66 @@ AC_PROG_CXX
 AC_LANG([C++])
 LT_INIT
 PKG_PROG_PKG_CONFIG
-AX_CXX_COMPILE_STDCXX_11
 
 MUSTACHE_CXXFLAGS=
 MUSTACHE_CPPFLAGS=
 MUSTACHE_LDFLAGS=
+
+AC_CACHE_CHECK([for a $CXX option that enables C++17],
+    [mustache_cv_cxx17_flag], [
+    mustache_save_CXXFLAGS=$CXXFLAGS
+    mustache_cv_cxx17_flag=unsupported
+    mustache_cxx17_default=no
+    CXXFLAGS=$mustache_save_CXXFLAGS
+    AC_COMPILE_IFELSE([
+        AC_LANG_PROGRAM([[
+            #include <optional>
+            #include <string_view>
+            #include <utility>
+        ]], [[
+            std::optional<std::string_view> value("mustache");
+            auto pair = std::make_pair(value->size(), true);
+            auto [size, valid] = pair;
+            return valid && size > 0 ? 0 : 1;
+        ]])
+    ], [mustache_cxx17_default=yes])
+    for mustache_cxx17_flag in \
+            -std=c++17 -std=c++1z -std=gnu++17 -std=gnu++1z; do
+        CXXFLAGS="$mustache_save_CXXFLAGS $mustache_cxx17_flag"
+        AC_COMPILE_IFELSE([
+            AC_LANG_PROGRAM([[
+                #include <optional>
+                #include <string_view>
+                #include <utility>
+            ]], [[
+                std::optional<std::string_view> value("mustache");
+                auto pair = std::make_pair(value->size(), true);
+                auto [size, valid] = pair;
+                return valid && size > 0 ? 0 : 1;
+            ]])
+        ], [
+            mustache_cv_cxx17_flag=$mustache_cxx17_flag
+            break
+        ])
+    done
+    AS_IF([test "x$mustache_cv_cxx17_flag" = "xunsupported" &&
+            test "x$mustache_cxx17_default" = "xyes"], [
+        mustache_cv_cxx17_flag=none
+    ])
+    CXXFLAGS=$mustache_save_CXXFLAGS
+])
+AS_CASE([$mustache_cv_cxx17_flag],
+    [unsupported], [AC_MSG_ERROR([a compiler with C++17 support is required])],
+    [none], [MUSTACHE_CXX_STANDARD_FLAG=],
+    [
+        CXXFLAGS="$CXXFLAGS $mustache_cv_cxx17_flag"
+        MUSTACHE_CXX_STANDARD_FLAG=$mustache_cv_cxx17_flag
+    ])
+AC_SUBST([MUSTACHE_CXX_STANDARD_FLAG])
+AC_DEFINE([CXX_STANDARD], [17], [Required C++ standard version])
+AC_DEFINE([HAVE_CXX17], [1], [Define if the compiler supports C++17])
+AC_DEFINE([HAVE_CXX11], [1],
+    [Deprecated compatibility alias; C++17 support includes C++11])
 
 AC_ARG_ENABLE([debug],
     [AS_HELP_STRING([--enable-debug], [enable debug mode])],
@@ -102,7 +157,6 @@ PKG_CHECK_MODULES([YAML], [yaml-0.1], [
 AC_CHECK_HEADERS([cstdlib dirent.h exception fstream iostream list map memory sstream stack stdexcept string utility vector yaml.h])
 AC_TYPE_INT32_T
 AC_TYPE_LONG_LONG_INT
-AC_CXX_STL_HASH
 
 AC_SUBST([MUSTACHE_CXXFLAGS])
 AC_SUBST([MUSTACHE_CPPFLAGS])

@@ -12,6 +12,24 @@
 #define MUSTACHE_EXPECTED_VERSION "0.5.0"
 #endif
 
+#if defined(_MSVC_LANG)
+#if _MSVC_LANG < 201703L
+#error "The installed mustache target must require C++17"
+#endif
+#elif __cplusplus < 201703L
+#error "The installed mustache target must require C++17"
+#endif
+
+#if !defined(MUSTACHE_CXX_STANDARD) || MUSTACHE_CXX_STANDARD != 17
+#error "mustache_config.h must advertise C++17"
+#endif
+#ifndef MUSTACHE_HAVE_CXX17
+#error "mustache_config.h must advertise C++17 support"
+#endif
+#ifndef MUSTACHE_HAVE_CXX11
+#error "The deprecated C++11 compatibility macro must remain defined"
+#endif
+
 static_assert(!std::is_copy_constructible<mustache::Data>::value,
     "mustache::Data must not be copy constructible");
 static_assert(!std::is_copy_assignable<mustache::Data>::value,

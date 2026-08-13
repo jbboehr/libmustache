@@ -22,7 +22,8 @@ set(MUSTACHE_PUBLIC_HEADERS
 )
 
 function(mustache_configure_library target)
-    target_compile_features(${target} PUBLIC cxx_std_11)
+    target_compile_features(${target} PUBLIC cxx_std_${MUSTACHE_CXX_STANDARD})
+    set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
     target_include_directories(${target}
         PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>

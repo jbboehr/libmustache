@@ -177,7 +177,7 @@ jobs:
           export PKG_CONFIG_PATH="$RUNNER_TEMP/libmustache/lib/pkgconfig"
           pkg_version=$(pkg-config --modversion mustache)
           read -r -a pkg_config_flags <<< "$(pkg-config --cflags --libs mustache)"
-          "$CXX" tests/cmake-consumer/main.cpp \
+          "$CXX" -std=c++11 tests/cmake-consumer/main.cpp \
             "-DMUSTACHE_EXPECTED_VERSION=\"$pkg_version\"" \
             "${pkg_config_flags[@]}" \
             -o pkg-config-consumer

@@ -278,9 +278,5 @@ static void showVersion()
 #else
   fprintf(stdout, "JSON support: none\n");
 #endif
-#ifdef MUSTACHE_HAVE_CXX11
-  fprintf(stdout, "C++11 support: enabled\n");
-#else
-  fprintf(stdout, "C++11 support: disabled\n");
-#endif
+  fprintf(stdout, "C++ standard: C++%d\n", MUSTACHE_CXX_STANDARD);
 }

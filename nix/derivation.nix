@@ -123,6 +123,7 @@ stdenv.mkDerivation (finalAttrs: {
         )
       ''}
       "$CXX" "$src/tests/cmake-consumer/main.cpp" \
+        -std=c++11 \
         -DMUSTACHE_EXPECTED_VERSION='"${finalAttrs.version}"' \
         "''${pkg_config_flags[@]}" \
         "''${pkg_config_consumer_flags[@]}" \

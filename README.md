@@ -4,7 +4,7 @@
 [![GitHub CI Build Status](https://github.com/jbboehr/libmustache/workflows/ci/badge.svg)](https://github.com/jbboehr/libmustache/actions?query=workflow%3Aci)
 [![Appveyor Build status](https://ci.appveyor.com/api/projects/status/1bwyjyo1cel03b2r?svg=true)](https://ci.appveyor.com/project/jbboehr/libmustache)
 
-libmustache is a C++11 implementation of
+libmustache is a C++17 implementation of
 [Mustache](https://mustache.github.com/). It provides shared and static
 libraries plus the `mustachec` command-line renderer. It was originally written
 for [php-mustache](https://github.com/jbboehr/php-mustache), but can be consumed
@@ -12,7 +12,7 @@ as an ordinary C++ library.
 
 ## Requirements
 
-- A C++11 compiler
+- A C++17 compiler
 - json-c
 - libyaml
 - CMake 3.18 or Autoconf 2.69 with Automake and Libtool
@@ -88,6 +88,11 @@ nix run .#mustachec -- -v
 
 The default Nix package uses Autotools; `libmustache-cmake` exercises the CMake
 packaging path.
+
+The installed `mustache_config.h` defines `MUSTACHE_CXX_STANDARD` as `17` and
+defines `MUSTACHE_HAVE_CXX17`. `MUSTACHE_HAVE_CXX11` remains defined as a
+deprecated source-compatibility alias because the required C++17 baseline
+necessarily includes C++11 support.
 
 ## Windows
 

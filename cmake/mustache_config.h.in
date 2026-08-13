@@ -6,12 +6,11 @@
 #define MUSTACHE_VERSION_MINOR @MUSTACHE_VERSION_MINOR@
 #define MUSTACHE_VERSION_PATCH @MUSTACHE_VERSION_PATCH@
 
+#define MUSTACHE_CXX_STANDARD @MUSTACHE_CXX_STANDARD@
+#define MUSTACHE_HAVE_CXX17 1
+/* Deprecated compatibility alias: the required C++17 baseline includes C++11. */
 #define MUSTACHE_HAVE_CXX11 1
 #define MUSTACHE_HAVE_LIBJSON 1
 #define MUSTACHE_HAVE_LIBYAML 1
-
-#define MUSTACHE_HASH_MAP_H <unordered_map>
-#define MUSTACHE_HASH_NAMESPACE std
-#define MUSTACHE_HASH_MAP_CLASS unordered_map
 
 #endif

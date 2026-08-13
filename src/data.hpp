@@ -8,9 +8,8 @@
 #include <memory>
 #include <map>
 #include <string>
+#include <unordered_map>
 #include <vector>
-
-#include MUSTACHE_HASH_MAP_H
 
 #include "exception.hpp"
 #include "lambda.hpp"
@@ -27,7 +26,7 @@ namespace mustache {
 class Data {
   public:
     typedef std::string String;
-    typedef MUSTACHE_HASH_NAMESPACE::MUSTACHE_HASH_MAP_CLASS<std::string,Data *> Map;
+    typedef std::unordered_map<std::string,Data *> Map;
     typedef std::list<Data *> List;
     typedef std::vector<Data *> Array;
     

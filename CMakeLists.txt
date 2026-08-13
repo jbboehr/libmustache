@@ -10,6 +10,13 @@ set(MUSTACHE_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(MUSTACHE_VERSION_MAJOR "${PROJECT_VERSION_MAJOR}")
 set(MUSTACHE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
 set(MUSTACHE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
+set(MUSTACHE_CXX_STANDARD 17)
+
+# Keep pkg-config consumers on the compiler-specific spelling selected by
+# CMake (for example, -std=c++1z on GCC 7). Some compilers express a language
+# mode with more than one option, while others need no option at all.
+string(JOIN " " MUSTACHE_CXX_STANDARD_FLAG
+    ${CMAKE_CXX17_STANDARD_COMPILE_OPTION})
 
 set(MUSTACHE_SPEC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/spec/specs" CACHE PATH
     "Path to the mustache specification suites")

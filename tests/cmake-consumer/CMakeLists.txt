@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.15)
 project(mustache_consumer LANGUAGES CXX)
 
+# Start below libmustache's requirement to verify that the imported target
+# raises consumers to the public C++17 baseline.
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 set(MUSTACHE_CONSUMER_LINKAGE shared CACHE STRING
     "Installed mustache component to consume (shared or static)")
 set_property(CACHE MUSTACHE_CONSUMER_LINKAGE PROPERTY STRINGS shared static)
