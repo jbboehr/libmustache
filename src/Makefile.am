@@ -5,6 +5,7 @@ CLEANFILES = mustache_config.h
 # include_HEADERS = mustache.hpp mustache_config.h
 mustacheincludedir = $(includedir)/mustache
 mustacheinclude_HEADERS = \
+	compiled_template.hpp \
 	lambda.hpp \
 	data.hpp \
 	exception.hpp \
@@ -18,6 +19,8 @@ mustacheinclude_HEADERS = \
 
 lib_LTLIBRARIES = libmustache.la
 libmustache_la_SOURCES = \
+	compiled_template.cpp \
+	compiled_template.hpp \
 	lambda.cpp \
 	lambda.hpp \
 	data.cpp \

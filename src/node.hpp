@@ -126,18 +126,21 @@ class Node {
     //! Destructor
     ~Node();
 
-    std::string children_to_template_string(const std::string& start, const std::string& stop);
+    std::string children_to_template_string(
+        const std::string& start, const std::string& stop) const;
     
     //! Set data
     void setData(const std::string& data);
     
     //! Serialize
-    std::vector<uint8_t> * serialize();
+    std::vector<uint8_t> * serialize() const;
 
     //! Serialize with explicit resource limits
-    std::vector<uint8_t> * serialize(const SerializationLimits& limits);
+    std::vector<uint8_t> * serialize(
+        const SerializationLimits& limits) const;
 
-    std::string to_template_string(const std::string& start, const std::string& stop);
+    std::string to_template_string(
+        const std::string& start, const std::string& stop) const;
     
     //! Unserialize
     static Node * unserialize(std::vector<uint8_t> & serial, size_t offset, size_t * vpos);

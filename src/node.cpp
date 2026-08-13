@@ -404,12 +404,13 @@ void Node::resetMovedFrom() noexcept
 
 Node::~Node() = default;
 
-std::string Node::children_to_template_string(const std::string& start, const std::string& stop)
+std::string Node::children_to_template_string(
+    const std::string& start, const std::string& stop) const
 {
   std::string template_string;
 
   if( children.size() > 0 ) {
-    Node::Children::iterator it;
+    Node::Children::const_iterator it;
     for( it = children.begin() ; it != children.end(); it++ ) {
       if( *it == NULL ) {
         throw Exception("Invalid null child node");
@@ -441,13 +442,14 @@ void Node::setData(const std::string& data)
   dataParts.swap(nextDataParts);
 }
 
-std::vector<uint8_t> * Node::serialize()
+std::vector<uint8_t> * Node::serialize() const
 {
   const SerializationLimits limits;
   return serialize(limits);
 }
 
-std::vector<uint8_t> * Node::serialize(const SerializationLimits& limits)
+std::vector<uint8_t> * Node::serialize(
+    const SerializationLimits& limits) const
 {
   std::unique_ptr<std::vector<uint8_t> > output(
       new std::vector<uint8_t>());
@@ -458,7 +460,8 @@ std::vector<uint8_t> * Node::serialize(const SerializationLimits& limits)
   return output.release();
 }
 
-std::string Node::to_template_string(const std::string& start, const std::string& stop)
+std::string Node::to_template_string(
+    const std::string& start, const std::string& stop) const
 {
   std::string template_string;
 
@@ -509,7 +512,7 @@ std::string Node::to_template_string(const std::string& start, const std::string
       template_string.append(stop);
     case Node::TypeRoot: // a root node only has children, so start here
       if( children.size() > 0 ) {
-        Node::Children::iterator it;
+        Node::Children::const_iterator it;
         for( it = children.begin() ; it != children.end(); it++ ) {
           if( *it == NULL ) {
             throw Exception("Invalid null child node");

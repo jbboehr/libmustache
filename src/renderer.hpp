@@ -2,6 +2,7 @@
 #ifndef MUSTACHE_RENDERER_HPP
 #define MUSTACHE_RENDERER_HPP
 
+#include <functional>
 #include <iostream>
 #include <map>
 #include <string>
@@ -14,6 +15,8 @@
 
 namespace mustache {
 
+class Mustache;
+
 
 /*! \class Renderer
     \brief Renders a token tree
@@ -22,8 +25,10 @@ namespace mustache {
 */
 class Renderer {
   private:
+    typedef std::function<const Node *(const std::string&)> PartialResolver;
+
     //! The root token node
-    Node * _node;
+    const Node * _node;
     
     //! The root data node
     Data * _data;
@@ -32,15 +37,22 @@ class Renderer {
     Stack<Data *> * _stack;
     
     //! Partials
-    Node::Partials * _partials;
+    const Node::Partials * _partials;
+
+    //! Optional lookup for opaque compiled partials
+    PartialResolver _partialResolver;
     
     //! Current output buffer
     std::string * _output;
     
     //! Renders a single node
-    void _renderNode(Node * node);
+    void _renderNode(const Node * node);
     
-    Data * _lookup(Node * node);
+    Data * _lookup(const Node * node);
+
+    void setPartialResolver(PartialResolver resolver);
+
+    friend class Mustache;
     
     bool _strictPaths;
     
@@ -64,16 +76,17 @@ class Renderer {
     void clear();
     
     //! Initializes the renderer
-    void init(Node * node, Data * data, Node::Partials * partials, std::string * output);
+    void init(const Node * node, Data * data,
+        const Node::Partials * partials, std::string * output);
     
     //! Sets the current root token node
-    void setNode(Node * node);
+    void setNode(const Node * node);
     
     //! Sets the current root data node
     void setData(Data * data);
     
     //! Sets the current partials
-    void setPartials(Node::Partials * partials);
+    void setPartials(const Node::Partials * partials);
     
     //! Sets the current output buffer
     void setOutput(std::string * output);
@@ -82,7 +95,7 @@ class Renderer {
     void render();
 
     //! Renders the given node to the given output using the stored variables
-    void renderForLambda(Node * node, std::string * output);
+    void renderForLambda(const Node * node, std::string * output);
 };
 
 

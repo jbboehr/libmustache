@@ -1,6 +1,8 @@
 
 #include "renderer.hpp"
 
+#include <utility>
+
 namespace mustache {
 
 
@@ -18,10 +20,12 @@ void Renderer::clear()
   }
   _stack = NULL;
   _partials = NULL;
+  _partialResolver = PartialResolver();
   _output = NULL;
 }
 
-void Renderer::init(Node * node, Data * data, Node::Partials * partials, std::string * output)
+void Renderer::init(const Node * node, Data * data,
+    const Node::Partials * partials, std::string * output)
 {
   clear();
   _node = node;
@@ -33,7 +37,7 @@ void Renderer::init(Node * node, Data * data, Node::Partials * partials, std::st
   _output = output;
 }
 
-void Renderer::setNode(Node * node)
+void Renderer::setNode(const Node * node)
 {
   _node = node;
 }
@@ -43,9 +47,14 @@ void Renderer::setData(Data * data)
   _data = data;
 }
 
-void Renderer::setPartials(Node::Partials * partials)
+void Renderer::setPartials(const Node::Partials * partials)
 {
   _partials = partials;
+}
+
+void Renderer::setPartialResolver(PartialResolver resolver)
+{
+  _partialResolver = std::move(resolver);
 }
 
 void Renderer::render()
@@ -76,7 +85,7 @@ void Renderer::render()
   //clear();
 }
 
-void Renderer::renderForLambda(Node * node, std::string * output)
+void Renderer::renderForLambda(const Node * node, std::string * output)
 {
   // Check node and data
   if( _node == NULL ) {
@@ -97,7 +106,7 @@ void Renderer::renderForLambda(Node * node, std::string * output)
   _output = parentOutput; // Put back original buffer
 }
 
-void Renderer::_renderNode(Node * node)
+void Renderer::_renderNode(const Node * node)
 {
   if( node == NULL ) {
     throw Exception("Empty tree node");
@@ -132,7 +141,7 @@ void Renderer::_renderNode(Node * node)
       
     case Node::TypeRoot:
       if( node->children.size() > 0 ) {
-        Node::Children::iterator it;
+        Node::Children::const_iterator it;
         for ( it = node->children.begin() ; it != node->children.end(); it++ ) {
           _renderNode(it->get());
         }
@@ -180,7 +189,7 @@ void Renderer::_renderNode(Node * node)
       
     case Node::TypeNegate:
       if( valIsEmpty ) {
-        Node::Children::iterator it;
+        Node::Children::const_iterator it;
         for( it = node->children.begin() ; it != node->children.end(); it++ ) {
           _renderNode(it->get());
         }
@@ -193,7 +202,7 @@ void Renderer::_renderNode(Node * node)
           default:
           case Data::TypeString:
             _stack->push_back(val);
-            for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
+            for( Node::Children::const_iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
               _renderNode(it->get());
             }
             _stack->pop_back();
@@ -201,7 +210,7 @@ void Renderer::_renderNode(Node * node)
           case Data::TypeList:
             for( Data::List::iterator childrenIt = val->children.begin() ; childrenIt != val->children.end(); childrenIt++ ) {
               _stack->push_back(*childrenIt);
-              for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
+              for( Node::Children::const_iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
                 _renderNode(it->get());
               }
               _stack->pop_back();
@@ -210,7 +219,7 @@ void Renderer::_renderNode(Node * node)
           case Data::TypeArray:
         	  for( int i = 0; i < val->length; i++ ) {
                   _stack->push_back(val->array[i]);
-                  for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
+                  for( Node::Children::const_iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
                     _renderNode(it->get());
                   }
                   _stack->pop_back();
@@ -219,7 +228,7 @@ void Renderer::_renderNode(Node * node)
           case Data::TypeMap:
             // Associate array/map
             _stack->push_back(val);
-            for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
+            for( Node::Children::const_iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
               _renderNode(it->get());
             }
             _stack->pop_back();
@@ -247,8 +256,15 @@ void Renderer::_renderNode(Node * node)
       break;
       
     case Node::TypePartial:
+      if( !partialFound && _partialResolver ) {
+        const Node * partial = _partialResolver(*node->data);
+        if( partial != NULL ) {
+          partialFound = true;
+          _renderNode(partial);
+        }
+      }
       if( !partialFound && _partials != NULL ) {
-        Node::Partials::iterator p_it;
+        Node::Partials::const_iterator p_it;
         p_it = _partials->find(*(node->data));
         if( p_it != _partials->end() && p_it->second != NULL ) {
           partialFound = true;
@@ -256,7 +272,7 @@ void Renderer::_renderNode(Node * node)
         }
       }
       if( !partialFound && _node->partials.size() > 0 ) {
-        Node::Partials::iterator p_it;
+        Node::Partials::const_iterator p_it;
         p_it = _node->partials.find(*(node->data));
         if( p_it != _node->partials.end() && p_it->second != NULL ) {
           partialFound = true;
@@ -271,7 +287,7 @@ void Renderer::_renderNode(Node * node)
   }
 }
 
-Data * Renderer::_lookup(Node * node)
+Data * Renderer::_lookup(const Node * node)
 {
   Data * data = _stack->back();
   
@@ -294,7 +310,7 @@ Data * Renderer::_lookup(Node * node)
   }
   
   // Get initial segment for dot notation
-  std::string * initial;
+  const std::string * initial;
   if( !node->dataParts.empty() ) {
     initial = &(node->dataParts.at(0));
   } else {
@@ -321,7 +337,7 @@ Data * Renderer::_lookup(Node * node)
   // Resolve or dot notation
   if( ref != NULL && node->dataParts.size() > 1 ) {
     // Dot notation
-    std::vector<std::string>::iterator vs_it;
+    std::vector<std::string>::const_iterator vs_it;
     for( vs_it = node->dataParts.begin(), vs_it++;
         vs_it != node->dataParts.end(); vs_it++ ) {
       if( ref == NULL ) {

@@ -107,6 +107,39 @@ Applications processing untrusted templates should supply limits appropriate
 for their workload. The 62-section default leaves room for the root and closing
 node within the serializer's default 64-node root-to-leaf limit.
 
+## Library use
+
+Prefer `CompiledTemplate` for application and extension code. It owns an
+immutable parsed template, is cheap to copy, and can be rendered repeatedly
+without exposing the AST representation:
+
+```cpp
+#include <mustache/mustache.hpp>
+
+#include <memory>
+#include <string>
+
+std::unique_ptr<mustache::Data> data(
+    mustache::Data::createFromJSON("{\"name\":\"world\"}"));
+mustache::CompiledTemplate greeting =
+    mustache::compile("Hello {{name}}!");
+std::string output = mustache::render(greeting, *data);
+```
+
+Partials have explicit shared ownership through compiled handles as well:
+
+```cpp
+mustache::PartialMap partials;
+partials.emplace("greeting", mustache::compile("Hello {{name}}!"));
+mustache::CompiledTemplate page = mustache::compile("<p>{{>greeting}}</p>");
+std::string output = mustache::render(page, *data, partials);
+```
+
+Use `Mustache::compile()` when custom delimiters or tokenizer configuration are
+needed. Both member and free `compile()` overloads accept `Tokenizer::Limits`.
+The public `Node` tokenizer and renderer entry points remain available as a
+source-compatibility surface for existing consumers.
+
 `Node` is move-only and owns its complete compatibility AST. Text and dotted
 name components are stored as values; `children`, `child`, and `partials` use
 `std::unique_ptr<Node>` to make ownership explicit. Construct manually supplied

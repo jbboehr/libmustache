@@ -1,4 +1,5 @@
 set(MUSTACHE_SOURCES
+    compiled_template.cpp
     data.cpp
     lambda.cpp
     mustache.cpp
@@ -10,6 +11,7 @@ set(MUSTACHE_SOURCES
 )
 
 set(MUSTACHE_PUBLIC_HEADERS
+    compiled_template.hpp
     data.hpp
     exception.hpp
     lambda.hpp

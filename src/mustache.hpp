@@ -12,6 +12,7 @@
 #include <string_view>
 #include <vector>
 
+#include "compiled_template.hpp"
 #include "data.hpp"
 #include "exception.hpp"
 #include "node.hpp"
@@ -54,9 +55,24 @@ class Mustache {
     //! Utility method for Tokenizer::tokenize() with resource limits
     void tokenize(std::string_view tmpl, Node * root,
         const Tokenizer::Limits& limits);
+
+    //! Compiles an immutable template handle
+    CompiledTemplate compile(std::string_view source);
+
+    //! Compiles an immutable template handle with resource limits
+    CompiledTemplate compile(std::string_view source,
+        const Tokenizer::Limits& limits);
     
     //! Utility method for Renderer::init() and Renderer::render()
-    void render(Node * node, Data * data, Node::Partials * partials, std::string * output);
+    void render(const Node * node, Data * data,
+        const Node::Partials * partials, std::string * output);
+
+    //! Renders an immutable compiled template
+    std::string render(const CompiledTemplate& compiled, Data& data) const;
+
+    //! Renders an immutable compiled template with compiled partials
+    std::string render(const CompiledTemplate& compiled, Data& data,
+        const PartialMap& partials) const;
     
     //! Utility method for Tokenizer::setStartSequence()
     void setStartSequence(const std::string& start) {
@@ -130,6 +146,20 @@ class Mustache {
       return tokenizer.getEscapeByDefault();
     };
 };
+
+//! Compiles a template with default tokenizer settings
+CompiledTemplate compile(std::string_view source);
+
+//! Compiles a template with explicit resource limits
+CompiledTemplate compile(
+    std::string_view source, const Tokenizer::Limits& limits);
+
+//! Renders a compiled template with no partials
+std::string render(const CompiledTemplate& compiled, Data& data);
+
+//! Renders a compiled template with compiled partials
+std::string render(const CompiledTemplate& compiled, Data& data,
+    const PartialMap& partials);
 
 
 } // namespace Mustache

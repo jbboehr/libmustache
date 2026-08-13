@@ -53,6 +53,11 @@ static_assert(std::is_same<mustache::Node::Children::value_type,
 static_assert(std::is_same<mustache::Node::Partials::mapped_type,
         std::unique_ptr<mustache::Node> >::value,
     "installed Node partials must have explicit ownership");
+static_assert(std::is_copy_constructible<mustache::CompiledTemplate>::value,
+    "installed CompiledTemplate must be copy constructible");
+static_assert(
+    std::is_nothrow_move_constructible<mustache::CompiledTemplate>::value,
+    "installed CompiledTemplate must be nothrow move constructible");
 
 int main()
 {
@@ -79,11 +84,21 @@ int main()
     std::unique_ptr<mustache::Node> decoded(
         mustache::Node::unserialize(
             serial->data(), serial->size(), 0, &position, limits));
+
+    mustache::Data scalar(mustache::Data::TypeString, 8);
+    *scalar.val = "compiled";
+    mustache::CompiledTemplate compiled = mustache::compile("[{{>value}}]");
+    mustache::PartialMap partials;
+    partials.emplace("value", mustache::compile("{{.}}"));
+    const std::string compiledOutput =
+        mustache::render(compiled, scalar, partials);
+
     return decoded->type == mustache::Node::TypeRoot &&
             decoded->children.size() == 1 &&
             decoded->children.front()->data.has_value() &&
             *decoded->children.front()->data == "owned" &&
-            position == serial->size()
+            position == serial->size() &&
+            compiledOutput == "[compiled]"
         ? 0
         : 1;
 }

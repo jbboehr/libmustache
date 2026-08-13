@@ -226,12 +226,14 @@ php-mustache compatibility job reports downstream breakage clearly.
 
 ## Phase 4: Replace the AST ownership model
 
-The first ownership slice converts the compatibility `Node` tree itself to
-RAII: node text and dotted-name components are values, children and the legacy
-container child are uniquely owned, partial maps contain uniquely owned nodes,
-and the unused fixed-size `NodeStack` has been removed. `Node` remains
-move-only while the opaque immutable `CompiledTemplate` API below is still to
-be introduced.
+**Status: implemented on the 0.6 development branch.**
+
+The compatibility `Node` tree now uses RAII: node text and dotted-name
+components are values, children and the legacy container child are uniquely
+owned, partial maps contain uniquely owned nodes, and the unused fixed-size
+`NodeStack` has been removed. `Node` remains move-only for source
+compatibility. New consumers can instead use the opaque `CompiledTemplate`
+handle, which immutably shares the owned AST without exposing its layout.
 
 AST nodes should become rule-of-zero values or immutable owned state:
 
@@ -242,7 +244,7 @@ AST nodes should become rule-of-zero values or immutable owned state:
 - safe copying or explicit immutable sharing; and
 - enforced parser depth and size budgets.
 
-Introduce an opaque, immutable compiled-template handle alongside the
+The opaque, immutable compiled-template handle is available alongside the
 compatibility surface:
 
 ```cpp
@@ -250,14 +252,16 @@ CompiledTemplate compile(std::string_view source);
 
 std::string render(
     const CompiledTemplate& compiled,
-    const Data& data,
+    Data& data,
     const PartialMap& partials
 );
 ```
 
-Partials should refer to compiled-template handles rather than borrowed
-`Node*` values. A compatibility `Node` API can temporarily act as a facade over
-the safe representation. This lets libmustache change parser internals without
+`PartialMap` owns compiled-template handles rather than borrowing `Node*`
+values, and the renderer reads AST nodes through const pointers. A fresh
+renderer instance holds the transient data and output state for each compiled
+render. The compatibility `Node` API remains available during the downstream
+migration window. This lets libmustache change parser internals without
 requiring php-mustache to depend on AST layout.
 
 Add a template-parser fuzz target during this phase, with depth, input-size,
