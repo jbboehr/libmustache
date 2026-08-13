@@ -44,8 +44,16 @@ class Mustache {
     //! Utility method for Tokenizer::tokenize()
     void tokenize(std::string * tmpl, Node * root);
 
+    //! Utility method for Tokenizer::tokenize() with resource limits
+    void tokenize(std::string * tmpl, Node * root,
+        const Tokenizer::Limits& limits);
+
     //! Utility method for Tokenizer::tokenize()
     void tokenize(std::string_view tmpl, Node * root);
+
+    //! Utility method for Tokenizer::tokenize() with resource limits
+    void tokenize(std::string_view tmpl, Node * root,
+        const Tokenizer::Limits& limits);
     
     //! Utility method for Renderer::init() and Renderer::render()
     void render(Node * node, Data * data, Node::Partials * partials, std::string * output);

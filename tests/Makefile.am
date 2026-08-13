@@ -12,12 +12,21 @@ test_tokenizer_safety_SOURCES = test_tokenizer_safety.cpp
 
 EXTRA_DIST = \
 	fuzz_node_unserialize.cpp \
+	fuzz_tokenizer.cpp \
 	fuzz/node_unserialize.dict \
+	fuzz/tokenizer.dict \
 	fuzz/corpus/node_unserialize/deeply-nested \
 	fuzz/corpus/node_unserialize/oversized-child-region \
 	fuzz/corpus/node_unserialize/php-variable \
 	fuzz/corpus/node_unserialize/trailing-byte \
-	fuzz/corpus/node_unserialize/truncated-header
+	fuzz/corpus/node_unserialize/truncated-header \
+	fuzz/corpus/tokenizer/deep-valid-section \
+	fuzz/corpus/tokenizer/delimiter-change \
+	fuzz/corpus/tokenizer/many-data-parts \
+	fuzz/corpus/tokenizer/mismatched-section \
+	fuzz/corpus/tokenizer/triple-mustache \
+	fuzz/corpus/tokenizer/unclosed-tag \
+	fuzz/corpus/tokenizer/valid-section
 
 TESTS = test_spec test_utils test_misc test_data_behavior test_node_serialization test_ownership test_length_aware_api test_tokenizer_safety
 TESTS_ENVIRONMENT = \

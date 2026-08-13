@@ -250,6 +250,14 @@ node-count, and delimiter invariants represented in its corpus. Existing exact
 rendering tests should remain unchanged unless a behavior correction is
 separately documented.
 
+The parser fuzzer is `fuzz_tokenizer`. Its CI smoke run is part of
+`nix build .#checks.x86_64-linux.libmustache-fuzz`; an extended acceptance run
+should invoke it with `-max_total_time=3600`, the committed tokenizer
+dictionary, and the copied tokenizer corpus in the build tree. Serialization
+round-trip failures after successful parsing are fuzz findings, not expected
+parser rejections; the fuzzer uses compatible explicit serialization limits so
+those invariants remain observable.
+
 **Definition of done:** the AST contains no owning or silently borrowed raw
 pointers; partial lifetime is explicit; existing parser and rendering behavior
 passes its characterization suite; all parser limits have tests; and the parser

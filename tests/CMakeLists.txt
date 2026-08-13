@@ -46,11 +46,18 @@ add_test(NAME length_aware_api COMMAND test_length_aware_api)
 add_test(NAME tokenizer_safety COMMAND test_tokenizer_safety)
 
 if(MUSTACHE_ENABLE_FUZZING)
+    function(mustache_configure_fuzz_target target)
+        target_link_libraries(${target} PRIVATE mustache_static)
+        mustache_apply_build_options(${target})
+        target_compile_options(${target} PRIVATE -fsanitize=fuzzer)
+        target_link_options(${target} PRIVATE -fsanitize=fuzzer)
+    endfunction()
+
     add_executable(fuzz_node_unserialize fuzz_node_unserialize.cpp)
-    target_link_libraries(fuzz_node_unserialize PRIVATE mustache_static)
-    mustache_apply_build_options(fuzz_node_unserialize)
-    target_compile_options(fuzz_node_unserialize PRIVATE -fsanitize=fuzzer)
-    target_link_options(fuzz_node_unserialize PRIVATE -fsanitize=fuzzer)
+    mustache_configure_fuzz_target(fuzz_node_unserialize)
+
+    add_executable(fuzz_tokenizer fuzz_tokenizer.cpp)
+    mustache_configure_fuzz_target(fuzz_tokenizer)
 
     set(MUSTACHE_FUZZ_CORPUS_SOURCE
         "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus/node_unserialize")
@@ -58,9 +65,17 @@ if(MUSTACHE_ENABLE_FUZZING)
         "${CMAKE_CURRENT_BINARY_DIR}/fuzz-corpus/node_unserialize")
     set(MUSTACHE_FUZZ_ARTIFACTS
         "${CMAKE_CURRENT_BINARY_DIR}/fuzz-artifacts/node_unserialize")
+    set(MUSTACHE_TOKENIZER_FUZZ_CORPUS_SOURCE
+        "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus/tokenizer")
+    set(MUSTACHE_TOKENIZER_FUZZ_CORPUS_BINARY
+        "${CMAKE_CURRENT_BINARY_DIR}/fuzz-corpus/tokenizer")
+    set(MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS
+        "${CMAKE_CURRENT_BINARY_DIR}/fuzz-artifacts/tokenizer")
     file(MAKE_DIRECTORY
         "${MUSTACHE_FUZZ_CORPUS_BINARY}"
-        "${MUSTACHE_FUZZ_ARTIFACTS}")
+        "${MUSTACHE_FUZZ_ARTIFACTS}"
+        "${MUSTACHE_TOKENIZER_FUZZ_CORPUS_BINARY}"
+        "${MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS}")
     file(COPY "${MUSTACHE_FUZZ_CORPUS_SOURCE}/"
         DESTINATION "${MUSTACHE_FUZZ_CORPUS_BINARY}")
 
@@ -73,6 +88,21 @@ if(MUSTACHE_ENABLE_FUZZING)
             "-artifact_prefix=${MUSTACHE_FUZZ_ARTIFACTS}/"
             "${MUSTACHE_FUZZ_CORPUS_BINARY}")
     set_tests_properties(fuzz_node_unserialize_smoke PROPERTIES
+        LABELS fuzz
+        RUN_SERIAL TRUE
+        TIMEOUT 30)
+
+    file(COPY "${MUSTACHE_TOKENIZER_FUZZ_CORPUS_SOURCE}/"
+        DESTINATION "${MUSTACHE_TOKENIZER_FUZZ_CORPUS_BINARY}")
+    add_test(NAME fuzz_tokenizer_smoke
+        COMMAND fuzz_tokenizer
+            -runs=1000
+            -max_len=4096
+            -timeout=5
+            "-dict=${CMAKE_CURRENT_SOURCE_DIR}/fuzz/tokenizer.dict"
+            "-artifact_prefix=${MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS}/"
+            "${MUSTACHE_TOKENIZER_FUZZ_CORPUS_BINARY}")
+    set_tests_properties(fuzz_tokenizer_smoke PROPERTIES
         LABELS fuzz
         RUN_SERIAL TRUE
         TIMEOUT 30)

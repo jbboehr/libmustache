@@ -1,6 +1,8 @@
 
 #include "tokenizer.hpp"
 
+#include <vector>
+
 namespace mustache {
 
 namespace {
@@ -20,13 +22,40 @@ bool matchesAt(
       input.compare(position, sequence.size(), sequence) == 0;
 }
 
-Node * appendNode(Node * parent, std::unique_ptr<Node> node)
+struct ParseFrame {
+  ParseFrame(Node * node, int lineNo, int charNo) :
+      node(node), lineNo(lineNo), charNo(charNo) {}
+
+  Node * node;
+  int lineNo;
+  int charNo;
+};
+
+Node * appendNode(Node * parent, std::unique_ptr<Node> node,
+    std::size_t * nodeCount, const Tokenizer::Limits& limits,
+    int lineNo, int charNo)
 {
+  if( *nodeCount >= limits.maxNodes ) {
+    throw TokenizerException(
+        "Template node count limit exceeded", lineNo, charNo);
+  }
   parent->children.push_back(node.get());
+  ++*nodeCount;
   return node.release();
 }
 
 } // namespace
+
+Tokenizer::Limits::Limits() :
+    maxInputBytes(64 * 1024 * 1024),
+    // Default serialization permits 64 nodes along a root-to-leaf path.
+    // A parsed path includes the root and its innermost closing node.
+    maxNestingDepth(62),
+    maxNodes(100000),
+    maxTagBytes(1024 * 1024),
+    maxDelimiterBytes(1024)
+{
+}
 
 
 void Tokenizer::setStartSequence(const std::string& start) {
@@ -92,14 +121,36 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root, bool escapeOutput)
   if( tmpl == NULL ) {
     throw Exception("Missing template");
   }
-  tokenize(std::string_view(*tmpl), root, escapeOutput);
+  tokenize(std::string_view(*tmpl), root, Limits(), escapeOutput);
+}
+
+void Tokenizer::tokenize(std::string * tmpl, Node * root,
+    const Limits& limits, bool escapeOutput)
+{
+  if( tmpl == NULL ) {
+    throw Exception("Missing template");
+  }
+  tokenize(std::string_view(*tmpl), root, limits, escapeOutput);
 }
 
 void Tokenizer::tokenize(
     std::string_view tmpl, Node * root, bool escapeOutput)
 {
+  tokenize(tmpl, root, Limits(), escapeOutput);
+}
+
+void Tokenizer::tokenize(std::string_view tmpl, Node * root,
+    const Limits& limits, bool escapeOutput)
+{
   if( root == NULL ) {
     throw Exception("Missing token root");
+  }
+  if( tmpl.size() > limits.maxInputBytes ) {
+    throw TokenizerException("Template input size limit exceeded");
+  }
+  if( _startSequence.size() > limits.maxDelimiterBytes ||
+      _stopSequence.size() > limits.maxDelimiterBytes ) {
+    throw TokenizerException("Template delimiter size limit exceeded");
   }
   std::string stop(_stopSequence);
   std::string start(_startSequence);
@@ -129,14 +180,15 @@ void Tokenizer::tokenize(
   int currentFlags = Node::FlagNone;
   
   Node parsedRoot;
-  NodeStack nodeStack;
+  std::vector<ParseFrame> nodeStack;
+  std::size_t nodeCount = 0;
   Node * node;
   
   // Initialize root node and stack[0]
   parsedRoot.type = Node::TypeRoot;
   parsedRoot.flags = Node::FlagNone;
   
-  nodeStack.push_back(&parsedRoot);
+  nodeStack.push_back(ParseFrame(&parsedRoot, 0, 0));
   
   // Scan loop
   for( pos = 0; pos < tmplL; pos++ ) {
@@ -163,8 +215,9 @@ void Tokenizer::tokenize(
       if( tmpl[pos] == startC && matchesAt(tmpl, pos, start) ) {
         // Close previous buffer
         if( buffer.length() > 0 ) {
-          node = appendNode(nodeStack.back(), std::unique_ptr<Node>(
-              new Node(Node::TypeOutput, buffer)));
+          appendNode(nodeStack.back().node, std::unique_ptr<Node>(
+              new Node(Node::TypeOutput, buffer)), &nodeCount, limits,
+              lineNo, charNo);
           buffer.clear();
         }
         // Open new buffer
@@ -232,6 +285,12 @@ void Tokenizer::tokenize(
                   << startLineNo << ":" << startCharNo;
               throw TokenizerException(oss.str(), startLineNo, startCharNo);
             }
+            if( delims[0].size() > limits.maxDelimiterBytes ||
+                delims[1].size() > limits.maxDelimiterBytes ) {
+              throw TokenizerException(
+                  "Template delimiter size limit exceeded",
+                  startLineNo, startCharNo);
+            }
             
             // Assign new start/stop
             start.assign(delims.at(0));
@@ -256,6 +315,39 @@ void Tokenizer::tokenize(
               currentFlags = currentFlags ^ Node::FlagEscape;
             }
           }
+
+          if( currentType & Node::TypeHasChildren ) {
+            const std::size_t currentDepth = nodeStack.size() - 1;
+            if( currentDepth >= limits.maxNestingDepth ) {
+              throw TokenizerException(
+                  "Template nesting limit exceeded",
+                  startLineNo, startCharNo);
+            }
+          } else if( currentType == Node::TypeStop ) {
+            if( nodeStack.size() <= 1 ) {
+              std::ostringstream oss;
+              oss << "Extra closing section '" << buffer << "' at "
+                  << startLineNo << ":" << startCharNo;
+              throw TokenizerException(
+                  oss.str(), startLineNo, startCharNo);
+            }
+
+            const ParseFrame& openSection = nodeStack.back();
+            if( openSection.node->data == NULL ||
+                *openSection.node->data != buffer ) {
+              std::ostringstream oss;
+              oss << "Mismatched closing section '" << buffer
+                  << "' at " << startLineNo << ":" << startCharNo
+                  << "; expected '"
+                  << (openSection.node->data == NULL
+                      ? std::string() : *openSection.node->data)
+                  << "' opened at " << openSection.lineNo
+                  << ":" << openSection.charNo;
+              throw TokenizerException(
+                  oss.str(), startLineNo, startCharNo);
+            }
+          }
+
           std::unique_ptr<Node> pendingNode(
               new Node(currentType, buffer, currentFlags));
 
@@ -264,18 +356,13 @@ void Tokenizer::tokenize(
             pendingNode->stopSequence = new std::string(stop);
           }
 
-          node = appendNode(nodeStack.back(), std::move(pendingNode));
+          node = appendNode(nodeStack.back().node, std::move(pendingNode),
+              &nodeCount, limits, startLineNo, startCharNo);
           // Push/pop stack
           if( currentType & Node::TypeHasChildren ) {
-            nodeStack.push_back(node);
+            nodeStack.push_back(
+                ParseFrame(node, startLineNo, startCharNo));
           } else if( currentType == Node::TypeStop ) {
-            if( nodeStack.size() <= 0 ) {
-              std::ostringstream oss;
-              oss << "Extra closing section or missing opening section"
-                  << " detected after tag starting at "
-                  << startLineNo << ":" << startCharNo;
-              throw TokenizerException(oss.str(), startLineNo, startCharNo);
-            }
             nodeStack.pop_back();
           }
         }
@@ -304,6 +391,10 @@ void Tokenizer::tokenize(
     
     // Append to buffer
     if( skipUntil == std::string_view::npos ) {
+      if( inTag && buffer.size() >= limits.maxTagBytes ) {
+        throw TokenizerException(
+            "Template tag size limit exceeded", lineNo, charNo);
+      }
       buffer.append(1, tmpl[pos]);
     }
   }
@@ -328,7 +419,8 @@ void Tokenizer::tokenize(
     } else {
       pendingNode->data = new std::string(buffer);
     }
-    appendNode(nodeStack.back(), std::move(pendingNode));
+    appendNode(nodeStack.back().node, std::move(pendingNode),
+        &nodeCount, limits, lineNo, charNo);
     buffer.clear();
   }
 

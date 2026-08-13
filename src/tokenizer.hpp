@@ -2,6 +2,7 @@
 #ifndef MUSTACHE_TOKENIZER_HPP
 #define MUSTACHE_TOKENIZER_HPP
 
+#include <cstddef>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -34,6 +35,23 @@ class Tokenizer {
     bool _escapeByDefault;
     
   public:
+    /*! \struct Limits
+        \brief Resource limits for parsing templates.
+
+        Every field is an enforced maximum. A zero value therefore rejects
+        any input that consumes that resource; zero never means unlimited.
+        Nesting depth counts open sections and excludes the root node.
+    */
+    struct Limits {
+      std::size_t maxInputBytes;
+      std::size_t maxNestingDepth;
+      std::size_t maxNodes;
+      std::size_t maxTagBytes;
+      std::size_t maxDelimiterBytes;
+
+      Limits();
+    };
+
     //! Constructor
     Tokenizer() : _startSequence("{{"), _stopSequence("}}"), _escapeByDefault(true) {};
     
@@ -70,8 +88,16 @@ class Tokenizer {
     //! Tokenizes the given string template
     void tokenize(std::string * tmpl, Node * root, bool escapeOutput = false);
 
+    //! Tokenizes the given string template with resource limits
+    void tokenize(std::string * tmpl, Node * root, const Limits& limits,
+        bool escapeOutput = false);
+
     //! Tokenizes an explicitly sized template view
     void tokenize(std::string_view tmpl, Node * root,
+        bool escapeOutput = false);
+
+    //! Tokenizes an explicitly sized template view with resource limits
+    void tokenize(std::string_view tmpl, Node * root, const Limits& limits,
         bool escapeOutput = false);
 };
 

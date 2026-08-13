@@ -99,6 +99,14 @@ have length-aware C++17 entry points. Prefer `std::string_view` for text and
 the pointer-plus-length `Node::unserialize` overload for raw bytes. Existing
 `std::string` and `std::vector<uint8_t>` calls remain supported as adapters.
 
+Template parsing also accepts `Tokenizer::Limits`. The compatibility defaults
+permit 64 MiB of input, 62 nested sections, 100,000 AST nodes excluding the
+root, 1 MiB per tag, and 1 KiB per delimiter. Each value is a hard maximum;
+zero means that a template consuming that resource is rejected, not unlimited.
+Applications processing untrusted templates should supply limits appropriate
+for their workload. The 62-section default leaves room for the root and closing
+node within the serializer's default 64-node root-to-leaf limit.
+
 ## Windows
 
 The repository contains a vcpkg manifest and is tested with Visual Studio 2022

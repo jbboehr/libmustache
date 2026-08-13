@@ -1,7 +1,11 @@
 #include "mustache_config.h"
 
+#include <cstddef>
 #include <cstdio>
+#include <memory>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "exception.hpp"
 #include "node.hpp"
@@ -106,6 +110,176 @@ void testSetDataReplacesOwnedState()
       "setData did not publish its replacement state");
 }
 
+void expectLimitFailure(std::string_view source,
+    const mustache::Tokenizer::Limits& limits, const char * expectedMessage,
+    const char * failureMessage)
+{
+  mustache::Node root;
+  populateExistingTree(&root);
+  mustache::Node * originalChild = root.children.front();
+  mustache::Tokenizer tokenizer;
+
+  bool rejected = false;
+  try {
+    tokenizer.tokenize(source, &root, limits);
+  } catch( const mustache::TokenizerException& exception ) {
+    rejected = std::string(exception.what()).find(expectedMessage) !=
+        std::string::npos;
+  }
+
+  expect(rejected, failureMessage);
+  expect(root.type == mustache::Node::TypeSection &&
+          root.children.size() == 1 &&
+          root.children.front() == originalChild &&
+          root.child == originalChild,
+      "a parser limit failure changed the destination tree");
+}
+
+std::string nestedSections(std::size_t depth)
+{
+  std::string source;
+  source.reserve(depth * 12);
+  for( std::size_t i = 0; i < depth; ++i ) {
+    source.append("{{#s}}");
+  }
+  for( std::size_t i = 0; i < depth; ++i ) {
+    source.append("{{/s}}");
+  }
+  return source;
+}
+
+void testParserLimits()
+{
+  mustache::Tokenizer::Limits limits;
+  expect(limits.maxNestingDepth == 62,
+      "default parser nesting limit changed");
+
+  mustache::Node defaultDepthRoot;
+  mustache::Tokenizer tokenizer;
+  tokenizer.tokenize(
+      nestedSections(limits.maxNestingDepth), &defaultDepthRoot, limits);
+  bool defaultDepthSerializable = false;
+  try {
+    std::unique_ptr<std::vector<uint8_t> > serial(
+        defaultDepthRoot.serialize());
+    defaultDepthSerializable = !serial->empty();
+  } catch( const mustache::Exception& ) {
+  }
+  expect(defaultDepthSerializable,
+      "the default parser depth produced an unserializable AST");
+  expectLimitFailure(nestedSections(limits.maxNestingDepth + 1), limits,
+      "nesting limit", "the default parser accepted a depth that default "
+      "serialization rejects");
+
+  limits.maxInputBytes = 2;
+  mustache::Node root;
+  tokenizer.tokenize("ab", &root, limits);
+  expect(root.children.size() == 1 && *root.children[0]->data == "ab",
+      "the exact template input limit was rejected");
+  limits.maxInputBytes = 1;
+  expectLimitFailure("ab", limits, "input size limit",
+      "an oversized template input was accepted");
+
+  limits = mustache::Tokenizer::Limits();
+  limits.maxNodes = 2;
+  tokenizer.tokenize("a{{b}}", &root, limits);
+  expect(root.children.size() == 2,
+      "the exact parser node limit was rejected");
+  limits.maxNodes = 1;
+  expectLimitFailure("a{{b}}", limits, "node count limit",
+      "an oversized parser node count was accepted");
+
+  limits = mustache::Tokenizer::Limits();
+  limits.maxNestingDepth = 2;
+  tokenizer.tokenize("{{#a}}{{#b}}{{/b}}{{/a}}", &root, limits);
+  expect(root.children.size() == 1 &&
+          root.children[0]->children.size() == 2,
+      "the exact parser nesting limit was rejected");
+  limits.maxNestingDepth = 1;
+  expectLimitFailure("{{#a}}{{#b}}{{/b}}{{/a}}", limits,
+      "nesting limit", "an oversized parser nesting depth was accepted");
+  limits.maxNestingDepth = 0;
+  expectLimitFailure("{{#a}}{{/a}}", limits, "nesting limit",
+      "a zero parser nesting limit was treated as unlimited");
+
+  limits = mustache::Tokenizer::Limits();
+  limits.maxTagBytes = 3;
+  tokenizer.tokenize("{{abc}}", &root, limits);
+  expect(root.children.size() == 1 && *root.children[0]->data == "abc",
+      "the exact template tag limit was rejected");
+  limits.maxTagBytes = 2;
+  expectLimitFailure("{{abc}}", limits, "tag size limit",
+      "an oversized template tag was accepted");
+  limits.maxTagBytes = 0;
+  expectLimitFailure("{{a}}", limits, "tag size limit",
+      "a zero template tag limit was treated as unlimited");
+
+  limits = mustache::Tokenizer::Limits();
+  limits.maxDelimiterBytes = 2;
+  tokenizer.tokenize("{{=<% %>=}}<%value%>", &root, limits);
+  expect(root.children.size() == 1 && *root.children[0]->data == "value",
+      "the exact changed-delimiter limit was rejected");
+  expectLimitFailure("{{=<<< >>>=}}", limits, "delimiter size limit",
+      "an oversized changed delimiter was accepted");
+  limits.maxDelimiterBytes = 0;
+  expectLimitFailure("", limits, "delimiter size limit",
+      "a zero delimiter limit was treated as unlimited");
+
+  limits.maxDelimiterBytes = 2;
+
+  mustache::Tokenizer longDelimiterTokenizer;
+  longDelimiterTokenizer.setStartSequence("<<<");
+  bool rejected = false;
+  try {
+    longDelimiterTokenizer.tokenize("", &root, limits);
+  } catch( const mustache::TokenizerException& exception ) {
+    rejected = std::string(exception.what()).find("delimiter size limit") !=
+        std::string::npos;
+  }
+  expect(rejected, "an oversized configured delimiter was accepted");
+
+  limits = mustache::Tokenizer::Limits();
+  limits.maxInputBytes = 0;
+  limits.maxNodes = 0;
+  tokenizer.tokenize("", &root, limits);
+  expect(root.type == mustache::Node::TypeRoot && root.children.empty(),
+      "zero limits rejected an empty template that consumes no resources");
+}
+
+void testSectionClosureValidation()
+{
+  mustache::Tokenizer tokenizer;
+  mustache::Node root;
+  bool rejected = false;
+  try {
+    tokenizer.tokenize("before{{/orphan}}after", &root);
+  } catch( const mustache::TokenizerException& exception ) {
+    rejected = std::string(exception.what()).find(
+        "Extra closing section 'orphan'") != std::string::npos;
+  }
+  expect(rejected, "an orphan closing section was accepted");
+
+  rejected = false;
+  try {
+    tokenizer.tokenize("{{#open}}body{{/different}}", &root);
+  } catch( const mustache::TokenizerException& exception ) {
+    const std::string message(exception.what());
+    rejected = message.find("Mismatched closing section 'different'") !=
+            std::string::npos &&
+        message.find("expected 'open'") != std::string::npos &&
+        message.find("opened at") != std::string::npos;
+  }
+  expect(rejected, "a mismatched closing section was accepted");
+
+  tokenizer.tokenize(
+      "{{#outer}}{{=<% %>=}}<%#inner%><%/inner%><%/outer%>", &root);
+  expect(root.children.size() == 1 &&
+          root.children[0]->children.size() == 2 &&
+          root.children[0]->children[0]->type ==
+              mustache::Node::TypeSection,
+      "valid nested sections with changed delimiters were rejected");
+}
+
 } // namespace
 
 int main()
@@ -113,5 +287,7 @@ int main()
   testFailedTokenizePreservesExistingTree();
   testSuccessfulTokenizeReplacesExistingTree();
   testSetDataReplacesOwnedState();
+  testParserLimits();
+  testSectionClosureValidation();
   return failures == 0 ? 0 : 1;
 }

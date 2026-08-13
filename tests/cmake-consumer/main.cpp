@@ -57,8 +57,10 @@ int main()
     const char templateSource[] = {'o', 'k'};
     mustache::Mustache mustache;
     mustache::Node parsed;
+    mustache::Tokenizer::Limits parseLimits;
     mustache.tokenize(
-        std::string_view(templateSource, sizeof(templateSource)), &parsed);
+        std::string_view(templateSource, sizeof(templateSource)), &parsed,
+        parseLimits);
 
     mustache::Node::SerializationLimits limits;
     mustache::Node root;
