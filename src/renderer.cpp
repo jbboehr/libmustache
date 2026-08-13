@@ -218,7 +218,8 @@ void Renderer::_renderNode(Node * node)
             break;
           case Data::TypeLambda:
             std::string text = node->children_to_template_string(*node->startSequence, *node->stopSequence);
-            std::string invoked = val->lambda->invoke(&text, this);
+            std::string invoked = val->lambda->invoke(
+                std::string_view(text), this);
 
             Tokenizer tokenizer;
             Node nodeFromLambda;

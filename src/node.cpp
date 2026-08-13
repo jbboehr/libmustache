@@ -208,8 +208,8 @@ void serializeNode(const Node& node, std::vector<uint8_t>& output,
 
 class SerialReader {
   public:
-    SerialReader(const std::vector<uint8_t>& serial, size_t offset) :
-        serial_(serial), pos_(offset) {}
+    SerialReader(const uint8_t * serial, size_t size, size_t offset) :
+        serial_(serial), size_(size), pos_(offset) {}
 
     size_t position() const
     {
@@ -218,7 +218,7 @@ class SerialReader {
 
     size_t remaining(size_t limit) const
     {
-      if( limit > serial_.size() || pos_ > limit ) {
+      if( limit > size_ || pos_ > limit ) {
         throw Exception("Invalid serial bounds");
       }
       return limit - pos_;
@@ -259,7 +259,8 @@ class SerialReader {
       require(length, limit);
       std::string value;
       if( length > 0 ) {
-        value.assign(reinterpret_cast<const char *>(&serial_[pos_]), length);
+        value.assign(
+            reinterpret_cast<const char *>(serial_ + pos_), length);
         pos_ += length;
       }
       return value;
@@ -273,7 +274,8 @@ class SerialReader {
       }
     }
 
-    const std::vector<uint8_t>& serial_;
+    const uint8_t * serial_;
+    size_t size_;
     size_t pos_;
 };
 
@@ -534,33 +536,65 @@ std::string Node::to_template_string(const std::string& start, const std::string
 
 Node * Node::unserialize(std::vector<uint8_t>& serial, size_t offset, size_t * vpos)
 {
-  const SerializationLimits limits;
-  return unserialize(serial, offset, vpos, limits);
+  return unserialize(serial.data(), serial.size(), offset, vpos);
 }
 
 Node * Node::unserialize(std::vector<uint8_t>& serial, size_t offset,
     size_t * vpos, const SerializationLimits& limits)
 {
+  return unserialize(
+      serial.data(), serial.size(), offset, vpos, limits);
+}
+
+Node * Node::unserialize(const uint8_t * serial, size_t length,
+    size_t offset, size_t * vpos)
+{
+  const SerializationLimits limits;
+  return unserialize(serial, length, offset, vpos, limits);
+}
+
+Node * Node::unserialize(const uint8_t * serial, size_t length,
+    size_t offset, size_t * vpos, const SerializationLimits& limits)
+{
   if( vpos == NULL ) {
     throw Exception("Missing serial output position");
   }
-  if( offset > serial.size() ) {
+  if( serial == NULL && length != 0 ) {
+    throw Exception("Missing serial data");
+  }
+  if( offset > length ) {
     throw Exception("Invalid serial offset");
   }
-  if( serial.size() - offset > limits.maxInputBytes ) {
+  if( length - offset > limits.maxInputBytes ) {
     throw Exception("Serialized AST size limit exceeded");
   }
 
-  SerialReader reader(serial, offset);
+  SerialReader reader(serial, length, offset);
   SerialState state(limits);
   std::unique_ptr<Node> node(
-      unserializeNode(reader, serial.size(), state, 0));
-  if( reader.position() != serial.size() ) {
+      unserializeNode(reader, length, state, 0));
+  if( reader.position() != length ) {
     throw Exception("Trailing serial data");
   }
 
   *vpos = reader.position();
   return node.release();
+}
+
+Node * Node::unserialize(
+    std::string_view serial, size_t offset, size_t * vpos)
+{
+  return unserialize(
+      reinterpret_cast<const uint8_t *>(serial.data()),
+      serial.size(), offset, vpos);
+}
+
+Node * Node::unserialize(std::string_view serial, size_t offset,
+    size_t * vpos, const SerializationLimits& limits)
+{
+  return unserialize(
+      reinterpret_cast<const uint8_t *>(serial.data()),
+      serial.size(), offset, vpos, limits);
 }
 
 

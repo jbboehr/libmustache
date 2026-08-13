@@ -9,6 +9,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "data.hpp"
@@ -42,6 +43,9 @@ class Mustache {
     
     //! Utility method for Tokenizer::tokenize()
     void tokenize(std::string * tmpl, Node * root);
+
+    //! Utility method for Tokenizer::tokenize()
+    void tokenize(std::string_view tmpl, Node * root);
     
     //! Utility method for Renderer::init() and Renderer::render()
     void render(Node * node, Data * data, Node::Partials * partials, std::string * output);
@@ -50,20 +54,52 @@ class Mustache {
     void setStartSequence(const std::string& start) {
       return tokenizer.setStartSequence(start);
     };
+
+    //! Utility method for Tokenizer::setStartSequence()
+    void setStartSequence(std::string_view start) {
+      tokenizer.setStartSequence(start);
+    };
     
     //! Utility method for Tokenizer::setStartSequence()
     void setStartSequence(const char * start, long len = 0) {
-      tokenizer.setStartSequence(start, len);
+      if( start == NULL ) {
+        throw Exception("Missing start delimiter");
+      }
+      if( len < 0 ) {
+        throw Exception("Invalid start delimiter length");
+      }
+      if( len == 0 ) {
+        tokenizer.setStartSequence(start);
+      } else {
+        tokenizer.setStartSequence(
+            std::string_view(start, static_cast<size_t>(len)));
+      }
     };
     
     //! Utility method for Tokenizer::setStopSequence()
     void setStopSequence(const std::string& stop) {
       tokenizer.setStopSequence(stop);
     };
+
+    //! Utility method for Tokenizer::setStopSequence()
+    void setStopSequence(std::string_view stop) {
+      tokenizer.setStopSequence(stop);
+    };
     
     //! Utility method for Tokenizer::setStopSequence()
     void setStopSequence(const char * stop, long len = 0) {
-      tokenizer.setStopSequence(stop, len);
+      if( stop == NULL ) {
+        throw Exception("Missing stop delimiter");
+      }
+      if( len < 0 ) {
+        throw Exception("Invalid stop delimiter length");
+      }
+      if( len == 0 ) {
+        tokenizer.setStopSequence(stop);
+      } else {
+        tokenizer.setStopSequence(
+            std::string_view(stop, static_cast<size_t>(len)));
+      }
     };
     
     //! Utility method for Tokenizer::setEscapeByDefault()

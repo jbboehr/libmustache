@@ -94,6 +94,11 @@ defines `MUSTACHE_HAVE_CXX17`. `MUSTACHE_HAVE_CXX11` remains defined as a
 deprecated source-compatibility alias because the required C++17 baseline
 necessarily includes C++11 support.
 
+Template source, delimiters, lambda section text, and serialized AST input
+have length-aware C++17 entry points. Prefer `std::string_view` for text and
+the pointer-plus-length `Node::unserialize` overload for raw bytes. Existing
+`std::string` and `std::vector<uint8_t>` calls remain supported as adapters.
+
 ## Windows
 
 The repository contains a vcpkg manifest and is tested with Visual Studio 2022

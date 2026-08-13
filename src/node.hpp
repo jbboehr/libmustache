@@ -7,6 +7,7 @@
 #include <memory>
 #include <stack>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <stdint.h>
 
@@ -153,6 +154,22 @@ class Node {
 
     //! Unserialize with explicit resource limits
     static Node * unserialize(std::vector<uint8_t> & serial, size_t offset,
+        size_t * vpos, const SerializationLimits& limits);
+
+    //! Unserialize an explicitly sized byte range
+    static Node * unserialize(const uint8_t * serial, size_t length,
+        size_t offset, size_t * vpos);
+
+    //! Unserialize an explicitly sized byte range with resource limits
+    static Node * unserialize(const uint8_t * serial, size_t length,
+        size_t offset, size_t * vpos, const SerializationLimits& limits);
+
+    //! Unserialize bytes held in a string view
+    static Node * unserialize(std::string_view serial, size_t offset,
+        size_t * vpos);
+
+    //! Unserialize bytes held in a string view with resource limits
+    static Node * unserialize(std::string_view serial, size_t offset,
         size_t * vpos, const SerializationLimits& limits);
 
   private:

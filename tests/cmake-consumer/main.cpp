@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -53,6 +54,12 @@ int main()
         return 1;
     }
 
+    const char templateSource[] = {'o', 'k'};
+    mustache::Mustache mustache;
+    mustache::Node parsed;
+    mustache.tokenize(
+        std::string_view(templateSource, sizeof(templateSource)), &parsed);
+
     mustache::Node::SerializationLimits limits;
     mustache::Node root;
     root.type = mustache::Node::TypeRoot;
@@ -60,7 +67,8 @@ int main()
     std::unique_ptr<std::vector<uint8_t> > serial(movedRoot.serialize(limits));
     std::size_t position = 0;
     std::unique_ptr<mustache::Node> decoded(
-        mustache::Node::unserialize(*serial, 0, &position, limits));
+        mustache::Node::unserialize(
+            serial->data(), serial->size(), 0, &position, limits));
     return decoded->type == mustache::Node::TypeRoot &&
             position == serial->size()
         ? 0

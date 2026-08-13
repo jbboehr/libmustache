@@ -3,6 +3,7 @@
 #define MUSTACHE_LAMBDA_HPP
 
 #include <string>
+#include <string_view>
 
 namespace mustache {
 
@@ -21,6 +22,17 @@ class Lambda {
 
     //! Invoke this lambda if it's being used as a section
     virtual std::string invoke(std::string * text, Renderer * renderer) = 0;
+
+    /*! Invoke this lambda with explicitly sized section text.
+
+        Existing implementations remain compatible through the owning-string
+        adapter. New callers should prefer this overload so embedded NULs and
+        non-NUL-terminated inputs retain their explicit length.
+    */
+    std::string invoke(std::string_view text, Renderer * renderer) {
+      std::string ownedText(text);
+      return invoke(&ownedText, renderer);
+    }
 };
 
 

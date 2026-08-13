@@ -7,6 +7,7 @@
 #include <sstream>
 #include <stack>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "exception.hpp"
@@ -38,12 +39,18 @@ class Tokenizer {
     
     //! Sets the start sequence
     void setStartSequence(const std::string& start);
+
+    //! Sets the start sequence from an explicitly sized view
+    void setStartSequence(std::string_view start);
     
     //! Sets the start sequence
     void setStartSequence(const char * start, int len = 0);
     
     //! Sets the stop sequence
     void setStopSequence(const std::string& stop);
+
+    //! Sets the stop sequence from an explicitly sized view
+    void setStopSequence(std::string_view stop);
     
     //! Sets the stop sequence
     void setStopSequence(const char * stop, int len = 0);
@@ -62,6 +69,10 @@ class Tokenizer {
     
     //! Tokenizes the given string template
     void tokenize(std::string * tmpl, Node * root, bool escapeOutput = false);
+
+    //! Tokenizes an explicitly sized template view
+    void tokenize(std::string_view tmpl, Node * root,
+        bool escapeOutput = false);
 };
 
 

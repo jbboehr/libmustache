@@ -3,31 +3,66 @@
 
 namespace mustache {
 
+namespace {
+
+void validateDelimiter(std::string_view delimiter, const char * name)
+{
+  if( delimiter.empty() ) {
+    throw Exception(std::string("Empty ") + name + " delimiter");
+  }
+}
+
+bool matchesAt(
+    std::string_view input, size_t position, std::string_view sequence)
+{
+  return position <= input.size() &&
+      sequence.size() <= input.size() - position &&
+      input.compare(position, sequence.size(), sequence) == 0;
+}
+
+} // namespace
+
 
 void Tokenizer::setStartSequence(const std::string& start) {
-  _startSequence.assign(start);
+  setStartSequence(std::string_view(start));
+}
+
+void Tokenizer::setStartSequence(std::string_view start) {
+  validateDelimiter(start, "start");
+  _startSequence.assign(start.data(), start.size());
 }
 
 void Tokenizer::setStartSequence(const char * start, int len) {
-  // @todo specifying the length seems to cause huge allocations
-  //if( len <= 0 ) {
-    _startSequence.assign(start);
-  //} else {
-  //  _startSequence.assign(start, (size_t) len);
-  //}
+  if( start == NULL ) {
+    throw Exception("Missing start delimiter");
+  }
+  if( len < 0 ) {
+    throw Exception("Invalid start delimiter length");
+  }
+  setStartSequence(len == 0
+      ? std::string_view(start)
+      : std::string_view(start, static_cast<size_t>(len)));
 }
 
 void Tokenizer::setStopSequence(const std::string& stop) {
-  _stopSequence.assign(stop);
+  setStopSequence(std::string_view(stop));
+}
+
+void Tokenizer::setStopSequence(std::string_view stop) {
+  validateDelimiter(stop, "stop");
+  _stopSequence.assign(stop.data(), stop.size());
 }
 
 void Tokenizer::setStopSequence(const char * stop, int len) {
-  // @todo specifying the length seems to cause huge allocations
-  //if( len <= 0 ) {
-    _stopSequence.assign(stop);
-  //} else {
-  //  _stopSequence.assign(stop, (size_t) len);
-  //}
+  if( stop == NULL ) {
+    throw Exception("Missing stop delimiter");
+  }
+  if( len < 0 ) {
+    throw Exception("Invalid stop delimiter length");
+  }
+  setStopSequence(len == 0
+      ? std::string_view(stop)
+      : std::string_view(stop, static_cast<size_t>(len)));
 }
 
 void Tokenizer::setEscapeByDefault(bool flag) {
@@ -48,23 +83,34 @@ bool Tokenizer::getEscapeByDefault() {
 
 void Tokenizer::tokenize(std::string * tmpl, Node * root, bool escapeOutput)
 {
+  if( tmpl == NULL ) {
+    throw Exception("Missing template");
+  }
+  tokenize(std::string_view(*tmpl), root, escapeOutput);
+}
+
+void Tokenizer::tokenize(
+    std::string_view tmpl, Node * root, bool escapeOutput)
+{
+  if( root == NULL ) {
+    throw Exception("Missing token root");
+  }
   std::string stop(_stopSequence);
   std::string start(_startSequence);
   std::string buffer;
   buffer.reserve(100); // Reserver 100 chars
   
-  unsigned int tmplL = tmpl->length();
-  const char * chr = tmpl->c_str();
+  const size_t tmplL = tmpl.length();
   
   char startC = start.at(0);
-  int startL = start.length();
+  size_t startL = start.length();
   
   char stopC = stop.at(0);
-  int stopL = stop.length();
-  int tmpStopL = stopL;
+  size_t stopL = stop.length();
+  size_t tmpStopL = stopL;
   
-  int pos = 0;
-  int skipUntil = -1;
+  size_t pos = 0;
+  size_t skipUntil = std::string_view::npos;
   int lineNo = 1;
   int charNo = 0;
   
@@ -88,10 +134,10 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root, bool escapeOutput)
   nodeStack.push_back(root);
   
   // Scan loop
-  for( pos = 0; pos < tmplL; pos++, chr++ ) {
+  for( pos = 0; pos < tmplL; pos++ ) {
     
     // Track line numbers
-    if( *chr == '\n' ) {
+    if( tmpl[pos] == '\n' ) {
       lineNo++;
       charNo = 0;
     } else {
@@ -99,17 +145,17 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root, bool escapeOutput)
     }
       
     // Skip until position
-    if( skipUntil > -1 ) {
+    if( skipUntil != std::string_view::npos ) {
       if( pos <= skipUntil ) {
         continue;
       } else {
-        skipUntil = -1;
+        skipUntil = std::string_view::npos;
       }
     }
     
     // Main
     if( !inTag ) {
-      if( *chr == startC && tmpl->compare(pos, startL, start) == 0 ) {
+      if( tmpl[pos] == startC && matchesAt(tmpl, pos, start) ) {
         // Close previous buffer
         if( buffer.length() > 0 ) {
           node = new Node(Node::TypeOutput, buffer);
@@ -122,13 +168,13 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root, bool escapeOutput)
         startLineNo = lineNo;
         startCharNo = charNo; // Could be inaccurate
         // Triple mustache
-        if( start.compare("{{") == 0 && tmpl->compare(pos+2, 1, "{") == 0 ) {
+        if( start.compare("{{") == 0 && matchesAt(tmpl, pos + 2, "{") ) {
           inTripleTag = true;
           skipUntil++;
         }
       }
     } else {
-      if( *chr == stopC && tmpl->compare(pos, stopL, stop) == 0 ) {
+      if( tmpl[pos] == stopC && matchesAt(tmpl, pos, stop) ) {
         // Trim buffer
         trim(buffer);
         if( buffer.length() <= 0 ) {
@@ -234,7 +280,7 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root, bool escapeOutput)
         skipUntil = pos + tmpStopL - 1;
         // Triple mustache
         if( !skip && inTripleTag && stop.compare("}}") == 0 ) {
-          if( tmpl->compare(pos+2, 1, "}") != 0 ) {
+          if( !matchesAt(tmpl, pos + 2, "}") ) {
             std::ostringstream oss;
             oss << "Missing closing triple mustache delimiter at "
                 << lineNo << ":" << charNo
@@ -251,8 +297,8 @@ void Tokenizer::tokenize(std::string * tmpl, Node * root, bool escapeOutput)
     }
     
     // Append to buffer
-    if( skipUntil == -1 ) {
-      buffer.append(1, *chr);
+    if( skipUntil == std::string_view::npos ) {
+      buffer.append(1, tmpl[pos]);
     }
   }
   

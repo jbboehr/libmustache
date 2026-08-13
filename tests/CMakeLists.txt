@@ -28,12 +28,17 @@ add_executable(test_ownership test_ownership.cpp)
 target_link_libraries(test_ownership PRIVATE mustache_static)
 mustache_apply_build_options(test_ownership)
 
+add_executable(test_length_aware_api test_length_aware_api.cpp)
+target_link_libraries(test_length_aware_api PRIVATE mustache_static)
+mustache_apply_build_options(test_length_aware_api)
+
 add_test(NAME spec COMMAND test_spec "${MUSTACHE_SPEC_DIR}")
 add_test(NAME utils COMMAND test_utils)
 add_test(NAME misc COMMAND test_misc)
 add_test(NAME data_behavior COMMAND test_data_behavior)
 add_test(NAME node_serialization COMMAND test_node_serialization)
 add_test(NAME ownership COMMAND test_ownership)
+add_test(NAME length_aware_api COMMAND test_length_aware_api)
 
 if(MUSTACHE_ENABLE_FUZZING)
     add_executable(fuzz_node_unserialize fuzz_node_unserialize.cpp)
