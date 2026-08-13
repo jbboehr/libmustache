@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <map>
 #include <memory>
-#include <stack>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -21,10 +21,10 @@ namespace mustache {
 */
 class Node {
   public:
-    typedef std::vector<Node *> Children;
+    typedef std::vector<std::unique_ptr<Node> > Children;
     typedef std::map<std::string,std::string> RawPartials;
-    typedef std::map<std::string,Node> Partials;
-    typedef std::pair<std::string,Node> PartialPair;
+    typedef std::map<std::string,std::unique_ptr<Node> > Partials;
+    typedef Partials::value_type PartialPair;
 
     /*! \struct SerializationLimits
         \brief Resource limits for serialized AST encoding and decoding.
@@ -86,43 +86,33 @@ class Node {
     int flags;
     
     //! The string value
-    std::string * data;
+    std::optional<std::string> data;
     
     //! The string parts for dot notation
-    std::vector<std::string> * dataParts;
+    std::vector<std::string> dataParts;
     
     //! Child nodes
     Node::Children children;
     
-    //! Child node. Should not be freed
-    Node * child;
+    //! Owned child node for compatibility with TypeContainer
+    std::unique_ptr<Node> child;
     
     //! Internal partials
     Node::Partials partials;
 
     //! The start sequence value for this node's children (used when rendering lambdas as sections, so only needed if this node is a section)
-    std::string * startSequence;
+    std::optional<std::string> startSequence;
 
     //! The stop sequence value for this node's children (used when rendering lambdas as sections, so only needed if this node is a section)
-    std::string * stopSequence;
+    std::optional<std::string> stopSequence;
     
     //! Constructor
     Node() : 
         type(Node::TypeNone),
-        flags(Node::FlagNone),
-        data(NULL),
-        dataParts(NULL),
-        child(NULL),
-        startSequence(NULL),
-        stopSequence(NULL) {}
+        flags(Node::FlagNone) {}
     Node(Node::Type type, const std::string& data, int flags = 0) :
         type(type),
-        flags(flags),
-        data(NULL),
-        dataParts(NULL),
-        child(NULL),
-        startSequence(NULL),
-        stopSequence(NULL) {
+        flags(flags) {
       setData(data);
     }
 
@@ -173,51 +163,7 @@ class Node {
         size_t * vpos, const SerializationLimits& limits);
 
   private:
-    void swap(Node& other) noexcept;
-};
-
-/*! \class NodeStack
-    \brief Node stack.
-
-    This class is used to implement stack lookups in the tokenizer.
-*/
-class NodeStack {
-  public:
-    //! The maximum size of the stack
-#ifdef LIBMUSTACHE_NODE_STACK_MAXSIZE
-    static const int MAXSIZE = LIBMUSTACHE_NODE_STACK_MAXSIZE;
-#else
-    static const int MAXSIZE = 32;
-#endif
-    
-  private:
-    //! The current size
-    int _size;
-    
-    //! The data
-    Node * _stack[NodeStack::MAXSIZE];
-    
-  public:
-    //! Constructor
-    NodeStack() : _size(0) {};
-    
-    //! Add an element onto the top of the stack
-    void push_back(Node * data);
-    
-    //! Pop an element off the top of the stack
-    void pop_back();
-    
-    //! Get the top of the stack
-    Node * back();
-    
-    //! Get the size of the stack
-    int size() { return _size; };
-    
-    //! Gets a pointer to the beginning of the stack
-    Node ** begin();
-    
-    //! Gets a pointer to the end of the stack
-    Node ** end();
+    void resetMovedFrom() noexcept;
 };
 
 } // namespace Mustache

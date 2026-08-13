@@ -25,7 +25,7 @@ stdenv.mkDerivation (finalAttrs: {
     + lib.optionalString cmakeSupport "-cmake"
     + lib.optionalString sanitizerSupport "-sanitized"
     + lib.optionalString fuzzSupport "-fuzz";
-  version = "0.5.0";
+  version = "0.6.0";
 
   src =
     if builtins.isPath libmustacheSrc

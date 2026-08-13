@@ -2,6 +2,8 @@
 #include "test_spec.hpp"
 #include "./fixtures/lambdas.hpp"
 
+#include <memory>
+
 #ifdef _WIN32
 #include <io.h>
 #else
@@ -345,6 +347,8 @@ void mustache_spec_parse_partials(yaml_document_t * document, yaml_node_t * node
     std::string ckey(keyValue);
     std::string tmpl(valueValue);
 
-    mustache.tokenize(&tmpl, &(*partials)[ckey]);
+    std::unique_ptr<mustache::Node>& partial = (*partials)[ckey];
+    partial = std::make_unique<mustache::Node>();
+    mustache.tokenize(&tmpl, partial.get());
   }
 }

@@ -1,7 +1,9 @@
 # Modernization and memory-safety strategy
 
-**Date:** 2026-08-11  
-**Last revised:** 2026-08-12  
+**Date:** 2026-08-11
+
+**Last revised:** 2026-08-13
+
 **Status:** Proposed implementation strategy
 
 This document describes the planned modernization of libmustache after the
@@ -68,10 +70,16 @@ Do not preserve:
 - unsafe implicit copy operations; or
 - direct mutation of internal type discriminators.
 
-The result should be released as a new ABI, probably libmustache 0.6, even if
+The result should be released as the new libmustache 0.6 ABI, even if
 ordinary callers retain approximate source compatibility. Compatibility means
 keeping the high-level library recognizable; it does not mean emulating unsafe
 field-level ownership.
+
+The modernization development line now reports package version 0.6.0 and ABI
+6 so its shared library cannot be mistaken for the released ABI 5. ABI 6 is
+not considered stable or released until this modernization is complete; the
+project will make this single ABI transition rather than assigning a new ABI
+number to every incompatible commit on the unreleased development line.
 
 The current AST byte format is publicly exposed by php-mustache through the
 `MustacheAST` constructor, string conversion, and PHP serialization hooks. It
@@ -217,6 +225,13 @@ build systems enforce C++17, installed consumers pass, and at least one
 php-mustache compatibility job reports downstream breakage clearly.
 
 ## Phase 4: Replace the AST ownership model
+
+The first ownership slice converts the compatibility `Node` tree itself to
+RAII: node text and dotted-name components are values, children and the legacy
+container child are uniquely owned, partial maps contain uniquely owned nodes,
+and the unused fixed-size `NodeStack` has been removed. `Node` remains
+move-only while the opaque immutable `CompiledTemplate` API below is still to
+be introduced.
 
 AST nodes should become rule-of-zero values or immutable owned state:
 

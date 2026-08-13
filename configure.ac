@@ -1,5 +1,5 @@
 AC_PREREQ([2.69])
-AC_INIT([mustache], [0.5.0], [jbboehr@gmail.com], [mustache], [https://github.com/jbboehr/libmustache])
+AC_INIT([mustache], [0.6.0], [jbboehr@gmail.com], [mustache], [https://github.com/jbboehr/libmustache])
 AC_CONFIG_SRCDIR([src/mustache.cpp])
 AC_CONFIG_AUX_DIR([build])
 AC_CONFIG_MACRO_DIR([m4])

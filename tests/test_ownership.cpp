@@ -1,12 +1,14 @@
 #include "mustache_config.h"
 
 #include <cstdio>
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <utility>
 
 #include "data.hpp"
 #include "node.hpp"
+#include "renderer.hpp"
 
 static_assert(!std::is_copy_constructible<mustache::Data>::value,
     "mustache::Data must not be copy constructible");
@@ -24,6 +26,12 @@ static_assert(std::is_nothrow_move_constructible<mustache::Node>::value,
     "mustache::Node must be nothrow move constructible");
 static_assert(std::is_nothrow_move_assignable<mustache::Node>::value,
     "mustache::Node must be nothrow move assignable");
+static_assert(std::is_same<mustache::Node::Children::value_type,
+        std::unique_ptr<mustache::Node> >::value,
+    "mustache::Node children must have explicit ownership");
+static_assert(std::is_same<mustache::Node::Partials::mapped_type,
+        std::unique_ptr<mustache::Node> >::value,
+    "mustache::Node partials must have explicit ownership");
 
 namespace {
 
@@ -147,36 +155,42 @@ void testNodeMoveConstruction()
 {
   mustache::Node source(
       mustache::Node::TypeSection, "person.name", mustache::Node::FlagEscape);
-  source.children.push_back(
-      new mustache::Node(mustache::Node::TypeVariable, "value"));
-  source.child = source.children.front();
+  source.children.push_back(std::make_unique<mustache::Node>(
+      mustache::Node::TypeVariable, "value"));
+  source.child = std::make_unique<mustache::Node>(
+      mustache::Node::TypeOutput, "container child");
   source.partials.emplace("card",
-      mustache::Node(mustache::Node::TypeVariable, "title"));
-  source.startSequence = new std::string("<%");
-  source.stopSequence = new std::string("%>");
+      std::make_unique<mustache::Node>(
+          mustache::Node::TypeVariable, "title"));
+  source.startSequence = "<%";
+  source.stopSequence = "%>";
 
   mustache::Node moved(std::move(source));
 
   expect(source.type == mustache::Node::TypeNone,
       "Node move construction did not reset the source type");
-  expect(source.data == NULL && source.dataParts == NULL &&
+  expect(!source.data.has_value() && source.dataParts.empty() &&
           source.children.empty() && source.child == NULL &&
-          source.partials.empty() && source.startSequence == NULL &&
-          source.stopSequence == NULL,
-      "Node move construction left owned or borrowed state in the source");
+          source.partials.empty() && !source.startSequence.has_value() &&
+          !source.stopSequence.has_value(),
+      "Node move construction left owned state in the source");
   expect(moved.type == mustache::Node::TypeSection &&
           moved.flags == mustache::Node::FlagEscape,
       "Node move construction did not transfer scalar state");
-  expect(moved.data != NULL && *moved.data == "person.name" &&
-          moved.dataParts != NULL && moved.dataParts->size() == 2,
+  expect(moved.data.has_value() && *moved.data == "person.name" &&
+          moved.dataParts.size() == 2,
       "Node move construction did not transfer data state");
-  expect(moved.children.size() == 1 && moved.child == moved.children.front(),
-      "Node move construction did not preserve child relationships");
+  expect(moved.children.size() == 1 && moved.child != NULL &&
+          moved.child->data.has_value() &&
+          *moved.child->data == "container child",
+      "Node move construction did not transfer child ownership");
   mustache::Node::Partials::iterator partial = moved.partials.find("card");
-  expect(partial != moved.partials.end() && partial->second.data != NULL &&
-          *partial->second.data == "title",
+  expect(partial != moved.partials.end() && partial->second != NULL &&
+          partial->second->data.has_value() &&
+          *partial->second->data == "title",
       "Node move construction did not transfer internal partials");
-  expect(moved.startSequence != NULL && moved.stopSequence != NULL &&
+  expect(moved.startSequence.has_value() &&
+          moved.stopSequence.has_value() &&
           *moved.startSequence == "<%" && *moved.stopSequence == "%>",
       "Node move construction did not transfer delimiters");
 }
@@ -184,27 +198,58 @@ void testNodeMoveConstruction()
 void testNodeMoveAssignment()
 {
   mustache::Node source(mustache::Node::TypeVariable, "new.value");
-  source.children.push_back(
-      new mustache::Node(mustache::Node::TypeComment, "child"));
+  source.children.push_back(std::make_unique<mustache::Node>(
+      mustache::Node::TypeComment, "child"));
 
   mustache::Node destination(mustache::Node::TypeVariable, "old.value");
-  destination.children.push_back(
-      new mustache::Node(mustache::Node::TypeComment, "old child"));
-  destination.partials.emplace("old", mustache::Node(
+  destination.children.push_back(std::make_unique<mustache::Node>(
+      mustache::Node::TypeComment, "old child"));
+  destination.partials.emplace("old", std::make_unique<mustache::Node>(
       mustache::Node::TypeVariable, "old partial"));
   destination = std::move(source);
 
-  expect(source.type == mustache::Node::TypeNone && source.data == NULL &&
-          source.dataParts == NULL && source.children.empty(),
+  expect(source.type == mustache::Node::TypeNone &&
+          !source.data.has_value() && source.dataParts.empty() &&
+          source.children.empty(),
       "Node move assignment did not reset the source");
   expect(destination.type == mustache::Node::TypeVariable &&
-          destination.data != NULL && *destination.data == "new.value",
+          destination.data.has_value() && *destination.data == "new.value",
       "Node move assignment did not transfer data");
   expect(destination.children.size() == 1 &&
           *destination.children.front()->data == "child",
       "Node move assignment did not replace owned children");
   expect(destination.partials.empty(),
       "Node move assignment retained the destination's old partials");
+}
+
+void testOwnedNodeRendering()
+{
+  mustache::Data data(mustache::Data::TypeString, 0);
+  mustache::Renderer renderer;
+  std::string output;
+
+  mustache::Node container;
+  container.type = mustache::Node::TypeContainer;
+  container.child = std::make_unique<mustache::Node>(
+      mustache::Node::TypeOutput, "owned child");
+  renderer.init(&container, &data, NULL, &output);
+  renderer.render();
+  expect(output == "owned child",
+      "Renderer did not follow the owned container child");
+
+  mustache::Node invalidRoot;
+  invalidRoot.type = mustache::Node::TypeRoot;
+  invalidRoot.children.push_back(std::unique_ptr<mustache::Node>());
+  output.clear();
+  renderer.init(&invalidRoot, &data, NULL, &output);
+  bool rejected = false;
+  try {
+    renderer.render();
+  } catch( const mustache::Exception& exception ) {
+    rejected = std::string(exception.what()).find("Empty tree node") !=
+        std::string::npos;
+  }
+  expect(rejected, "Renderer did not reject a null owned child safely");
 }
 
 } // namespace
@@ -216,5 +261,6 @@ int main()
   testDataLambdaMoveAssignment();
   testNodeMoveConstruction();
   testNodeMoveAssignment();
+  testOwnedNodeRendering();
   return failures == 0 ? 0 : 1;
 }

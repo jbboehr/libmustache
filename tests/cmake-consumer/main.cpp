@@ -10,7 +10,7 @@
 #include <vector>
 
 #ifndef MUSTACHE_EXPECTED_VERSION
-#define MUSTACHE_EXPECTED_VERSION "0.5.0"
+#define MUSTACHE_EXPECTED_VERSION "0.6.0"
 #endif
 
 #if defined(_MSVC_LANG)
@@ -47,6 +47,12 @@ static_assert(std::is_nothrow_move_constructible<mustache::Node>::value,
     "mustache::Node must be nothrow move constructible");
 static_assert(std::is_nothrow_move_assignable<mustache::Node>::value,
     "mustache::Node must be nothrow move assignable");
+static_assert(std::is_same<mustache::Node::Children::value_type,
+        std::unique_ptr<mustache::Node> >::value,
+    "installed Node children must have explicit ownership");
+static_assert(std::is_same<mustache::Node::Partials::mapped_type,
+        std::unique_ptr<mustache::Node> >::value,
+    "installed Node partials must have explicit ownership");
 
 int main()
 {
@@ -65,6 +71,8 @@ int main()
     mustache::Node::SerializationLimits limits;
     mustache::Node root;
     root.type = mustache::Node::TypeRoot;
+    root.children.push_back(std::make_unique<mustache::Node>(
+        mustache::Node::TypeOutput, "owned"));
     mustache::Node movedRoot(std::move(root));
     std::unique_ptr<std::vector<uint8_t> > serial(movedRoot.serialize(limits));
     std::size_t position = 0;
@@ -72,6 +80,9 @@ int main()
         mustache::Node::unserialize(
             serial->data(), serial->size(), 0, &position, limits));
     return decoded->type == mustache::Node::TypeRoot &&
+            decoded->children.size() == 1 &&
+            decoded->children.front()->data.has_value() &&
+            *decoded->children.front()->data == "owned" &&
             position == serial->size()
         ? 0
         : 1;

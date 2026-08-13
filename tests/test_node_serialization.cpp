@@ -247,19 +247,20 @@ void testPHPFixture()
       "php-mustache fixture root type changed");
   expect(root->flags == mustache::Node::FlagNone,
       "php-mustache fixture root flags changed");
-  expect(root->data == NULL, "php-mustache fixture root unexpectedly has data");
+  expect(!root->data.has_value(),
+      "php-mustache fixture root unexpectedly has data");
   expect(root->children.size() == 1,
       "php-mustache fixture must contain one child");
 
   if( root->children.size() == 1 ) {
-    mustache::Node * child = root->children[0];
+    mustache::Node * child = root->children[0].get();
     expect(child != NULL, "php-mustache fixture child must not be null");
     if( child != NULL ) {
       expect(child->type == mustache::Node::TypeVariable,
           "php-mustache fixture child type changed");
       expect(child->flags == mustache::Node::FlagEscape,
           "php-mustache fixture child flags changed");
-      expect(child->data != NULL && *child->data == "test",
+      expect(child->data.has_value() && *child->data == "test",
           "php-mustache fixture child data changed");
       expect(child->children.empty(),
           "php-mustache fixture child unexpectedly has children");
@@ -398,9 +399,9 @@ void testOffsetAndScalarCompatibility()
 
   mustache::Node root;
   root.type = mustache::Node::TypeRoot;
-  root.children.push_back(
-      new mustache::Node(mustache::Node::TypeComment, ""));
-  root.children.push_back(new mustache::Node(
+  root.children.push_back(std::make_unique<mustache::Node>(
+      mustache::Node::TypeComment, ""));
+  root.children.push_back(std::make_unique<mustache::Node>(
       mustache::Node::TypeOutput, std::string("a\0b", 3)));
 
   std::unique_ptr<std::vector<uint8_t> > serial(root.serialize());
@@ -410,10 +411,10 @@ void testOffsetAndScalarCompatibility()
   expect(roundTrip->children.size() == 2,
       "empty and embedded-NUL data must survive decoding");
   if( roundTrip->children.size() == 2 ) {
-    expect(roundTrip->children[0]->data != NULL &&
+    expect(roundTrip->children[0]->data.has_value() &&
             roundTrip->children[0]->data->empty(),
         "empty serialized data must remain present");
-    expect(roundTrip->children[1]->data != NULL &&
+    expect(roundTrip->children[1]->data.has_value() &&
             *roundTrip->children[1]->data == std::string("a\0b", 3),
         "embedded NUL bytes must survive decoding");
   }
@@ -442,12 +443,14 @@ void testComplexTokenizerCompatibility()
 
   bool foundSection = false;
   for( std::size_t i = 0; i < decoded->children.size(); ++i ) {
-    mustache::Node * child = decoded->children[i];
+    mustache::Node * child = decoded->children[i].get();
     if( child->type == mustache::Node::TypeSection ) {
       foundSection = true;
-      expect(child->startSequence != NULL && *child->startSequence == "{{",
+      expect(child->startSequence.has_value() &&
+              *child->startSequence == "{{",
           "decoded sections must have a safe default start delimiter");
-      expect(child->stopSequence != NULL && *child->stopSequence == "}}",
+      expect(child->stopSequence.has_value() &&
+              *child->stopSequence == "}}",
           "decoded sections must have a safe default stop delimiter");
     }
   }
@@ -585,37 +588,37 @@ void testSerializerValidation()
 
   mustache::Node nullChild;
   nullChild.type = mustache::Node::TypeRoot;
-  nullChild.children.push_back(NULL);
+  nullChild.children.push_back(std::unique_ptr<mustache::Node>());
   expectSerializeInvalid(nullChild, "null children must not be serialized");
 
   mustache::Node leafWithChild(mustache::Node::TypeVariable, "value");
-  leafWithChild.children.push_back(
-      new mustache::Node(mustache::Node::TypeOutput, "child"));
+  leafWithChild.children.push_back(std::make_unique<mustache::Node>(
+      mustache::Node::TypeOutput, "child"));
   expectSerializeInvalid(leafWithChild,
       "children on leaf nodes must not be serialized");
 
   mustache::Node oversizedData;
   oversizedData.type = mustache::Node::TypeOutput;
-  oversizedData.data = new std::string(0x00ffffff, 'x');
+  oversizedData.data = std::string(0x00ffffff, 'x');
   expectSerializeInvalid(oversizedData,
       "data exceeding the 24-bit field must not be serialized");
 
   mustache::Node oversizedChildren;
   oversizedChildren.type = mustache::Node::TypeRoot;
-  oversizedChildren.children.assign(0x00010000, NULL);
+  oversizedChildren.children.resize(0x00010000);
   expectSerializeInvalid(oversizedChildren,
       "child counts exceeding the 16-bit field must not be serialized");
 
   mustache::Node excessiveDataParts;
   excessiveDataParts.type = mustache::Node::TypeVariable;
-  excessiveDataParts.data = new std::string(256, '.');
+  excessiveDataParts.data = std::string(256, '.');
   expectSerializeInvalid(excessiveDataParts,
       "excessive dotted-name components must not be serialized");
 
   mustache::Node aggregateDataParts;
   aggregateDataParts.type = mustache::Node::TypeRoot;
   for( int i = 0; i < 391; ++i ) {
-    aggregateDataParts.children.push_back(new mustache::Node(
+    aggregateDataParts.children.push_back(std::make_unique<mustache::Node>(
         mustache::Node::TypeVariable, std::string(255, '.')));
   }
   expectSerializeInvalid(aggregateDataParts,
@@ -625,10 +628,9 @@ void testSerializerValidation()
   excessiveDepth.type = mustache::Node::TypeRoot;
   mustache::Node * parent = &excessiveDepth;
   for( int depth = 0; depth < 64; ++depth ) {
-    mustache::Node * section =
-        new mustache::Node(mustache::Node::TypeSection, "x");
-    parent->children.push_back(section);
-    parent = section;
+    parent->children.push_back(std::make_unique<mustache::Node>(
+        mustache::Node::TypeSection, "x"));
+    parent = parent->children.back().get();
   }
   expectSerializeInvalid(excessiveDepth,
       "excessive node nesting must not be serialized");

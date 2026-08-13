@@ -28,20 +28,23 @@ void populateExistingTree(mustache::Node * root)
   root->type = mustache::Node::TypeSection;
   root->flags = mustache::Node::FlagEscape;
   root->setData("original.path");
-  root->children.push_back(
-      new mustache::Node(mustache::Node::TypeOutput, "original child"));
-  root->child = root->children.front();
-  root->partials.emplace("original partial", mustache::Node(
-      mustache::Node::TypeOutput, "partial body"));
-  root->startSequence = new std::string("<%");
-  root->stopSequence = new std::string("%>");
+  root->children.push_back(std::make_unique<mustache::Node>(
+      mustache::Node::TypeOutput, "original child"));
+  root->child = std::make_unique<mustache::Node>(
+      mustache::Node::TypeOutput, "container child");
+  root->partials.emplace("original partial",
+      std::make_unique<mustache::Node>(
+          mustache::Node::TypeOutput, "partial body"));
+  root->startSequence = "<%";
+  root->stopSequence = "%>";
 }
 
 void testFailedTokenizePreservesExistingTree()
 {
   mustache::Node root;
   populateExistingTree(&root);
-  mustache::Node * originalChild = root.children.front();
+  mustache::Node * originalChild = root.children.front().get();
+  mustache::Node * originalContainerChild = root.child.get();
 
   mustache::Tokenizer tokenizer;
   bool rejected = false;
@@ -55,16 +58,16 @@ void testFailedTokenizePreservesExistingTree()
   expect(root.type == mustache::Node::TypeSection &&
           root.flags == mustache::Node::FlagEscape,
       "failed tokenization changed the existing root state");
-  expect(root.data != NULL && *root.data == "original.path" &&
-          root.dataParts != NULL && root.dataParts->size() == 2,
+  expect(root.data.has_value() && *root.data == "original.path" &&
+          root.dataParts.size() == 2,
       "failed tokenization changed the existing root data");
   expect(root.children.size() == 1 &&
-          root.children.front() == originalChild &&
-          root.child == originalChild,
+          root.children.front().get() == originalChild &&
+          root.child.get() == originalContainerChild,
       "failed tokenization changed the existing child ownership");
   expect(root.partials.size() == 1 &&
-          root.startSequence != NULL && *root.startSequence == "<%" &&
-          root.stopSequence != NULL && *root.stopSequence == "%>",
+          root.startSequence.has_value() && *root.startSequence == "<%" &&
+          root.stopSequence.has_value() && *root.stopSequence == "%>",
       "failed tokenization changed existing auxiliary AST state");
 }
 
@@ -79,8 +82,9 @@ void testSuccessfulTokenizeReplacesExistingTree()
   expect(root.type == mustache::Node::TypeRoot &&
           root.flags == mustache::Node::FlagNone,
       "successful tokenization did not publish a new root");
-  expect(root.data == NULL && root.dataParts == NULL && root.child == NULL &&
-          root.startSequence == NULL && root.stopSequence == NULL,
+  expect(!root.data.has_value() && root.dataParts.empty() &&
+          root.child == NULL && !root.startSequence.has_value() &&
+          !root.stopSequence.has_value(),
       "successful tokenization retained state from the previous tree");
   expect(root.partials.size() == 1 &&
           root.partials.find("original partial") != root.partials.end(),
@@ -96,17 +100,17 @@ void testSuccessfulTokenizeReplacesExistingTree()
 void testSetDataReplacesOwnedState()
 {
   mustache::Node node(mustache::Node::TypeVariable, "one.two");
-  expect(node.dataParts != NULL && node.dataParts->size() == 2,
+  expect(node.dataParts.size() == 2,
       "the initial dotted name was not split");
 
   node.setData("plain");
-  expect(node.data != NULL && *node.data == "plain" &&
-          node.dataParts == NULL,
+  expect(node.data.has_value() && *node.data == "plain" &&
+          node.dataParts.empty(),
       "setData retained stale dotted-name state");
 
   node.setData("three.parts.here");
-  expect(node.data != NULL && *node.data == "three.parts.here" &&
-          node.dataParts != NULL && node.dataParts->size() == 3,
+  expect(node.data.has_value() && *node.data == "three.parts.here" &&
+          node.dataParts.size() == 3,
       "setData did not publish its replacement state");
 }
 
@@ -116,7 +120,8 @@ void expectLimitFailure(std::string_view source,
 {
   mustache::Node root;
   populateExistingTree(&root);
-  mustache::Node * originalChild = root.children.front();
+  mustache::Node * originalChild = root.children.front().get();
+  mustache::Node * originalContainerChild = root.child.get();
   mustache::Tokenizer tokenizer;
 
   bool rejected = false;
@@ -130,8 +135,8 @@ void expectLimitFailure(std::string_view source,
   expect(rejected, failureMessage);
   expect(root.type == mustache::Node::TypeSection &&
           root.children.size() == 1 &&
-          root.children.front() == originalChild &&
-          root.child == originalChild,
+          root.children.front().get() == originalChild &&
+          root.child.get() == originalContainerChild,
       "a parser limit failure changed the destination tree");
 }
 

@@ -15,6 +15,7 @@
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <memory>
 #include <vector>
 
 #include "mustache.hpp"
@@ -154,7 +155,9 @@ int main( int argc, char * argv[] )
   
   // Tokenize partials
   for( pf_it = partialFiles.begin(); pf_it != partialFiles.end(); pf_it++ ) {
-    must.tokenize(&pf_it->second, &(partials[pf_it->first]));
+    std::unique_ptr<mustache::Node>& partial = partials[pf_it->first];
+    partial = std::make_unique<mustache::Node>();
+    must.tokenize(&pf_it->second, partial.get());
   }
   
   // Get input data

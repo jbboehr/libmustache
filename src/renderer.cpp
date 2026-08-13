@@ -99,10 +99,15 @@ void Renderer::renderForLambda(Node * node, std::string * output)
 
 void Renderer::_renderNode(Node * node)
 {
+  if( node == NULL ) {
+    throw Exception("Empty tree node");
+  }
+
   // Check stack size?
   if( _stack->size() <= 0 ) {
     throw Exception("Whoops, empty data");
-  } else if( !(node->type & Node::TypeHasNoString) && node->data == NULL ) {
+  } else if( !(node->type & Node::TypeHasNoString) &&
+      !node->data.has_value() ) {
     throw Exception("Whoops, empty tag");
   }
   
@@ -129,19 +134,22 @@ void Renderer::_renderNode(Node * node)
       if( node->children.size() > 0 ) {
         Node::Children::iterator it;
         for ( it = node->children.begin() ; it != node->children.end(); it++ ) {
-          _renderNode(*it);
+          _renderNode(it->get());
         }
       }
       return;
       break;
     case Node::TypeOutput:
-      if( node->data != NULL && node->data->length() > 0 ) {
+      if( node->data.has_value() && node->data->length() > 0 ) {
         _output->append(*node->data);
       }
       return;
       break;
     case Node::TypeContainer:
-      _renderNode(node->child);
+      if( node->child == NULL ) {
+        throw Exception("Empty container node");
+      }
+      _renderNode(node->child.get());
       return;
       break;
       
@@ -174,7 +182,7 @@ void Renderer::_renderNode(Node * node)
       if( valIsEmpty ) {
         Node::Children::iterator it;
         for( it = node->children.begin() ; it != node->children.end(); it++ ) {
-          _renderNode(*it);
+          _renderNode(it->get());
         }
       }
       break;
@@ -186,7 +194,7 @@ void Renderer::_renderNode(Node * node)
           case Data::TypeString:
             _stack->push_back(val);
             for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
-              _renderNode(*it);
+              _renderNode(it->get());
             }
             _stack->pop_back();
             break;
@@ -194,7 +202,7 @@ void Renderer::_renderNode(Node * node)
             for( Data::List::iterator childrenIt = val->children.begin() ; childrenIt != val->children.end(); childrenIt++ ) {
               _stack->push_back(*childrenIt);
               for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
-                _renderNode(*it);
+                _renderNode(it->get());
               }
               _stack->pop_back();
             }
@@ -203,7 +211,7 @@ void Renderer::_renderNode(Node * node)
         	  for( int i = 0; i < val->length; i++ ) {
                   _stack->push_back(val->array[i]);
                   for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
-                    _renderNode(*it);
+                    _renderNode(it->get());
                   }
                   _stack->pop_back();
         	  }
@@ -212,11 +220,15 @@ void Renderer::_renderNode(Node * node)
             // Associate array/map
             _stack->push_back(val);
             for( Node::Children::iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
-              _renderNode(*it);
+              _renderNode(it->get());
             }
             _stack->pop_back();
             break;
           case Data::TypeLambda:
+            if( !node->startSequence.has_value() ||
+                !node->stopSequence.has_value() ) {
+              throw Exception("Missing section delimiters");
+            }
             std::string text = node->children_to_template_string(*node->startSequence, *node->stopSequence);
             std::string invoked = val->lambda->invoke(
                 std::string_view(text), this);
@@ -238,17 +250,17 @@ void Renderer::_renderNode(Node * node)
       if( !partialFound && _partials != NULL ) {
         Node::Partials::iterator p_it;
         p_it = _partials->find(*(node->data));
-        if( p_it != _partials->end() ) {
+        if( p_it != _partials->end() && p_it->second != NULL ) {
           partialFound = true;
-          _renderNode(&(p_it->second));
+          _renderNode(p_it->second.get());
         }
       }
       if( !partialFound && _node->partials.size() > 0 ) {
         Node::Partials::iterator p_it;
         p_it = _node->partials.find(*(node->data));
-        if( p_it != _node->partials.end() ) {
+        if( p_it != _node->partials.end() && p_it->second != NULL ) {
           partialFound = true;
-          _renderNode(&(p_it->second));
+          _renderNode(p_it->second.get());
         }
       }
       break;
@@ -283,10 +295,10 @@ Data * Renderer::_lookup(Node * node)
   
   // Get initial segment for dot notation
   std::string * initial;
-  if( node->dataParts != NULL ) {
-    initial = &(node->dataParts->at(0));
+  if( !node->dataParts.empty() ) {
+    initial = &(node->dataParts.at(0));
   } else {
-    initial = node->data;
+    initial = &*node->data;
   }
   
   // Resolve up the data stack
@@ -307,10 +319,11 @@ Data * Renderer::_lookup(Node * node)
   }
 
   // Resolve or dot notation
-  if( ref != NULL && node->dataParts != NULL && node->dataParts->size() > 1 ) {
+  if( ref != NULL && node->dataParts.size() > 1 ) {
     // Dot notation
     std::vector<std::string>::iterator vs_it;
-    for( vs_it = node->dataParts->begin(), vs_it++; vs_it != node->dataParts->end(); vs_it++ ) {
+    for( vs_it = node->dataParts.begin(), vs_it++;
+        vs_it != node->dataParts.end(); vs_it++ ) {
       if( ref == NULL ) {
         break;
       } else if( ref->type != Data::TypeMap ) {

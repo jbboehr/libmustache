@@ -39,9 +39,9 @@ Node * appendNode(Node * parent, std::unique_ptr<Node> node,
     throw TokenizerException(
         "Template node count limit exceeded", lineNo, charNo);
   }
-  parent->children.push_back(node.get());
+  parent->children.push_back(std::move(node));
   ++*nodeCount;
-  return node.release();
+  return parent->children.back().get();
 }
 
 } // namespace
@@ -215,8 +215,8 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root,
       if( tmpl[pos] == startC && matchesAt(tmpl, pos, start) ) {
         // Close previous buffer
         if( buffer.length() > 0 ) {
-          appendNode(nodeStack.back().node, std::unique_ptr<Node>(
-              new Node(Node::TypeOutput, buffer)), &nodeCount, limits,
+          appendNode(nodeStack.back().node, std::make_unique<Node>(
+              Node::TypeOutput, buffer), &nodeCount, limits,
               lineNo, charNo);
           buffer.clear();
         }
@@ -333,13 +333,13 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root,
             }
 
             const ParseFrame& openSection = nodeStack.back();
-            if( openSection.node->data == NULL ||
+            if( !openSection.node->data.has_value() ||
                 *openSection.node->data != buffer ) {
               std::ostringstream oss;
               oss << "Mismatched closing section '" << buffer
                   << "' at " << startLineNo << ":" << startCharNo
                   << "; expected '"
-                  << (openSection.node->data == NULL
+                  << (!openSection.node->data.has_value()
                       ? std::string() : *openSection.node->data)
                   << "' opened at " << openSection.lineNo
                   << ":" << openSection.charNo;
@@ -348,12 +348,12 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root,
             }
           }
 
-          std::unique_ptr<Node> pendingNode(
-              new Node(currentType, buffer, currentFlags));
+          std::unique_ptr<Node> pendingNode =
+              std::make_unique<Node>(currentType, buffer, currentFlags);
 
           if( currentType == Node::TypeSection ) {
-            pendingNode->startSequence = new std::string(start);
-            pendingNode->stopSequence = new std::string(stop);
+            pendingNode->startSequence = start;
+            pendingNode->stopSequence = stop;
           }
 
           node = appendNode(nodeStack.back().node, std::move(pendingNode),
@@ -411,13 +411,13 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root,
         << (nodeStack.size() - 1);
     throw TokenizerException(oss.str(), -1, -1);
   } else if( buffer.length() > 0 ) {
-    std::unique_ptr<Node> pendingNode(new Node());
+    std::unique_ptr<Node> pendingNode = std::make_unique<Node>();
     pendingNode->type = Node::TypeOutput;
     if( escapeOutput ) {
-      pendingNode->data = new std::string();
-      htmlspecialchars_append(&buffer, pendingNode->data);
+      pendingNode->data.emplace();
+      htmlspecialchars_append(&buffer, &*pendingNode->data);
     } else {
-      pendingNode->data = new std::string(buffer);
+      pendingNode->data = buffer;
     }
     appendNode(nodeStack.back().node, std::move(pendingNode),
         &nodeCount, limits, lineNo, charNo);

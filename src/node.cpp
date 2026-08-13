@@ -155,7 +155,7 @@ void serializeNode(const Node& node, std::vector<uint8_t>& output,
 {
   checkSerialBudget(state, depth);
   validateNodeShape(
-      node.type, static_cast<size_t>(node.flags), node.data != NULL,
+      node.type, static_cast<size_t>(node.flags), node.data.has_value(),
       node.children.size());
 
   if( node.flags < 0 ) {
@@ -166,7 +166,7 @@ void serializeNode(const Node& node, std::vector<uint8_t>& output,
   }
 
   size_t dataSize = 0;
-  if( node.data != NULL ) {
+  if( node.data.has_value() ) {
     if( node.data->size() >= serialMaxDataSize ) {
       throw Exception("Serial node data exceeds format limit");
     }
@@ -185,7 +185,7 @@ void serializeNode(const Node& node, std::vector<uint8_t>& output,
   const size_t childrenSizePos = output.size();
   appendUint32(output, 0, state);
 
-  if( node.data != NULL ) {
+  if( node.data.has_value() ) {
     output.insert(output.end(), node.data->begin(), node.data->end());
     output.push_back(0);
   }
@@ -323,23 +323,21 @@ std::unique_ptr<Node> unserializeNode(SerialReader& reader, size_t limit,
   }
   const size_t childrenEnd = reader.position() + childrenSize;
 
-  std::unique_ptr<Node> node(new Node());
+  std::unique_ptr<Node> node = std::make_unique<Node>();
   node->type = type;
   node->flags = static_cast<int>(flags);
   if( dataSize > 0 ) {
     node->setData(data);
   }
   if( type == Node::TypeSection ) {
-    node->startSequence = new std::string("{{");
-    node->stopSequence = new std::string("}}");
+    node->startSequence = "{{";
+    node->stopSequence = "}}";
   }
 
   node->children.reserve(childrenNum);
   for( size_t i = 0; i < childrenNum; ++i ) {
-    std::unique_ptr<Node> child(
+    node->children.push_back(
         unserializeNode(reader, childrenEnd, state, depth + 1));
-    node->children.push_back(child.get());
-    child.release();
   }
 
   if( reader.position() != childrenEnd ) {
@@ -361,72 +359,50 @@ Node::SerializationLimits::SerializationLimits() :
 }
 
 Node::Node(Node&& other) noexcept :
-    type(Node::TypeNone),
-    flags(Node::FlagNone),
-    data(NULL),
-    dataParts(NULL),
-    child(NULL),
-    startSequence(NULL),
-    stopSequence(NULL)
+    type(other.type),
+    flags(other.flags),
+    data(std::move(other.data)),
+    dataParts(std::move(other.dataParts)),
+    children(std::move(other.children)),
+    child(std::move(other.child)),
+    partials(std::move(other.partials)),
+    startSequence(std::move(other.startSequence)),
+    stopSequence(std::move(other.stopSequence))
 {
-  swap(other);
+  other.resetMovedFrom();
 }
 
 Node& Node::operator=(Node&& other) noexcept
 {
   if( this != &other ) {
-    Node previous(std::move(other));
-    swap(previous);
+    type = other.type;
+    flags = other.flags;
+    data = std::move(other.data);
+    dataParts = std::move(other.dataParts);
+    children = std::move(other.children);
+    child = std::move(other.child);
+    partials = std::move(other.partials);
+    startSequence = std::move(other.startSequence);
+    stopSequence = std::move(other.stopSequence);
+    other.resetMovedFrom();
   }
   return *this;
 }
 
-void Node::swap(Node& other) noexcept
+void Node::resetMovedFrom() noexcept
 {
-  using std::swap;
-  swap(type, other.type);
-  swap(flags, other.flags);
-  swap(data, other.data);
-  swap(dataParts, other.dataParts);
-  children.swap(other.children);
-  swap(child, other.child);
-  partials.swap(other.partials);
-  swap(startSequence, other.startSequence);
-  swap(stopSequence, other.stopSequence);
-}
-
-
-Node::~Node()
-{
-  // Data
-  if( data != NULL ) {
-    delete data;
-  }
-  
-  // Data parts
-  if( dataParts != NULL ) {
-    delete dataParts;
-  }
-  
-  // Children
-  if( children.size() > 0 ) {
-    Node::Children::iterator it;
-    for ( it = children.begin() ; it != children.end(); it++ ) {
-      delete *it;
-    }
-  }
+  type = Node::TypeNone;
+  flags = Node::FlagNone;
+  data.reset();
+  dataParts.clear();
   children.clear();
-  
-  // Child should not be freed
-
-  if( startSequence != NULL ) {
-    delete startSequence;
-  }
-
-  if( stopSequence != NULL ) {
-    delete stopSequence;
-  }
+  child.reset();
+  partials.clear();
+  startSequence.reset();
+  stopSequence.reset();
 }
+
+Node::~Node() = default;
 
 std::string Node::children_to_template_string(const std::string& start, const std::string& stop)
 {
@@ -435,6 +411,9 @@ std::string Node::children_to_template_string(const std::string& start, const st
   if( children.size() > 0 ) {
     Node::Children::iterator it;
     for( it = children.begin() ; it != children.end(); it++ ) {
+      if( *it == NULL ) {
+        throw Exception("Invalid null child node");
+      }
       if( (*it)->type == Node::TypeStop ) {
         continue;
       }
@@ -448,21 +427,18 @@ std::string Node::children_to_template_string(const std::string& start, const st
 
 void Node::setData(const std::string& data)
 {
-  std::unique_ptr<std::string> nextData(new std::string(data));
-  std::unique_ptr<std::vector<std::string> > nextDataParts;
+  std::optional<std::string> nextData(data);
+  std::vector<std::string> nextDataParts;
 
   if( this->type & Node::TypeHasDot ) {
     size_t found = data.find(".");
     if( found != std::string::npos ) {
-      nextDataParts.reset(new std::vector<std::string>);
-      explode(".", *nextData, nextDataParts.get());
+      explode(".", data, &nextDataParts);
     }
   }
 
-  delete this->data;
-  delete dataParts;
-  this->data = nextData.release();
-  dataParts = nextDataParts.release();
+  this->data.swap(nextData);
+  dataParts.swap(nextDataParts);
 }
 
 std::vector<uint8_t> * Node::serialize()
@@ -485,6 +461,10 @@ std::vector<uint8_t> * Node::serialize(const SerializationLimits& limits)
 std::string Node::to_template_string(const std::string& start, const std::string& stop)
 {
   std::string template_string;
+
+  if( !(type & Node::TypeHasNoString) && !data.has_value() ) {
+    throw Exception("Invalid node without data");
+  }
 
   switch( type ) {
     case Node::TypeComment:
@@ -531,6 +511,9 @@ std::string Node::to_template_string(const std::string& start, const std::string
       if( children.size() > 0 ) {
         Node::Children::iterator it;
         for( it = children.begin() ; it != children.end(); it++ ) {
+          if( *it == NULL ) {
+            throw Exception("Invalid null child node");
+          }
           template_string.append((*it)->to_template_string(start, stop));
         }
       }
@@ -602,44 +585,5 @@ Node * Node::unserialize(std::string_view serial, size_t offset,
       reinterpret_cast<const uint8_t *>(serial.data()),
       serial.size(), offset, vpos, limits);
 }
-
-
-
-void NodeStack::push_back(Node * node)
-{
-  if( _size < 0 || _size >= NodeStack::MAXSIZE ) {
-    throw Exception("Reached max stack size");
-  }
-  _stack[_size] = node;
-  _size++;
-}
-
-void NodeStack::pop_back()
-{
-  if( _size > 0 ) {
-    _size--;
-    _stack[_size] = NULL;
-  }
-}
-
-Node * NodeStack::back()
-{
-  if( _size <= 0 ) {
-    throw Exception("Reached bottom of stack");
-  } else {
-    return _stack[_size - 1];
-  }
-}
-
-Node ** NodeStack::begin()
-{
-  return _stack;
-}
-
-Node ** NodeStack::end()
-{
-  return (_stack + _size - 1);
-}
-
 
 } // namespace Mustache

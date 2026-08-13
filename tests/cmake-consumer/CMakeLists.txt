@@ -19,7 +19,7 @@ else()
         "MUSTACHE_CONSUMER_LINKAGE must be either shared or static")
 endif()
 
-find_package(mustache 0.5 CONFIG REQUIRED
+find_package(mustache 0.6 CONFIG REQUIRED
     COMPONENTS ${MUSTACHE_CONSUMER_LINKAGE})
 
 add_executable(mustache_consumer main.cpp)

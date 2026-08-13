@@ -49,7 +49,7 @@ the default and does not require dependency development packages at consume
 time:
 
 ```cmake
-find_package(mustache 0.5 CONFIG REQUIRED)
+find_package(mustache 0.6 CONFIG REQUIRED)
 target_link_libraries(example PRIVATE mustache::mustache)
 ```
 
@@ -57,7 +57,7 @@ Static consumers request the static component, which also locates json-c and
 libyaml:
 
 ```cmake
-find_package(mustache 0.5 CONFIG REQUIRED COMPONENTS static)
+find_package(mustache 0.6 CONFIG REQUIRED COMPONENTS static)
 target_link_libraries(example PRIVATE mustache::mustache_static)
 ```
 
@@ -106,6 +106,12 @@ zero means that a template consuming that resource is rejected, not unlimited.
 Applications processing untrusted templates should supply limits appropriate
 for their workload. The 62-section default leaves room for the root and closing
 node within the serializer's default 64-node root-to-leaf limit.
+
+`Node` is move-only and owns its complete compatibility AST. Text and dotted
+name components are stored as values; `children`, `child`, and `partials` use
+`std::unique_ptr<Node>` to make ownership explicit. Construct manually supplied
+nodes with `std::make_unique<Node>()` and move them into those containers. The
+tokenizer and decoder publish complete trees transactionally.
 
 ## Windows
 
