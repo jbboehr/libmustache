@@ -282,9 +282,65 @@ initially reproducing the characterized rendering behavior. Any correction to
 truthiness or scalar formatting must be a separately documented behavior
 change with explicit compatibility tests.
 
+### Replace the json-c adapter
+
+The Nix build currently obtains json-c 0.18 from the pinned nixpkgs input, but
+the CMake and Autotools checks do not declare a minimum json-c version. This
+means compatibility tests must not accidentally treat behavior introduced by
+a newer json-c release, such as a particular floating-point spelling, as a
+libmustache guarantee.
+
+It is acceptable to raise the temporary minimum json-c version when a concrete
+security fix, API requirement, or supported-platform policy justifies it. Such
+a change must be applied consistently to CMake, Autotools, Nix, vcpkg, CI, and
+installed-consumer metadata. The minimum must not be raised solely to make a
+characterization test pass; version-dependent formatting should instead be
+tested semantically or recorded as dependency-specific behavior.
+
+Replace json-c while introducing the owned `Data` representation rather than
+as an isolated rewrite. This keeps parser behavior changes adjacent to the
+typed scalar model and avoids translating from one unsafe intermediate
+representation into another. Preserve `Data::createFromJSON` as a compatibility
+facade, but make the parser an implementation detail that produces a complete
+temporary value and publishes it only after successful validation and
+conversion.
+
+Boost.JSON is the leading replacement candidate because it offers RAII-owned
+values, strict parsing, explicit nesting limits, error-code APIs, and support
+for C++11 and later. Before selecting it, compare it with nlohmann/json and the
+existing json-c adapter using a small implementation spike. The comparison
+must cover:
+
+- Linux, macOS, and MSVC packaging and installed-consumer behavior;
+- shared and static linking, including whether parser dependencies leak into
+  the public package interface;
+- strict JSON and UTF-8 handling;
+- integer, floating-point, negative-zero, and overflow behavior;
+- duplicate object keys and exact trailing-input rejection;
+- parse errors and allocation-failure cleanup;
+- compile time, binary size, parse time, allocations, and peak memory; and
+- maintenance cost and the process for receiving dependency security updates.
+
+Do not select simdjson without a demonstrated workload need; its parser-owned
+view lifetimes add complexity that is unnecessary for the CLI and do not help
+the PHP extension's usual direct conversion path. Prefer a simple temporary
+DOM followed by transactional conversion into owned `Data`. A direct SAX
+builder may be considered only if profiling shows the temporary DOM to be a
+material cost and the builder can preserve the same validation and exception-
+safety guarantees.
+
+Whichever parser is selected, libmustache must impose its own input-byte,
+nesting-depth, node-count, aggregate-string-byte, and allocation budgets. The
+adapter must reject trailing input, invalid encodings, unsupported numeric
+values, and limit exhaustion with stable library errors. Parser defaults are
+defense in depth, not the public resource-limit policy. Add a JSON fuzz target
+and retain a differential corpus across json-c and the replacement until every
+intentional compatibility difference has been reviewed and recorded.
+
 **Definition of done:** JSON, YAML, and direct construction use the owned value
 model; no owning raw pointer or separate length remains; the recursive layout
-is tested with every supported standard library; allocation and parser failure
+is tested with every supported standard library; the selected JSON parser has
+explicit resource limits and fuzz coverage; allocation and parser failure
 unwind cleanly under sanitizers; and the scalar golden tests either remain
 unchanged or record an intentionally approved behavior change.
 
@@ -442,7 +498,8 @@ the migration and compatibility policies are published with the release.
 6. Establish one representative php-mustache compatibility job.
 7. Implement the safe AST and `CompiledTemplate` before changing scalar data
    semantics.
-8. Implement the safe owned `Data`, renderer limits, and callback lifetimes.
+8. Implement the safe owned `Data`, replace json-c after the parser spike, and
+   add renderer limits and safe callback lifetimes.
 9. Migrate php-mustache, run the serialization benchmark, and follow its
    decision.
 10. Remove transitional compatibility surfaces according to their documented
