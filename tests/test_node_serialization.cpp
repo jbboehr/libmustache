@@ -74,6 +74,116 @@ void expectBytes(
   ++failures;
 }
 
+void appendUint16(std::vector<uint8_t>& output, std::size_t value)
+{
+  output.push_back(static_cast<uint8_t>((value >> 8) & 0xff));
+  output.push_back(static_cast<uint8_t>(value & 0xff));
+}
+
+void appendUint24(std::vector<uint8_t>& output, std::size_t value)
+{
+  output.push_back(static_cast<uint8_t>((value >> 16) & 0xff));
+  output.push_back(static_cast<uint8_t>((value >> 8) & 0xff));
+  output.push_back(static_cast<uint8_t>(value & 0xff));
+}
+
+void appendUint32(std::vector<uint8_t>& output, std::size_t value)
+{
+  output.push_back(static_cast<uint8_t>((value >> 24) & 0xff));
+  output.push_back(static_cast<uint8_t>((value >> 16) & 0xff));
+  output.push_back(static_cast<uint8_t>((value >> 8) & 0xff));
+  output.push_back(static_cast<uint8_t>(value & 0xff));
+}
+
+void writeUint16(
+    std::vector<uint8_t>& output, std::size_t pos, std::size_t value)
+{
+  output[pos] = static_cast<uint8_t>((value >> 8) & 0xff);
+  output[pos + 1] = static_cast<uint8_t>(value & 0xff);
+}
+
+void writeUint24(
+    std::vector<uint8_t>& output, std::size_t pos, std::size_t value)
+{
+  output[pos] = static_cast<uint8_t>((value >> 16) & 0xff);
+  output[pos + 1] = static_cast<uint8_t>((value >> 8) & 0xff);
+  output[pos + 2] = static_cast<uint8_t>(value & 0xff);
+}
+
+void writeUint32(
+    std::vector<uint8_t>& output, std::size_t pos, std::size_t value)
+{
+  output[pos] = static_cast<uint8_t>((value >> 24) & 0xff);
+  output[pos + 1] = static_cast<uint8_t>((value >> 16) & 0xff);
+  output[pos + 2] = static_cast<uint8_t>((value >> 8) & 0xff);
+  output[pos + 3] = static_cast<uint8_t>(value & 0xff);
+}
+
+std::vector<uint8_t> makeSerialNode(mustache::Node::Type type, int flags,
+    bool hasData, const std::string& data,
+    const std::vector<std::vector<uint8_t> >& children)
+{
+  std::size_t childrenSize = 0;
+  for( std::size_t i = 0; i < children.size(); ++i ) {
+    childrenSize += children[i].size();
+  }
+
+  std::vector<uint8_t> serial;
+  serial.push_back('M');
+  serial.push_back('U');
+  appendUint16(serial, static_cast<std::size_t>(type));
+  serial.push_back(static_cast<uint8_t>(flags));
+  appendUint24(serial, hasData ? data.size() + 1 : 0);
+  appendUint16(serial, children.size());
+  appendUint32(serial, childrenSize);
+  if( hasData ) {
+    serial.insert(serial.end(), data.begin(), data.end());
+    serial.push_back(0);
+  }
+  for( std::size_t i = 0; i < children.size(); ++i ) {
+    serial.insert(serial.end(), children[i].begin(), children[i].end());
+  }
+  return serial;
+}
+
+void expectInvalid(std::vector<uint8_t> serial, const char * message,
+    std::size_t offset = 0)
+{
+  const std::size_t unchangedPosition = 1234567;
+  std::size_t position = unchangedPosition;
+  bool threw = false;
+  try {
+    std::unique_ptr<mustache::Node> node(
+        mustache::Node::unserialize(serial, offset, &position));
+  } catch( const mustache::Exception& ) {
+    threw = true;
+  }
+
+  if( !threw ) {
+    std::fprintf(stderr, "%s (decoder accepted invalid input)\n", message);
+    ++failures;
+  }
+  if( position != unchangedPosition ) {
+    std::fprintf(stderr, "%s (decoder published a partial position)\n",
+        message);
+    ++failures;
+  }
+}
+
+void expectSerializeInvalid(mustache::Node& node, const char * message)
+{
+  bool threw = false;
+  try {
+    std::unique_ptr<std::vector<uint8_t> > serial(node.serialize());
+  } catch( const mustache::Exception& ) {
+    threw = true;
+  }
+  if( !threw ) {
+    std::fprintf(stderr, "%s (serializer accepted invalid node)\n", message);
+    ++failures;
+  }
+}
+
 void testPHPFixture()
 {
   // This exact byte sequence is part of php-mustache's public MustacheAST
@@ -143,11 +253,272 @@ void testTokenizerCompatibility()
       "tokenizing '{{test}}' must retain the php-mustache byte format");
 }
 
+void testStrictDecoderValidation()
+{
+  const std::vector<uint8_t> fixture = decodeHex(phpMustacheVariableAST);
+
+  for( std::size_t size = 0; size < fixture.size(); ++size ) {
+    expectInvalid(std::vector<uint8_t>(fixture.begin(), fixture.begin() + size),
+        "every truncated php-mustache fixture must be rejected");
+  }
+
+  std::vector<uint8_t> invalid = fixture;
+  invalid[0] = 'X';
+  expectInvalid(invalid, "invalid magic must be rejected");
+
+  invalid = fixture;
+  writeUint16(invalid, 2, 0xffff);
+  expectInvalid(invalid, "unknown node types must be rejected");
+
+  invalid = fixture;
+  invalid[4] = 0x02;
+  expectInvalid(invalid, "unknown node flags must be rejected");
+
+  invalid = fixture;
+  writeUint24(invalid, 19, 6);
+  expectInvalid(invalid, "out-of-bounds data lengths must be rejected");
+
+  invalid = fixture;
+  invalid[invalid.size() - 1] = 0x01;
+  expectInvalid(invalid, "non-null data terminators must be rejected");
+
+  invalid = fixture;
+  writeUint16(invalid, 8, 2);
+  expectInvalid(invalid, "incorrect child counts must be rejected");
+
+  invalid = fixture;
+  writeUint32(invalid, 10, 18);
+  expectInvalid(invalid, "undersized child regions must be rejected");
+
+  invalid = fixture;
+  writeUint32(invalid, 10, 0xffffffff);
+  expectInvalid(invalid, "oversized child regions must be rejected");
+
+  invalid = fixture;
+  invalid.push_back(0);
+  expectInvalid(invalid, "trailing bytes must be rejected");
+
+  const std::vector<std::vector<uint8_t> > noChildren;
+  expectInvalid(makeSerialNode(
+      mustache::Node::TypeRoot, 0, true, "x", noChildren),
+      "root data must be rejected");
+  expectInvalid(makeSerialNode(
+      mustache::Node::TypeVariable, 0, false, "", noChildren),
+      "missing variable data must be rejected");
+  expectInvalid(makeSerialNode(
+      mustache::Node::TypeContainer, 0, false, "", noChildren),
+      "pointer-backed container nodes must be rejected");
+
+  std::vector<std::vector<uint8_t> > child;
+  child.push_back(makeSerialNode(
+      mustache::Node::TypeOutput, 0, true, "x", noChildren));
+  expectInvalid(makeSerialNode(
+      mustache::Node::TypeVariable, 0, true, "x", child),
+      "children on leaf nodes must be rejected");
+  expectInvalid(makeSerialNode(mustache::Node::TypeVariable, 0, true,
+      std::string(256, '.'), noChildren),
+      "excessive dotted-name components must be rejected");
+
+  std::vector<std::vector<uint8_t> > dottedChildren;
+  for( int i = 0; i < 391; ++i ) {
+    dottedChildren.push_back(makeSerialNode(mustache::Node::TypeVariable, 0,
+        true, std::string(255, '.'), noChildren));
+  }
+  expectInvalid(makeSerialNode(
+      mustache::Node::TypeRoot, 0, false, "", dottedChildren),
+      "aggregate dotted-name components must be bounded");
+
+  try {
+    std::vector<uint8_t> copy = fixture;
+    std::unique_ptr<mustache::Node> node(
+        mustache::Node::unserialize(copy, 0, NULL));
+    std::fprintf(stderr, "null output positions must be rejected\n");
+    ++failures;
+  } catch( const mustache::Exception& ) {
+  }
+
+  expectInvalid(fixture, "out-of-range offsets must be rejected",
+      fixture.size() + 1);
+}
+
+void testOffsetAndScalarCompatibility()
+{
+  const std::vector<uint8_t> fixture = decodeHex(phpMustacheVariableAST);
+  std::vector<uint8_t> prefixed;
+  prefixed.push_back(0xaa);
+  prefixed.push_back(0xbb);
+  prefixed.insert(prefixed.end(), fixture.begin(), fixture.end());
+
+  std::size_t position = 0;
+  std::unique_ptr<mustache::Node> decoded(
+      mustache::Node::unserialize(prefixed, 2, &position));
+  expect(position == prefixed.size(),
+      "nonzero decode offsets must report the exact final position");
+
+  mustache::Node root;
+  root.type = mustache::Node::TypeRoot;
+  root.children.push_back(
+      new mustache::Node(mustache::Node::TypeComment, ""));
+  root.children.push_back(new mustache::Node(
+      mustache::Node::TypeOutput, std::string("a\0b", 3)));
+
+  std::unique_ptr<std::vector<uint8_t> > serial(root.serialize());
+  position = 0;
+  std::unique_ptr<mustache::Node> roundTrip(
+      mustache::Node::unserialize(*serial, 0, &position));
+  expect(roundTrip->children.size() == 2,
+      "empty and embedded-NUL data must survive decoding");
+  if( roundTrip->children.size() == 2 ) {
+    expect(roundTrip->children[0]->data != NULL &&
+            roundTrip->children[0]->data->empty(),
+        "empty serialized data must remain present");
+    expect(roundTrip->children[1]->data != NULL &&
+            *roundTrip->children[1]->data == std::string("a\0b", 3),
+        "embedded NUL bytes must survive decoding");
+  }
+
+  std::unique_ptr<std::vector<uint8_t> > serializedAgain(
+      roundTrip->serialize());
+  expectBytes(*serializedAgain, *serial,
+      "empty and embedded-NUL data must round-trip byte-for-byte");
+}
+
+void testComplexTokenizerCompatibility()
+{
+  std::string tmpl(
+      "a{{value}}{{^missing}}b{{/missing}}{{#section}}c{{/section}}"
+      "{{! comment}}{{>partial}}");
+  mustache::Mustache mustache;
+  mustache::Node root;
+  mustache.tokenize(&tmpl, &root);
+
+  std::unique_ptr<std::vector<uint8_t> > serial(root.serialize());
+  std::size_t position = 0;
+  std::unique_ptr<mustache::Node> decoded(
+      mustache::Node::unserialize(*serial, 0, &position));
+  expect(position == serial->size(),
+      "complex tokenizer output must be consumed exactly");
+
+  bool foundSection = false;
+  for( std::size_t i = 0; i < decoded->children.size(); ++i ) {
+    mustache::Node * child = decoded->children[i];
+    if( child->type == mustache::Node::TypeSection ) {
+      foundSection = true;
+      expect(child->startSequence != NULL && *child->startSequence == "{{",
+          "decoded sections must have a safe default start delimiter");
+      expect(child->stopSequence != NULL && *child->stopSequence == "}}",
+          "decoded sections must have a safe default stop delimiter");
+    }
+  }
+  expect(foundSection, "complex tokenizer fixture must contain a section");
+
+  std::unique_ptr<std::vector<uint8_t> > serializedAgain(
+      decoded->serialize());
+  expectBytes(*serializedAgain, *serial,
+      "complex tokenizer output must retain its exact legacy bytes");
+}
+
+void testDecoderDepthLimit()
+{
+  const std::vector<std::vector<uint8_t> > noChildren;
+  std::vector<uint8_t> nested = makeSerialNode(
+      mustache::Node::TypeOutput, 0, true, "x", noChildren);
+  for( int depth = 0; depth < 64; ++depth ) {
+    std::vector<std::vector<uint8_t> > child(1, nested);
+    nested = makeSerialNode(
+        mustache::Node::TypeSection, 0, true, "x", child);
+  }
+
+  std::vector<std::vector<uint8_t> > child(1, nested);
+  expectInvalid(makeSerialNode(
+      mustache::Node::TypeRoot, 0, false, "", child),
+      "excessive decoder nesting must be rejected");
+}
+
+void testSerializerValidation()
+{
+  mustache::Node invalidType;
+  invalidType.type = mustache::Node::TypeContainer;
+  expectSerializeInvalid(invalidType,
+      "pointer-backed container nodes must not be serialized");
+
+  mustache::Node invalidFlags;
+  invalidFlags.type = mustache::Node::TypeRoot;
+  invalidFlags.flags = 2;
+  expectSerializeInvalid(invalidFlags,
+      "unknown flags must not be serialized");
+
+  mustache::Node missingData;
+  missingData.type = mustache::Node::TypeVariable;
+  expectSerializeInvalid(missingData,
+      "nodes requiring data must not serialize without it");
+
+  mustache::Node invalidRootData(
+      mustache::Node::TypeRoot, "unexpected");
+  expectSerializeInvalid(invalidRootData,
+      "root nodes must not serialize with data");
+
+  mustache::Node nullChild;
+  nullChild.type = mustache::Node::TypeRoot;
+  nullChild.children.push_back(NULL);
+  expectSerializeInvalid(nullChild, "null children must not be serialized");
+
+  mustache::Node leafWithChild(mustache::Node::TypeVariable, "value");
+  leafWithChild.children.push_back(
+      new mustache::Node(mustache::Node::TypeOutput, "child"));
+  expectSerializeInvalid(leafWithChild,
+      "children on leaf nodes must not be serialized");
+
+  mustache::Node oversizedData;
+  oversizedData.type = mustache::Node::TypeOutput;
+  oversizedData.data = new std::string(0x00ffffff, 'x');
+  expectSerializeInvalid(oversizedData,
+      "data exceeding the 24-bit field must not be serialized");
+
+  mustache::Node oversizedChildren;
+  oversizedChildren.type = mustache::Node::TypeRoot;
+  oversizedChildren.children.assign(0x00010000, NULL);
+  expectSerializeInvalid(oversizedChildren,
+      "child counts exceeding the 16-bit field must not be serialized");
+
+  mustache::Node excessiveDataParts;
+  excessiveDataParts.type = mustache::Node::TypeVariable;
+  excessiveDataParts.data = new std::string(256, '.');
+  expectSerializeInvalid(excessiveDataParts,
+      "excessive dotted-name components must not be serialized");
+
+  mustache::Node aggregateDataParts;
+  aggregateDataParts.type = mustache::Node::TypeRoot;
+  for( int i = 0; i < 391; ++i ) {
+    aggregateDataParts.children.push_back(new mustache::Node(
+        mustache::Node::TypeVariable, std::string(255, '.')));
+  }
+  expectSerializeInvalid(aggregateDataParts,
+      "aggregate dotted-name components must be bounded while serializing");
+
+  mustache::Node excessiveDepth;
+  excessiveDepth.type = mustache::Node::TypeRoot;
+  mustache::Node * parent = &excessiveDepth;
+  for( int depth = 0; depth < 64; ++depth ) {
+    mustache::Node * section =
+        new mustache::Node(mustache::Node::TypeSection, "x");
+    parent->children.push_back(section);
+    parent = section;
+  }
+  expectSerializeInvalid(excessiveDepth,
+      "excessive node nesting must not be serialized");
+}
+
 } // namespace
 
 int main()
 {
   testPHPFixture();
   testTokenizerCompatibility();
+  testStrictDecoderValidation();
+  testOffsetAndScalarCompatibility();
+  testComplexTokenizerCompatibility();
+  testDecoderDepthLimit();
+  testSerializerValidation();
   return failures == 0 ? 0 : 1;
 }
