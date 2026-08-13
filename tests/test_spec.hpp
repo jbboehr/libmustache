@@ -1,8 +1,6 @@
 
 #include "mustache_config.h"
 
-#define MAX_TEST_FILES 50
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -16,6 +14,7 @@
 #include <exception>
 
 #include "mustache.hpp"
+#include "spec_expectations.hpp"
 
 class MustacheSpecTest {
   private:
@@ -27,16 +26,16 @@ class MustacheSpecTest {
     mustache::Node::Partials partials;
     std::string expected;
     std::string output;
+    std::string suite;
+    std::string expectationReason;
+    bool skipped;
+    bool knownFailure;
     int _passed;
     
-    MustacheSpecTest() : _passed(-1) {};
+    MustacheSpecTest() : skipped(false), knownFailure(false), _passed(-1) {};
     bool passed() {
       if( -1 == _passed ) {
-        std::string strippedExpected = expected;
-        std::string strippedOutput = output;
-        mustache::stripWhitespace(strippedExpected);
-        mustache::stripWhitespace(strippedOutput);
-        if( strippedOutput == strippedExpected ) {
+        if( output == expected ) {
           _passed = 1;
         } else {
           _passed = 0;
@@ -44,14 +43,59 @@ class MustacheSpecTest {
       }
       return (_passed == 1);
     };
+    static std::string escapeForDiagnostic(const std::string& value) {
+      std::string escaped;
+      char buffer[5];
+      for( std::size_t i = 0; i < value.size(); ++i ) {
+        const unsigned char chr = static_cast<unsigned char>(value[i]);
+        switch( chr ) {
+          case '\\':
+            escaped.append("\\\\");
+            break;
+          case '"':
+            escaped.append("\\\"");
+            break;
+          case '\n':
+            escaped.append("\\n");
+            break;
+          case '\r':
+            escaped.append("\\r");
+            break;
+          case '\t':
+            escaped.append("\\t");
+            break;
+          default:
+            if( chr < 0x20 || chr >= 0x7f ) {
+              snprintf(buffer, sizeof(buffer), "\\x%02x", chr);
+              escaped.append(buffer);
+            } else {
+              escaped.push_back(static_cast<char>(chr));
+            }
+            break;
+        }
+      }
+      return escaped;
+    }
     void print() {
-      bool _passed = passed();
-      std::cout << name << " ... " 
-                << (_passed ? "PASSED" : "FAILED")
-                << "\n";
-      if( !_passed ) {
-        std::cout << "Expected: " << expected << "\n";
-        std::cout << "Output: " << output << "\n";
+      std::cout << suite << " / " << name << " ... ";
+      if( skipped ) {
+        std::cout << "SKIPPED (" << expectationReason << ")\n";
+        return;
+      }
+
+      const bool outputMatches = passed();
+      if( knownFailure ) {
+        std::cout << (outputMatches ? "UNEXPECTED PASS" : "KNOWN FAILURE")
+                  << " (" << expectationReason << ")\n";
+      } else {
+        std::cout << (outputMatches ? "PASSED" : "FAILED") << "\n";
+      }
+
+      if( !outputMatches && !knownFailure ) {
+        std::cout << "Expected: \"" << escapeForDiagnostic(expected)
+                  << "\"\n";
+        std::cout << "Output:   \"" << escapeForDiagnostic(output)
+                  << "\"\n";
       }
     }
     std::string toString() {

@@ -68,16 +68,16 @@ int main( int argc, char * argv[] )
   closedir(dir);
 #endif
 
-  int nFiles = 0;
+  files.sort();
+
   for( std::list<std::string>::const_iterator it = files.begin(); it != files.end(); ++it ) {
     const char * file = it->c_str();
     if( file[0] == '.' ) continue;
     if( strlen(file) < 5 ) continue;
     if( strcmp(file + strlen(file) - 4, ".yml") != 0 ) continue;
     //if( file[0] == '~' ) continue; // Ignore lambdas
-    if( nFiles >= MAX_TEST_FILES ) continue;
-    nFiles++;
     currentSuite = file;
+    mustache_test::specRecordSuiteFile(currentSuite);
 
     // Make filename
     std::string fileName;
@@ -110,23 +110,38 @@ int main( int argc, char * argv[] )
   // Summarize
   std::list<MustacheSpecTest *>::iterator it = tests.begin();
   int nPassed = 0;
-  int nFailed = 0;
+  int nKnownFailures = 0;
+  int nUnexpectedFailures = 0;
+  int nUnexpectedPasses = 0;
   int nSkipped = 0;
   for( ; it != tests.end(); ++it ) {
-    if( (*it)->passed() ) {
+    if( (*it)->skipped ) {
+      nSkipped++;
+    } else if( (*it)->knownFailure ) {
+      if( (*it)->passed() ) {
+        nUnexpectedPasses++;
+      } else {
+        nKnownFailures++;
+      }
+    } else if( (*it)->passed() ) {
       nPassed++;
     } else {
-      nFailed++;
+      nUnexpectedFailures++;
     }
     delete *it;
   }
   tests.clear();
-  int total = nPassed + nFailed;
+  const bool inventoryValid = mustache_test::validateSpecInventory(std::cerr);
+  int total = nPassed + nKnownFailures + nUnexpectedFailures +
+      nUnexpectedPasses + nSkipped;
   std::cout << nPassed << " passed, "
             << nSkipped << " skipped, "
-            << nFailed << " failed of "
+            << nKnownFailures << " known failures, "
+            << nUnexpectedFailures << " unexpected failures, "
+            << nUnexpectedPasses << " unexpected passes of "
             << total << " tests\n";
-  return (nFailed > 0 ? 1 : 0);
+  return (!inventoryValid || nUnexpectedFailures > 0 ||
+          nUnexpectedPasses > 0 ? 1 : 0);
 }
 
 void parse_file(char * fileData, int length)
@@ -188,14 +203,38 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
     return;
   }
 
-  // Support for inheritance and dynamic names is not implemented yet.
-  if (strcmp(currentSuite, "~inheritance.yml") == 0 || strcmp(currentSuite, "~dynamic-names.yml") == 0) {
+  MustacheSpecTest * test = new MustacheSpecTest;
+  test->suite.assign(currentSuite);
+
+  // Read the name first so unsupported tests can be counted without parsing
+  // data or partial structures that depend on the unsupported feature.
+  yaml_node_pair_t * pair;
+  for( pair = node->data.mapping.pairs.start;
+       pair < node->data.mapping.pairs.top; ++pair ) {
+    yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
+    yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
+    char * keyValue = reinterpret_cast<char *>(keyNode->data.scalar.value);
+    if( strcmp(keyValue, "name") == 0 &&
+        valueNode->type == YAML_SCALAR_NODE ) {
+      test->name.assign(
+          reinterpret_cast<char *>(valueNode->data.scalar.value));
+      break;
+    }
+  }
+
+  mustache_test::specRecordSuiteTest(test->suite);
+  mustache_test::SpecExpectation expectation =
+      mustache_test::specExpectationFor(test->suite, test->name);
+  test->expectationReason.assign(expectation.reason);
+  test->skipped = expectation.outcome == mustache_test::SpecExpectedSkip;
+  test->knownFailure =
+      expectation.outcome == mustache_test::SpecExpectedFailure;
+  if( test->skipped ) {
+    test->print();
+    tests.push_back(test);
     return;
   }
-  
-  MustacheSpecTest * test = new MustacheSpecTest;
-  
-  yaml_node_pair_t * pair;
+
   for( pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; pair++ ) {
     yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
     yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
@@ -229,12 +268,6 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
   // Load lambdas?
   if( isLambdaSuite ) {
     load_lambdas_into_test_data(&test->data, test->name);
-  }
-
-  // This test isn't supported yet
-  if (test->name == "Implicit Iterator - Array") {
-    delete test;
-    return;
   }
 
   // Tokenize
@@ -271,7 +304,6 @@ void mustache_spec_parse_data(yaml_document_t * document, yaml_node_t * node, mu
     yaml_node_item_t * item;
     int nItems = node->data.sequence.items.top - node->data.sequence.items.start;
     data->init(mustache::Data::TypeArray, nItems);
-    int i = 0;
     for( item = node->data.sequence.items.start; item < node->data.sequence.items.top; item ++) {
       mustache::Data * child = new mustache::Data();
       data->array.push_back(child);

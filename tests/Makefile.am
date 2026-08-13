@@ -1,7 +1,7 @@
 
 check_PROGRAMS = test_spec test_utils test_misc
 
-test_spec_SOURCES = test_spec.cpp test_spec.hpp ./fixtures/lambdas.cpp ./fixtures/lambdas.hpp
+test_spec_SOURCES = test_spec.cpp test_spec.hpp spec_expectations.hpp ./fixtures/lambdas.cpp ./fixtures/lambdas.hpp
 test_utils_SOURCES = test_utils.cpp
 test_misc_SOURCES = test_misc.cpp
 

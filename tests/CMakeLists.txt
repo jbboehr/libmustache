@@ -1,6 +1,7 @@
 add_executable(test_spec
     test_spec.cpp
     test_spec.hpp
+    spec_expectations.hpp
     fixtures/lambdas.cpp
     fixtures/lambdas.hpp
 )
