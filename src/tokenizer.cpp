@@ -20,6 +20,12 @@ bool matchesAt(
       input.compare(position, sequence.size(), sequence) == 0;
 }
 
+Node * appendNode(Node * parent, std::unique_ptr<Node> node)
+{
+  parent->children.push_back(node.get());
+  return node.release();
+}
+
 } // namespace
 
 
@@ -122,16 +128,15 @@ void Tokenizer::tokenize(
   Node::Type currentType = Node::TypeNone;
   int currentFlags = Node::FlagNone;
   
-  //Node::Stack nodeStack;
+  Node parsedRoot;
   NodeStack nodeStack;
   Node * node;
   
   // Initialize root node and stack[0]
-  root->type = Node::TypeRoot;
-  root->flags = Node::FlagNone;
-  root->data = NULL;
+  parsedRoot.type = Node::TypeRoot;
+  parsedRoot.flags = Node::FlagNone;
   
-  nodeStack.push_back(root);
+  nodeStack.push_back(&parsedRoot);
   
   // Scan loop
   for( pos = 0; pos < tmplL; pos++ ) {
@@ -158,8 +163,8 @@ void Tokenizer::tokenize(
       if( tmpl[pos] == startC && matchesAt(tmpl, pos, start) ) {
         // Close previous buffer
         if( buffer.length() > 0 ) {
-          node = new Node(Node::TypeOutput, buffer);
-          nodeStack.back()->children.push_back(node);
+          node = appendNode(nodeStack.back(), std::unique_ptr<Node>(
+              new Node(Node::TypeOutput, buffer)));
           buffer.clear();
         }
         // Open new buffer
@@ -251,14 +256,15 @@ void Tokenizer::tokenize(
               currentFlags = currentFlags ^ Node::FlagEscape;
             }
           }
-          node = new Node(currentType, buffer, currentFlags);
+          std::unique_ptr<Node> pendingNode(
+              new Node(currentType, buffer, currentFlags));
 
           if( currentType == Node::TypeSection ) {
-            node->startSequence = new std::string(start);
-            node->stopSequence = new std::string(stop);
+            pendingNode->startSequence = new std::string(start);
+            pendingNode->stopSequence = new std::string(stop);
           }
 
-          nodeStack.back()->children.push_back(node);
+          node = appendNode(nodeStack.back(), std::move(pendingNode));
           // Push/pop stack
           if( currentType & Node::TypeHasChildren ) {
             nodeStack.push_back(node);
@@ -314,17 +320,22 @@ void Tokenizer::tokenize(
         << (nodeStack.size() - 1);
     throw TokenizerException(oss.str(), -1, -1);
   } else if( buffer.length() > 0 ) {
-    node = new Node();
-    node->type = Node::TypeOutput;
+    std::unique_ptr<Node> pendingNode(new Node());
+    pendingNode->type = Node::TypeOutput;
     if( escapeOutput ) {
-      node->data = new std::string();
-      htmlspecialchars_append(&buffer, node->data);
+      pendingNode->data = new std::string();
+      htmlspecialchars_append(&buffer, pendingNode->data);
     } else {
-      node->data = new std::string(buffer);
+      pendingNode->data = new std::string(buffer);
     }
-    nodeStack.back()->children.push_back(node);
+    appendNode(nodeStack.back(), std::move(pendingNode));
     buffer.clear();
   }
+
+  // Partials are caller-managed fallback state rather than parser output.
+  // Preserve them while atomically replacing the parsed portion of the root.
+  parsedRoot.partials.swap(root->partials);
+  *root = std::move(parsedRoot);
 }
 
 

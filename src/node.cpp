@@ -448,15 +448,21 @@ std::string Node::children_to_template_string(const std::string& start, const st
 
 void Node::setData(const std::string& data)
 {
-  this->data = new std::string(data);
-  
+  std::unique_ptr<std::string> nextData(new std::string(data));
+  std::unique_ptr<std::vector<std::string> > nextDataParts;
+
   if( this->type & Node::TypeHasDot ) {
     size_t found = data.find(".");
     if( found != std::string::npos ) {
-      dataParts = new std::vector<std::string>;
-      explode(".", *(this->data), dataParts);
+      nextDataParts.reset(new std::vector<std::string>);
+      explode(".", *nextData, nextDataParts.get());
     }
   }
+
+  delete this->data;
+  delete dataParts;
+  this->data = nextData.release();
+  dataParts = nextDataParts.release();
 }
 
 std::vector<uint8_t> * Node::serialize()
