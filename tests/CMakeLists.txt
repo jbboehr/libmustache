@@ -29,3 +29,36 @@ add_test(NAME utils COMMAND test_utils)
 add_test(NAME misc COMMAND test_misc)
 add_test(NAME data_behavior COMMAND test_data_behavior)
 add_test(NAME node_serialization COMMAND test_node_serialization)
+
+if(MUSTACHE_ENABLE_FUZZING)
+    add_executable(fuzz_node_unserialize fuzz_node_unserialize.cpp)
+    target_link_libraries(fuzz_node_unserialize PRIVATE mustache_static)
+    mustache_apply_build_options(fuzz_node_unserialize)
+    target_compile_options(fuzz_node_unserialize PRIVATE -fsanitize=fuzzer)
+    target_link_options(fuzz_node_unserialize PRIVATE -fsanitize=fuzzer)
+
+    set(MUSTACHE_FUZZ_CORPUS_SOURCE
+        "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus/node_unserialize")
+    set(MUSTACHE_FUZZ_CORPUS_BINARY
+        "${CMAKE_CURRENT_BINARY_DIR}/fuzz-corpus/node_unserialize")
+    set(MUSTACHE_FUZZ_ARTIFACTS
+        "${CMAKE_CURRENT_BINARY_DIR}/fuzz-artifacts/node_unserialize")
+    file(MAKE_DIRECTORY
+        "${MUSTACHE_FUZZ_CORPUS_BINARY}"
+        "${MUSTACHE_FUZZ_ARTIFACTS}")
+    file(COPY "${MUSTACHE_FUZZ_CORPUS_SOURCE}/"
+        DESTINATION "${MUSTACHE_FUZZ_CORPUS_BINARY}")
+
+    add_test(NAME fuzz_node_unserialize_smoke
+        COMMAND fuzz_node_unserialize
+            -runs=1000
+            -max_len=4096
+            -timeout=5
+            "-dict=${CMAKE_CURRENT_SOURCE_DIR}/fuzz/node_unserialize.dict"
+            "-artifact_prefix=${MUSTACHE_FUZZ_ARTIFACTS}/"
+            "${MUSTACHE_FUZZ_CORPUS_BINARY}")
+    set_tests_properties(fuzz_node_unserialize_smoke PROPERTIES
+        LABELS fuzz
+        RUN_SERIAL TRUE
+        TIMEOUT 30)
+endif()

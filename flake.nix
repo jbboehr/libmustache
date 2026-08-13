@@ -92,6 +92,13 @@
             debugSupport = true;
             sanitizerSupport = true;
           };
+          libmustache-fuzz = makePackage {
+            stdenv = pkgs.llvmPackages.stdenv;
+            cmakeSupport = true;
+            debugSupport = true;
+            sanitizerSupport = true;
+            fuzzSupport = true;
+          };
           pre-commit = pre-commit-check;
         };
 

@@ -7,6 +7,15 @@ test_misc_SOURCES = test_misc.cpp
 test_data_behavior_SOURCES = test_data_behavior.cpp
 test_node_serialization_SOURCES = test_node_serialization.cpp
 
+EXTRA_DIST = \
+	fuzz_node_unserialize.cpp \
+	fuzz/node_unserialize.dict \
+	fuzz/corpus/node_unserialize/deeply-nested \
+	fuzz/corpus/node_unserialize/oversized-child-region \
+	fuzz/corpus/node_unserialize/php-variable \
+	fuzz/corpus/node_unserialize/trailing-byte \
+	fuzz/corpus/node_unserialize/truncated-header
+
 TESTS = test_spec test_utils test_misc test_data_behavior test_node_serialization
 TESTS_ENVIRONMENT = \
 	top_srcdir=$(top_srcdir) \

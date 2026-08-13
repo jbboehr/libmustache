@@ -17,12 +17,14 @@
   cmakeSupport ? false,
   debugSupport ? false,
   sanitizerSupport ? false,
+  fuzzSupport ? false,
 }:
 stdenv.mkDerivation (finalAttrs: {
   pname =
     "libmustache"
     + lib.optionalString cmakeSupport "-cmake"
-    + lib.optionalString sanitizerSupport "-sanitized";
+    + lib.optionalString sanitizerSupport "-sanitized"
+    + lib.optionalString fuzzSupport "-fuzz";
   version = "0.5.0";
 
   src =
@@ -52,7 +54,7 @@ stdenv.mkDerivation (finalAttrs: {
   strictDeps = true;
   enableParallelBuilding = true;
   separateDebugInfo = debugSupport;
-  dontStrip = sanitizerSupport;
+  dontStrip = sanitizerSupport || fuzzSupport;
 
   propagatedBuildInputs = [json_c libyaml];
   nativeBuildInputs =
@@ -84,6 +86,7 @@ stdenv.mkDerivation (finalAttrs: {
       (lib.cmakeBool "MUSTACHE_ENABLE_HARDENING" true)
       (lib.cmakeBool "MUSTACHE_ENABLE_ASSERTIONS" true)
       (lib.cmakeBool "MUSTACHE_ENABLE_SANITIZERS" sanitizerSupport)
+      (lib.cmakeBool "MUSTACHE_ENABLE_FUZZING" fuzzSupport)
       "-DCMAKE_BUILD_TYPE=${
         if debugSupport || sanitizerSupport
         then "Debug"

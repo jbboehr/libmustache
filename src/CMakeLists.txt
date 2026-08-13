@@ -49,6 +49,11 @@ set_target_properties(mustache PROPERTIES
 add_library(mustache_static STATIC ${MUSTACHE_SOURCES} ${MUSTACHE_PUBLIC_HEADERS})
 add_library(mustache::mustache_static ALIAS mustache_static)
 mustache_configure_library(mustache_static)
+if(MUSTACHE_ENABLE_FUZZING)
+    # The fuzz executable links this archive, so its implementation needs
+    # SanitizerCoverage instrumentation as well as the libFuzzer harness.
+    target_compile_options(mustache_static PRIVATE -fsanitize=fuzzer-no-link)
+endif()
 if(NOT WIN32)
     set_target_properties(mustache_static PROPERTIES OUTPUT_NAME mustache)
 endif()

@@ -13,22 +13,19 @@ namespace mustache {
 namespace {
 
 const size_t serialHeaderSize = 14;
-const size_t serialMaxSize = 64 * 1024 * 1024;
-const size_t serialMaxDepth = 64;
-const size_t serialMaxNodes = 100000;
 const size_t serialMaxDataSize = 0x00ffffff;
 const size_t serialMaxChildren = 0x0000ffff;
-const size_t serialMaxDataPartsPerNode = 256;
-const size_t serialMaxDataParts = 100000;
 
 struct SerialState {
-  SerialState() : nodes(0), dataParts(0) {}
+  explicit SerialState(const Node::SerializationLimits& limits) :
+      limits(limits), nodes(0), dataParts(0) {}
 
+  const Node::SerializationLimits& limits;
   size_t nodes;
   size_t dataParts;
 };
 
-bool isSerializableType(Node::Type type)
+bool isSerializableTypeValue(size_t type)
 {
   switch( type ) {
     case Node::TypeRoot:
@@ -45,6 +42,11 @@ bool isSerializableType(Node::Type type)
     default:
       return false;
   }
+}
+
+bool isSerializableType(Node::Type type)
+{
+  return isSerializableTypeValue(static_cast<size_t>(type));
 }
 
 bool typeAllowsChildren(Node::Type type)
@@ -75,10 +77,10 @@ void validateNodeShape(
 
 void checkSerialBudget(SerialState& state, size_t depth)
 {
-  if( depth >= serialMaxDepth ) {
+  if( depth >= state.limits.maxNestingDepth ) {
     throw Exception("Serial node nesting limit exceeded");
   }
-  if( state.nodes >= serialMaxNodes ) {
+  if( state.nodes >= state.limits.maxNodes ) {
     throw Exception("Serial node count limit exceeded");
   }
   ++state.nodes;
@@ -90,47 +92,53 @@ void validateNodeData(
   if( (type & Node::TypeHasDot) != 0 ) {
     const size_t parts =
         static_cast<size_t>(std::count(data.begin(), data.end(), '.')) + 1;
-    if( parts > serialMaxDataPartsPerNode ||
-        parts > serialMaxDataParts - state.dataParts ) {
+    if( parts > state.limits.maxDataPartsPerNode ||
+        state.dataParts > state.limits.maxDataParts ||
+        parts > state.limits.maxDataParts - state.dataParts ) {
       throw Exception("Serial data-part limit exceeded");
     }
     state.dataParts += parts;
   }
 }
 
-void ensureOutputSpace(const std::vector<uint8_t>& output, size_t additional)
+void ensureOutputSpace(const std::vector<uint8_t>& output, size_t additional,
+    const SerialState& state)
 {
-  if( output.size() > serialMaxSize ||
-      additional > serialMaxSize - output.size() ) {
+  if( output.size() > state.limits.maxOutputBytes ||
+      additional > state.limits.maxOutputBytes - output.size() ) {
     throw Exception("Serialized AST size limit exceeded");
   }
 }
 
-void appendByte(std::vector<uint8_t>& output, size_t value)
+void appendByte(
+    std::vector<uint8_t>& output, size_t value, const SerialState& state)
 {
-  ensureOutputSpace(output, 1);
+  ensureOutputSpace(output, 1, state);
   output.push_back(static_cast<uint8_t>(value));
 }
 
-void appendUint16(std::vector<uint8_t>& output, size_t value)
+void appendUint16(
+    std::vector<uint8_t>& output, size_t value, const SerialState& state)
 {
-  appendByte(output, (value & 0x0000ff00) >> 8);
-  appendByte(output, value & 0x000000ff);
+  appendByte(output, (value & 0x0000ff00) >> 8, state);
+  appendByte(output, value & 0x000000ff, state);
 }
 
-void appendUint24(std::vector<uint8_t>& output, size_t value)
+void appendUint24(
+    std::vector<uint8_t>& output, size_t value, const SerialState& state)
 {
-  appendByte(output, (value & 0x00ff0000) >> 16);
-  appendByte(output, (value & 0x0000ff00) >> 8);
-  appendByte(output, value & 0x000000ff);
+  appendByte(output, (value & 0x00ff0000) >> 16, state);
+  appendByte(output, (value & 0x0000ff00) >> 8, state);
+  appendByte(output, value & 0x000000ff, state);
 }
 
-void appendUint32(std::vector<uint8_t>& output, size_t value)
+void appendUint32(
+    std::vector<uint8_t>& output, size_t value, const SerialState& state)
 {
-  appendByte(output, (value & 0xff000000) >> 24);
-  appendByte(output, (value & 0x00ff0000) >> 16);
-  appendByte(output, (value & 0x0000ff00) >> 8);
-  appendByte(output, value & 0x000000ff);
+  appendByte(output, (value & 0xff000000) >> 24, state);
+  appendByte(output, (value & 0x00ff0000) >> 16, state);
+  appendByte(output, (value & 0x0000ff00) >> 8, state);
+  appendByte(output, value & 0x000000ff, state);
 }
 
 void writeUint32(std::vector<uint8_t>& output, size_t pos, size_t value)
@@ -165,16 +173,16 @@ void serializeNode(const Node& node, std::vector<uint8_t>& output,
     dataSize = node.data->size() + 1;
   }
 
-  ensureOutputSpace(output, serialHeaderSize + dataSize);
-  appendByte(output, 'M');
-  appendByte(output, 'U');
-  appendUint16(output, static_cast<size_t>(node.type));
-  appendByte(output, static_cast<size_t>(node.flags));
-  appendUint24(output, dataSize);
-  appendUint16(output, node.children.size());
+  ensureOutputSpace(output, serialHeaderSize + dataSize, state);
+  appendByte(output, 'M', state);
+  appendByte(output, 'U', state);
+  appendUint16(output, static_cast<size_t>(node.type), state);
+  appendByte(output, static_cast<size_t>(node.flags), state);
+  appendUint24(output, dataSize, state);
+  appendUint16(output, node.children.size(), state);
 
   const size_t childrenSizePos = output.size();
-  appendUint32(output, 0);
+  appendUint32(output, 0, state);
 
   if( node.data != NULL ) {
     output.insert(output.end(), node.data->begin(), node.data->end());
@@ -280,7 +288,11 @@ std::unique_ptr<Node> unserializeNode(SerialReader& reader, size_t limit,
     throw Exception("Invalid serial magic");
   }
 
-  const Node::Type type = static_cast<Node::Type>(reader.readUint16(limit));
+  const size_t typeValue = reader.readUint16(limit);
+  if( !isSerializableTypeValue(typeValue) ) {
+    throw Exception("Invalid serial node type");
+  }
+  const Node::Type type = static_cast<Node::Type>(typeValue);
   const size_t flags = reader.readByte(limit);
   const size_t dataSize = reader.readUint24(limit);
   const size_t childrenNum = reader.readUint16(limit);
@@ -334,6 +346,16 @@ std::unique_ptr<Node> unserializeNode(SerialReader& reader, size_t limit,
 }
 
 } // namespace
+
+Node::SerializationLimits::SerializationLimits() :
+    maxInputBytes(64 * 1024 * 1024),
+    maxOutputBytes(64 * 1024 * 1024),
+    maxNestingDepth(64),
+    maxNodes(100000),
+    maxDataPartsPerNode(256),
+    maxDataParts(100000)
+{
+}
 
 
 Node::~Node()
@@ -401,11 +423,17 @@ void Node::setData(const std::string& data)
 
 std::vector<uint8_t> * Node::serialize()
 {
+  const SerializationLimits limits;
+  return serialize(limits);
+}
+
+std::vector<uint8_t> * Node::serialize(const SerializationLimits& limits)
+{
   std::unique_ptr<std::vector<uint8_t> > output(
       new std::vector<uint8_t>());
   output->reserve(18);
 
-  SerialState state;
+  SerialState state(limits);
   serializeNode(*this, *output, state, 0);
   return output.release();
 }
@@ -470,18 +498,25 @@ std::string Node::to_template_string(const std::string& start, const std::string
 
 Node * Node::unserialize(std::vector<uint8_t>& serial, size_t offset, size_t * vpos)
 {
+  const SerializationLimits limits;
+  return unserialize(serial, offset, vpos, limits);
+}
+
+Node * Node::unserialize(std::vector<uint8_t>& serial, size_t offset,
+    size_t * vpos, const SerializationLimits& limits)
+{
   if( vpos == NULL ) {
     throw Exception("Missing serial output position");
   }
   if( offset > serial.size() ) {
     throw Exception("Invalid serial offset");
   }
-  if( serial.size() - offset > serialMaxSize ) {
+  if( serial.size() - offset > limits.maxInputBytes ) {
     throw Exception("Serialized AST size limit exceeded");
   }
 
   SerialReader reader(serial, offset);
-  SerialState state;
+  SerialState state(limits);
   std::unique_ptr<Node> node(
       unserializeNode(reader, serial.size(), state, 0));
   if( reader.position() != serial.size() ) {

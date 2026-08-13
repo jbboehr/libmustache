@@ -22,9 +22,10 @@ in
     cmakeSupport ? false,
     debugSupport ? false,
     sanitizerSupport ? false,
+    fuzzSupport ? false,
   }:
     pkgs.callPackage ./nix/derivation.nix {
       inherit stdenv mustache_spec libmustacheSrc;
-      inherit checkSupport cmakeSupport debugSupport sanitizerSupport;
+      inherit checkSupport cmakeSupport debugSupport sanitizerSupport fuzzSupport;
       inherit gitignoreFilterWith;
     }

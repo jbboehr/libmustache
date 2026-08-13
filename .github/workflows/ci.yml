@@ -274,7 +274,8 @@ jobs:
         run: |
           cmake -S . -B build-sanitized -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DMUSTACHE_ENABLE_SANITIZERS=ON
+            -DMUSTACHE_ENABLE_SANITIZERS=ON \
+            -DMUSTACHE_ENABLE_FUZZING=${{ matrix.compiler.name == 'Clang' && 'ON' || 'OFF' }}
           cmake --build build-sanitized --parallel
           ctest --test-dir build-sanitized --output-on-failure
 

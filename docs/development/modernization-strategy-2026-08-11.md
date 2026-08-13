@@ -148,6 +148,16 @@ The current serializer must also reject values that the legacy field widths
 cannot represent instead of silently truncating them, and it should return an
 owned value instead of a heap-allocated container pointer.
 
+Keep the existing `serialize()` and `unserialize()` entry points for source
+compatibility, but make their resource policy explicit through overloads that
+accept `Node::SerializationLimits`. The compatibility defaults are 64 MiB for
+both serialized input and output, 64 nodes along any root-to-leaf path, 100,000
+nodes in total, 256 dotted-name components per node, and 100,000 dotted-name
+components in total. Each value is a hard maximum; zero never means unlimited.
+The fixed 24-bit data-length and 16-bit child-count fields remain independent
+wire-format limits. PHP should pass request-appropriate limits rather than
+relying on the broader compatibility defaults.
+
 Create a dedicated binary-decoder fuzz target as part of this phase. Commit a
 seed corpus containing valid php-mustache fixtures plus malformed, truncated,
 oversized, and deeply nested cases. Run a short sanitizer-backed fuzz smoke test
@@ -155,6 +165,14 @@ in CI and record an extended run before considering the hardening complete.
 The initial extended acceptance run should be at least one CPU-hour under
 AddressSanitizer and UndefinedBehaviorSanitizer with no findings. Every fuzzer
 finding becomes a permanent regression test.
+
+The reproducible smoke check is
+`nix build .#checks.x86_64-linux.libmustache-fuzz`. For the one-hour acceptance
+run, configure a Clang build with `MUSTACHE_ENABLE_TESTS`,
+`MUSTACHE_ENABLE_SANITIZERS`, and `MUSTACHE_ENABLE_FUZZING` enabled, build it,
+then run `fuzz_node_unserialize` with `-max_total_time=3600`, the committed
+dictionary, and the corpus copy in the build tree. Keep any generated crash
+artifact and add its minimized input as a regression test before fixing it.
 
 Do not design a replacement serialization format in this phase. Preserve safe
 legacy reads while the PHP benchmark in Phase 7 determines whether persistent

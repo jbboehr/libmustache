@@ -2,6 +2,7 @@
 #ifndef MUSTACHE_NODE_HPP
 #define MUSTACHE_NODE_HPP
 
+#include <cstddef>
 #include <map>
 #include <memory>
 #include <stack>
@@ -23,6 +24,23 @@ class Node {
     typedef std::map<std::string,std::string> RawPartials;
     typedef std::map<std::string,Node> Partials;
     typedef std::pair<std::string,Node> PartialPair;
+
+    /*! \struct SerializationLimits
+        \brief Resource limits for serialized AST encoding and decoding.
+
+        Every field is an enforced maximum. A zero value therefore rejects
+        any input that consumes that resource; zero never means unlimited.
+    */
+    struct SerializationLimits {
+      std::size_t maxInputBytes;
+      std::size_t maxOutputBytes;
+      std::size_t maxNestingDepth;
+      std::size_t maxNodes;
+      std::size_t maxDataPartsPerNode;
+      std::size_t maxDataParts;
+
+      SerializationLimits();
+    };
     
     //! Enum of token types
     enum Type {
@@ -118,10 +136,17 @@ class Node {
     //! Serialize
     std::vector<uint8_t> * serialize();
 
+    //! Serialize with explicit resource limits
+    std::vector<uint8_t> * serialize(const SerializationLimits& limits);
+
     std::string to_template_string(const std::string& start, const std::string& stop);
     
     //! Unserialize
     static Node * unserialize(std::vector<uint8_t> & serial, size_t offset, size_t * vpos);
+
+    //! Unserialize with explicit resource limits
+    static Node * unserialize(std::vector<uint8_t> & serial, size_t offset,
+        size_t * vpos, const SerializationLimits& limits);
 };
 
 /*! \class NodeStack
@@ -171,5 +196,3 @@ class NodeStack {
 } // namespace Mustache
 
 #endif
-
-

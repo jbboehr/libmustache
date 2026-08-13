@@ -170,6 +170,31 @@ void expectInvalid(std::vector<uint8_t> serial, const char * message,
   }
 }
 
+void expectInvalidWithLimits(std::vector<uint8_t> serial,
+    const mustache::Node::SerializationLimits& limits, const char * message)
+{
+  const std::size_t unchangedPosition = 1234567;
+  std::size_t position = unchangedPosition;
+  bool threw = false;
+  try {
+    std::unique_ptr<mustache::Node> node(
+        mustache::Node::unserialize(serial, 0, &position, limits));
+  } catch( const mustache::Exception& ) {
+    threw = true;
+  }
+
+  if( !threw ) {
+    std::fprintf(stderr, "%s (decoder accepted input over its limit)\n",
+        message);
+    ++failures;
+  }
+  if( position != unchangedPosition ) {
+    std::fprintf(stderr, "%s (decoder published a partial position)\n",
+        message);
+    ++failures;
+  }
+}
+
 void expectSerializeInvalid(mustache::Node& node, const char * message)
 {
   bool threw = false;
@@ -180,6 +205,22 @@ void expectSerializeInvalid(mustache::Node& node, const char * message)
   }
   if( !threw ) {
     std::fprintf(stderr, "%s (serializer accepted invalid node)\n", message);
+    ++failures;
+  }
+}
+
+void expectSerializeInvalidWithLimits(mustache::Node& node,
+    const mustache::Node::SerializationLimits& limits, const char * message)
+{
+  bool threw = false;
+  try {
+    std::unique_ptr<std::vector<uint8_t> > serial(node.serialize(limits));
+  } catch( const mustache::Exception& ) {
+    threw = true;
+  }
+  if( !threw ) {
+    std::fprintf(stderr, "%s (serializer accepted input over its limit)\n",
+        message);
     ++failures;
   }
 }
@@ -435,6 +476,90 @@ void testDecoderDepthLimit()
       "excessive decoder nesting must be rejected");
 }
 
+void testSerializationLimits()
+{
+  const std::vector<uint8_t> fixture = decodeHex(phpMustacheVariableAST);
+  mustache::Node::SerializationLimits limits;
+
+  expect(limits.maxInputBytes == 64 * 1024 * 1024,
+      "default serialized-input limit changed");
+  expect(limits.maxOutputBytes == 64 * 1024 * 1024,
+      "default serialized-output limit changed");
+  expect(limits.maxNestingDepth == 64,
+      "default serialized nesting limit changed");
+  expect(limits.maxNodes == 100000,
+      "default serialized node-count limit changed");
+  expect(limits.maxDataPartsPerNode == 256,
+      "default per-node data-part limit changed");
+  expect(limits.maxDataParts == 100000,
+      "default aggregate data-part limit changed");
+
+  limits.maxInputBytes = fixture.size() - 1;
+  expectInvalidWithLimits(fixture, limits,
+      "explicit input-byte limits must be enforced");
+
+  limits = mustache::Node::SerializationLimits();
+  limits.maxNestingDepth = 1;
+  expectInvalidWithLimits(fixture, limits,
+      "explicit decoder nesting limits must be enforced");
+
+  limits = mustache::Node::SerializationLimits();
+  limits.maxNodes = 1;
+  expectInvalidWithLimits(fixture, limits,
+      "explicit decoder node-count limits must be enforced");
+
+  limits = mustache::Node::SerializationLimits();
+  limits.maxDataPartsPerNode = 0;
+  expectInvalidWithLimits(fixture, limits,
+      "explicit per-node decoder data-part limits must be enforced");
+
+  limits = mustache::Node::SerializationLimits();
+  limits.maxDataParts = 0;
+  expectInvalidWithLimits(fixture, limits,
+      "explicit aggregate decoder data-part limits must be enforced");
+
+  limits = mustache::Node::SerializationLimits();
+  limits.maxInputBytes = fixture.size();
+  limits.maxOutputBytes = fixture.size();
+  limits.maxNestingDepth = 2;
+  limits.maxNodes = 2;
+  limits.maxDataPartsPerNode = 1;
+  limits.maxDataParts = 1;
+  std::vector<uint8_t> copy = fixture;
+  std::size_t position = 0;
+  std::unique_ptr<mustache::Node> root(
+      mustache::Node::unserialize(copy, 0, &position, limits));
+  expect(position == fixture.size(),
+      "exact decoder resource limits must accept the fixture");
+  std::unique_ptr<std::vector<uint8_t> > serialized(root->serialize(limits));
+  expectBytes(*serialized, fixture,
+      "exact serializer resource limits must accept the fixture");
+
+  limits.maxOutputBytes = fixture.size() - 1;
+  expectSerializeInvalidWithLimits(*root, limits,
+      "explicit output-byte limits must be enforced");
+
+  limits = mustache::Node::SerializationLimits();
+  limits.maxNestingDepth = 1;
+  expectSerializeInvalidWithLimits(*root, limits,
+      "explicit serializer nesting limits must be enforced");
+
+  limits = mustache::Node::SerializationLimits();
+  limits.maxNodes = 1;
+  expectSerializeInvalidWithLimits(*root, limits,
+      "explicit serializer node-count limits must be enforced");
+
+  limits = mustache::Node::SerializationLimits();
+  limits.maxDataPartsPerNode = 0;
+  expectSerializeInvalidWithLimits(*root, limits,
+      "explicit per-node serializer data-part limits must be enforced");
+
+  limits = mustache::Node::SerializationLimits();
+  limits.maxDataParts = 0;
+  expectSerializeInvalidWithLimits(*root, limits,
+      "explicit aggregate serializer data-part limits must be enforced");
+}
+
 void testSerializerValidation()
 {
   mustache::Node invalidType;
@@ -519,6 +644,7 @@ int main()
   testOffsetAndScalarCompatibility();
   testComplexTokenizerCompatibility();
   testDecoderDepthLimit();
+  testSerializationLimits();
   testSerializerValidation();
   return failures == 0 ? 0 : 1;
 }
