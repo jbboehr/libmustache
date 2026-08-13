@@ -154,8 +154,6 @@ int main( int argc, char * argv[] )
   
   // Tokenize partials
   for( pf_it = partialFiles.begin(); pf_it != partialFiles.end(); pf_it++ ) {
-    mustache::Node node;
-    partials.insert(std::make_pair(pf_it->first, node));
     must.tokenize(&pf_it->second, &(partials[pf_it->first]));
   }
   

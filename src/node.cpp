@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <limits>
 #include <memory>
+#include <utility>
 
 namespace mustache {
 
@@ -355,6 +356,41 @@ Node::SerializationLimits::SerializationLimits() :
     maxDataPartsPerNode(256),
     maxDataParts(100000)
 {
+}
+
+Node::Node(Node&& other) noexcept :
+    type(Node::TypeNone),
+    flags(Node::FlagNone),
+    data(NULL),
+    dataParts(NULL),
+    child(NULL),
+    startSequence(NULL),
+    stopSequence(NULL)
+{
+  swap(other);
+}
+
+Node& Node::operator=(Node&& other) noexcept
+{
+  if( this != &other ) {
+    Node previous(std::move(other));
+    swap(previous);
+  }
+  return *this;
+}
+
+void Node::swap(Node& other) noexcept
+{
+  using std::swap;
+  swap(type, other.type);
+  swap(flags, other.flags);
+  swap(data, other.data);
+  swap(dataParts, other.dataParts);
+  children.swap(other.children);
+  swap(child, other.child);
+  partials.swap(other.partials);
+  swap(startSequence, other.startSequence);
+  swap(stopSequence, other.stopSequence);
 }
 
 

@@ -344,9 +344,7 @@ void mustache_spec_parse_partials(yaml_document_t * document, yaml_node_t * node
     
     std::string ckey(keyValue);
     std::string tmpl(valueValue);
-    mustache::Node node;
 
-    partials->insert(std::make_pair(ckey, node));
     mustache.tokenize(&tmpl, &(*partials)[ckey]);
   }
 }

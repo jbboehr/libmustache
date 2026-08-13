@@ -13,7 +13,40 @@
 
 #include "stdio.h"
 
+#include <utility>
+
 namespace mustache {
+
+
+Data::Data(Data&& other) noexcept :
+    type(Data::TypeNone),
+    length(0),
+    val(NULL),
+    lambda(NULL)
+{
+  swap(other);
+}
+
+Data& Data::operator=(Data&& other) noexcept
+{
+  if( this != &other ) {
+    Data previous(std::move(other));
+    swap(previous);
+  }
+  return *this;
+}
+
+void Data::swap(Data& other) noexcept
+{
+  using std::swap;
+  swap(type, other.type);
+  swap(length, other.length);
+  swap(val, other.val);
+  data.swap(other.data);
+  children.swap(other.children);
+  array.swap(other.array);
+  swap(lambda, other.lambda);
+}
 
 
 Data::~Data()

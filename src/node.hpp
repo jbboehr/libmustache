@@ -108,21 +108,28 @@ class Node {
     //! Constructor
     Node() : 
         type(Node::TypeNone),
+        flags(Node::FlagNone),
         data(NULL),
         dataParts(NULL),
-        flags(Node::FlagNone), 
         child(NULL),
         startSequence(NULL),
-        stopSequence(NULL) {};
+        stopSequence(NULL) {}
     Node(Node::Type type, const std::string& data, int flags = 0) :
         type(type),
-        dataParts(NULL), 
-        flags(flags), 
+        flags(flags),
+        data(NULL),
+        dataParts(NULL),
         child(NULL),
         startSequence(NULL),
         stopSequence(NULL) {
       setData(data);
-    };
+    }
+
+    // Node owns its AST storage and must never be shallow-copied.
+    Node(const Node&) = delete;
+    Node& operator=(const Node&) = delete;
+    Node(Node&& other) noexcept;
+    Node& operator=(Node&& other) noexcept;
         
     
     //! Destructor
@@ -147,6 +154,9 @@ class Node {
     //! Unserialize with explicit resource limits
     static Node * unserialize(std::vector<uint8_t> & serial, size_t offset,
         size_t * vpos, const SerializationLimits& limits);
+
+  private:
+    void swap(Node& other) noexcept;
 };
 
 /*! \class NodeStack

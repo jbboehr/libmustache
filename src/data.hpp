@@ -67,10 +67,20 @@ class Data {
         type(Data::TypeNone),
         length(0),
         val(NULL),
-        lambda(NULL) {};
-    Data(Data::Type type, int size) : val(NULL), lambda(NULL) {
+        lambda(NULL) {}
+    Data(Data::Type type, int size) :
+        type(Data::TypeNone),
+        length(0),
+        val(NULL),
+        lambda(NULL) {
       init(type, size);
-    };
+    }
+
+    // Data owns its active value and must never be shallow-copied.
+    Data(const Data&) = delete;
+    Data& operator=(const Data&) = delete;
+    Data(Data&& other) noexcept;
+    Data& operator=(Data&& other) noexcept;
     
     //! Destructor
     ~Data();
@@ -86,6 +96,9 @@ class Data {
     
     //! Create from yaml
     static Data * createFromYAML(const char * string);
+
+  private:
+    void swap(Data& other) noexcept;
 };
 
 Data * searchStack(Stack<Data *> * stack, std::string * key);
@@ -109,4 +122,3 @@ class DataStack : Stack<Data *> {
 } // namespace Mustache
 
 #endif
-
