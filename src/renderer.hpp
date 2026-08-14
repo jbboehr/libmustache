@@ -10,6 +10,7 @@
 #include "data.hpp"
 #include "exception.hpp"
 #include "node.hpp"
+#include "stack.hpp"
 #include "tokenizer.hpp"
 #include "utils.hpp"
 
@@ -21,7 +22,9 @@ class Mustache;
 /*! \class Renderer
     \brief Renders a token tree
 
-    This class renders a token tree.
+    This class renders a token tree. The Data tree must not be structurally
+    modified while a render is in progress; doing so can invalidate borrowed
+    entries in the renderer's lookup stack.
 */
 class Renderer {
   private:
@@ -31,10 +34,10 @@ class Renderer {
     const Node * _node;
     
     //! The root data node
-    Data * _data;
+    const Data * _data;
     
     //! The data stack
-    Stack<Data *> * _stack;
+    Stack<const Data *> _stack;
     
     //! Partials
     const Node::Partials * _partials;
@@ -48,7 +51,7 @@ class Renderer {
     //! Renders a single node
     void _renderNode(const Node * node);
     
-    Data * _lookup(const Node * node);
+    const Data * _lookup(const Node * node);
 
     void setPartialResolver(PartialResolver resolver);
 
@@ -63,8 +66,7 @@ class Renderer {
     //! Constructor
     Renderer() : 
         _node(NULL), 
-        _data(NULL), 
-        _stack(NULL), 
+        _data(NULL),
         _partials(NULL), 
         _output(NULL), 
         _strictPaths(false) {};
@@ -76,14 +78,14 @@ class Renderer {
     void clear();
     
     //! Initializes the renderer
-    void init(const Node * node, Data * data,
+    void init(const Node * node, const Data * data,
         const Node::Partials * partials, std::string * output);
     
     //! Sets the current root token node
     void setNode(const Node * node);
     
     //! Sets the current root data node
-    void setData(Data * data);
+    void setData(const Data * data);
     
     //! Sets the current partials
     void setPartials(const Node::Partials * partials);

@@ -66,6 +66,9 @@ void htmlspecialchars(std::string * str);
 */
 void htmlspecialchars_append(std::string * str, std::string * buf);
 
+//! Const-safe overload for owned scalar values.
+void htmlspecialchars_append(const std::string& str, std::string * buf);
+
 //! Explode a string.
 /*!
   http://www.zedwood.com/article/106/cpp-explode-function

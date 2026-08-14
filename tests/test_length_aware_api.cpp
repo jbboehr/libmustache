@@ -26,12 +26,9 @@ void expect(bool condition, const char * message)
   }
 }
 
-mustache::Data * makeStringData(std::string_view value)
+mustache::Data makeStringData(std::string_view value)
 {
-  std::unique_ptr<mustache::Data> data(new mustache::Data(
-      mustache::Data::TypeString, static_cast<int>(value.size())));
-  data->val->assign(value.data(), value.size());
-  return data.release();
+  return mustache::Data::string(std::string(value));
 }
 
 void testTemplateViewPreservesEmbeddedNul()
@@ -45,7 +42,7 @@ void testTemplateViewPreservesEmbeddedNul()
   mustache.tokenize(std::string_view(source, sizeof(source)), &root);
 
   mustache::Data data(mustache::Data::TypeMap, 0);
-  data.data["name"] = makeStringData("ok");
+  data.set("name", makeStringData("ok"));
   std::string output;
   mustache.render(&root, &data, NULL, &output);
 
@@ -71,7 +68,7 @@ void testExplicitDelimiterLengths()
   mustache::Node root;
   mustache.tokenize(std::string_view(source, sizeof(source)), &root);
   mustache::Data data(mustache::Data::TypeMap, 0);
-  data.data["name"] = makeStringData("ok");
+  data.set("name", makeStringData("ok"));
   std::string output;
   mustache.render(&root, &data, NULL, &output);
   expect(output == "AokB",
@@ -125,10 +122,8 @@ void testLengthAwareLambdaText()
   std::string observed;
 
   mustache::Data data(mustache::Data::TypeMap, 0);
-  std::unique_ptr<mustache::Data> lambdaData(
-      new mustache::Data(mustache::Data::TypeLambda, 0));
-  lambdaData->lambda = new LegacyLambda(&observed);
-  data.data["call"] = lambdaData.release();
+  data.set("call", mustache::Data::lambda(
+      std::make_unique<LegacyLambda>(&observed)));
 
   mustache::Mustache mustache;
   mustache::Node root;

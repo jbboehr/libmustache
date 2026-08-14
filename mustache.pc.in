@@ -8,5 +8,5 @@ Description: Library for mustache
 URL: https://github.com/jbboehr/libmustache
 Version: @VERSION@
 Libs: -L${libdir} -lmustache
-Requires.private: json-c yaml-0.1
+Requires.private: json-c >= 0.12 yaml-0.1
 Cflags: -I${includedir} @MUSTACHE_CXX_STANDARD_FLAG@

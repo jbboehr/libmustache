@@ -272,9 +272,7 @@ void testPHPFixture()
       "legacy fixture must serialize back to its exact public byte sequence");
 
   mustache::Data data(mustache::Data::TypeMap, 0);
-  mustache::Data * value = new mustache::Data(mustache::Data::TypeString, 3);
-  value->val->assign("baz");
-  data.data.insert(std::make_pair(std::string("test"), value));
+  data.set("test", mustache::Data::string("baz"));
 
   mustache::Mustache mustache;
   std::string output;

@@ -1,6 +1,8 @@
 
 #include <iostream>
+#include <memory>
 #include <sstream>
+#include <utility>
 
 #include "data.hpp"
 
@@ -8,19 +10,11 @@
 
 static void add_lambda(mustache::Lambda * lambda, mustache::Data * data)
 {
-	mustache::Data * child = new mustache::Data();
-	child->type = mustache::Data::TypeLambda;
-	child->lambda = lambda;
-	if( data->type == mustache::Data::TypeMap ) {
-		mustache::Data::Map::iterator existing = data->data.find("lambda");
-		if( existing != data->data.end() ) {
-			delete existing->second;
-			data->data.erase(existing);
-		}
-		data->data.insert(std::pair<std::string,mustache::Data *>("lambda", child));
+	std::unique_ptr<mustache::Lambda> owned(lambda);
+	if( data->type() == mustache::Data::TypeMap ) {
+		data->set("lambda", mustache::Data::lambda(std::move(owned)));
 	} else {
 		std::cerr << "Root data was not a map!" << std::endl;
-		delete child;
 	}
 }
 

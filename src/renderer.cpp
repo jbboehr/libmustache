@@ -15,16 +15,13 @@ void Renderer::clear()
 {
   _node = NULL;
   _data = NULL;
-  if( _stack != NULL ) {
-    delete _stack;
-  }
-  _stack = NULL;
+  _stack.clear();
   _partials = NULL;
   _partialResolver = PartialResolver();
   _output = NULL;
 }
 
-void Renderer::init(const Node * node, Data * data,
+void Renderer::init(const Node * node, const Data * data,
     const Node::Partials * partials, std::string * output)
 {
   clear();
@@ -42,7 +39,7 @@ void Renderer::setNode(const Node * node)
   _node = node;
 }
 
-void Renderer::setData(Data * data)
+void Renderer::setData(const Data * data)
 {
   _data = data;
 }
@@ -72,11 +69,8 @@ void Renderer::render()
   }
   
   // Initialize stack
-  if( _stack != NULL ) {
-    delete _stack;
-  }
-  _stack = new Stack<Data *>();
-  _stack->push_back(_data);
+  _stack.clear();
+  _stack.push_back(_data);
   
   // Render
   _renderNode(_node);
@@ -113,7 +107,7 @@ void Renderer::_renderNode(const Node * node)
   }
 
   // Check stack size?
-  if( _stack->size() <= 0 ) {
+  if( _stack.size() <= 0 ) {
     throw Exception("Whoops, empty data");
   } else if( !(node->type & Node::TypeHasNoString) &&
       !node->data.has_value() ) {
@@ -122,7 +116,7 @@ void Renderer::_renderNode(const Node * node)
   
   // Lookup data
   bool valIsEmpty = true;
-  Data * val = NULL;
+  const Data * val = NULL;
   if( node->type & Node::TypeHasData ) {
     val = _lookup(node);
   }
@@ -165,16 +159,21 @@ void Renderer::_renderNode(const Node * node)
     case Node::TypeTag:
     case Node::TypeVariable:
       if( !valIsEmpty) {
-        switch( val->type ) {
+        switch( val->type() ) {
           case Data::TypeString:
+          case Data::TypeBoolean:
+          case Data::TypeInteger:
+          case Data::TypeDouble: {
+            const std::string rendered = val->toString();
             if( node->flags & Node::FlagEscape ) {
-              htmlspecialchars_append(val->val, _output);
+              htmlspecialchars_append(rendered, _output);
             } else {
-              _output->append(*val->val);
+              _output->append(rendered);
             }
             break;
-          case Data::TypeLambda:
-            std::string invoked = val->lambda->invoke();
+          }
+          case Data::TypeLambda: {
+            std::string invoked = val->lambdaValue()->invoke();
 
             Tokenizer tokenizer;
             Node nodeFromLambda;
@@ -182,6 +181,12 @@ void Renderer::_renderNode(const Node * node)
             tokenizer.tokenize(&invoked, &nodeFromLambda, node->flags & Node::FlagEscape);
 
             _renderNode(&nodeFromLambda);
+            break;
+          }
+          case Data::TypeNone:
+          case Data::TypeList:
+          case Data::TypeMap:
+          case Data::TypeArray:
             break;
         }
       }
@@ -198,48 +203,51 @@ void Renderer::_renderNode(const Node * node)
       
     case Node::TypeSection:
       if( !valIsEmpty ) {
-        switch( val->type ) {
+        switch( val->type() ) {
           default:
           case Data::TypeString:
-            _stack->push_back(val);
+          case Data::TypeBoolean:
+          case Data::TypeInteger:
+          case Data::TypeDouble:
+            _stack.push_back(val);
             for( Node::Children::const_iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
               _renderNode(it->get());
             }
-            _stack->pop_back();
+            _stack.pop_back();
             break;
           case Data::TypeList:
-            for( Data::List::iterator childrenIt = val->children.begin() ; childrenIt != val->children.end(); childrenIt++ ) {
-              _stack->push_back(*childrenIt);
+            for( const Data& child : val->listItems() ) {
+              _stack.push_back(&child);
               for( Node::Children::const_iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
                 _renderNode(it->get());
               }
-              _stack->pop_back();
+              _stack.pop_back();
             }
             break;
           case Data::TypeArray:
-        	  for( int i = 0; i < val->length; i++ ) {
-                  _stack->push_back(val->array[i]);
-                  for( Node::Children::const_iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
-                    _renderNode(it->get());
-                  }
-                  _stack->pop_back();
-        	  }
+            for( const Data& child : val->arrayItems() ) {
+              _stack.push_back(&child);
+              for( Node::Children::const_iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
+                _renderNode(it->get());
+              }
+              _stack.pop_back();
+            }
             break;
           case Data::TypeMap:
             // Associate array/map
-            _stack->push_back(val);
+            _stack.push_back(val);
             for( Node::Children::const_iterator it = node->children.begin() ; it != node->children.end(); it++ ) {
               _renderNode(it->get());
             }
-            _stack->pop_back();
+            _stack.pop_back();
             break;
-          case Data::TypeLambda:
+          case Data::TypeLambda: {
             if( !node->startSequence.has_value() ||
                 !node->stopSequence.has_value() ) {
               throw Exception("Missing section delimiters");
             }
             std::string text = node->children_to_template_string(*node->startSequence, *node->stopSequence);
-            std::string invoked = val->lambda->invoke(
+            std::string invoked = val->lambdaValue()->invoke(
                 std::string_view(text), this);
 
             Tokenizer tokenizer;
@@ -250,6 +258,9 @@ void Renderer::_renderNode(const Node * node)
             tokenizer.tokenize(&invoked, &nodeFromLambda, node->flags & Node::FlagEscape);
 
             _renderNode(&nodeFromLambda);
+            break;
+          }
+          case Data::TypeNone:
             break;
         }
       }
@@ -287,20 +298,21 @@ void Renderer::_renderNode(const Node * node)
   }
 }
 
-Data * Renderer::_lookup(const Node * node)
+const Data * Renderer::_lookup(const Node * node)
 {
-  Data * data = _stack->back();
+  const Data * data = _stack.back();
   
-  if( data->type == Data::TypeString || data->type == Data::TypeLambda ) {
+  if( data->type() != Data::TypeMap &&
+      data->type() != Data::TypeList && data->type() != Data::TypeArray ) {
     // Simple
     if( node->data->compare(".") == 0 ) {
       return data;
     }
-  } else if( data->type == Data::TypeMap ) {
+  } else if( data->type() == Data::TypeMap ) {
     // Check top level
-    Data::Map::iterator it = data->data.find(*(node->data));
-    if( it != data->data.end() ) {
-      return it->second;
+    const Data * found = data->find(*node->data);
+    if( found != NULL ) {
+      return found;
     }
   } 
   
@@ -318,18 +330,14 @@ Data * Renderer::_lookup(const Node * node)
   }
   
   // Resolve up the data stack
-  Data * ref = NULL;
-  Data::Map::iterator d_it;
+  const Data * ref = NULL;
   int i;
-  Data ** _stackPos = _stack->end();
-  for( i = 0; i < _stack->size(); i++, _stackPos-- ) {
-    if( (*_stackPos)->type == Data::TypeMap ) {
-      d_it = (*_stackPos)->data.find(*initial);
-      if( d_it != (*_stackPos)->data.end() ) {
-        ref = d_it->second;
-        if( ref != NULL ) {
-          break;
-        }
+  const Data ** stackPos = _stack.end();
+  for( i = 0; i < _stack.size(); i++, stackPos-- ) {
+    if( *stackPos != NULL && (*stackPos)->type() == Data::TypeMap ) {
+      ref = (*stackPos)->find(*initial);
+      if( ref != NULL ) {
+        break;
       }
     }
   }
@@ -342,16 +350,15 @@ Data * Renderer::_lookup(const Node * node)
         vs_it != node->dataParts.end(); vs_it++ ) {
       if( ref == NULL ) {
         break;
-      } else if( ref->type != Data::TypeMap ) {
+      } else if( ref->type() != Data::TypeMap ) {
         ref = NULL; // Not sure about this
         break;
       } else {
-        d_it = ref->data.find(*vs_it);
-        if( d_it == ref->data.end() ) {
+        ref = ref->find(*vs_it);
+        if( ref == NULL ) {
           ref = NULL; // Not sure about this
           break; 
         }
-        ref = d_it->second;
       }
     }
   }

@@ -31,10 +31,10 @@
 #error "The deprecated C++11 compatibility macro must remain defined"
 #endif
 
-static_assert(!std::is_copy_constructible<mustache::Data>::value,
-    "mustache::Data must not be copy constructible");
-static_assert(!std::is_copy_assignable<mustache::Data>::value,
-    "mustache::Data must not be copy assignable");
+static_assert(std::is_copy_constructible<mustache::Data>::value,
+    "mustache::Data must be safely copy constructible");
+static_assert(std::is_copy_assignable<mustache::Data>::value,
+    "mustache::Data must be safely copy assignable");
 static_assert(std::is_nothrow_move_constructible<mustache::Data>::value,
     "mustache::Data must be nothrow move constructible");
 static_assert(std::is_nothrow_move_assignable<mustache::Data>::value,
@@ -85,8 +85,7 @@ int main()
         mustache::Node::unserialize(
             serial->data(), serial->size(), 0, &position, limits));
 
-    mustache::Data scalar(mustache::Data::TypeString, 8);
-    *scalar.val = "compiled";
+    const mustache::Data scalar = mustache::Data::string("compiled");
     mustache::CompiledTemplate compiled = mustache::compile("[{{>value}}]");
     mustache::PartialMap partials;
     partials.emplace("value", mustache::compile("{{.}}"));

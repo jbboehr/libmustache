@@ -56,6 +56,30 @@ if(MSVC)
         message(FATAL_ERROR "The json-c package did not provide a supported CMake target")
     endif()
 
+    # vcpkg's json-c config currently reports its version as unknown. Verify
+    # the public version header instead of rejecting a compatible package.
+    include(CheckCXXSourceCompiles)
+    set(CMAKE_REQUIRED_LIBRARIES ${MUSTACHE_JSON_TARGET})
+    check_cxx_source_compiles([=[
+        #include "json_c_version.h"
+        #ifndef JSON_C_MAJOR_VERSION
+        #error json-c version macros are unavailable
+        #endif
+        #ifndef JSON_C_MINOR_VERSION
+        #error json-c version macros are unavailable
+        #endif
+        #if JSON_C_MAJOR_VERSION == 0
+        #if JSON_C_MINOR_VERSION < 12
+        #error json-c 0.12 or newer is required
+        #endif
+        #endif
+        int main() { return 0; }
+    ]=] MUSTACHE_JSON_C_AT_LEAST_0_12)
+    unset(CMAKE_REQUIRED_LIBRARIES)
+    if(NOT MUSTACHE_JSON_C_AT_LEAST_0_12)
+        message(FATAL_ERROR "json-c 0.12 or newer is required")
+    endif()
+
     find_package(yaml CONFIG REQUIRED)
     if(TARGET yaml)
         set(MUSTACHE_YAML_TARGET yaml)
@@ -71,7 +95,7 @@ if(MSVC)
     endif()
 else()
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(JSONC REQUIRED IMPORTED_TARGET json-c)
+    pkg_check_modules(JSONC REQUIRED IMPORTED_TARGET "json-c>=0.12")
     pkg_check_modules(YAML REQUIRED IMPORTED_TARGET yaml-0.1)
     set(MUSTACHE_JSON_TARGET PkgConfig::JSONC)
     set(MUSTACHE_YAML_TARGET PkgConfig::YAML)

@@ -1,4 +1,3 @@
-
 #include "data.hpp"
 
 #ifdef MUSTACHE_HAVE_LIBYAML
@@ -11,358 +10,592 @@
 #include "json_tokener.h"
 #endif
 
-#include "stdio.h"
-
+#include <cmath>
+#include <iomanip>
+#include <limits>
+#include <locale>
+#include <sstream>
+#include <type_traits>
 #include <utility>
+#include <variant>
 
 namespace mustache {
 
+struct Data::Storage {
+  typedef std::variant<std::monostate, String, List, Map, Array,
+      std::shared_ptr<Lambda>, bool, std::int64_t, double> Value;
 
-Data::Data(Data&& other) noexcept :
-    type(Data::TypeNone),
-    length(0),
-    val(NULL),
-    lambda(NULL)
+  Value value;
+  std::string scalarSpelling;
+
+  Storage() = default;
+  Storage(const Storage&) = default;
+  Storage(Storage&&) noexcept = default;
+
+  template <typename T, typename = std::enable_if_t<
+      !std::is_same_v<std::decay_t<T>, Storage> > >
+  explicit Storage(T&& value) : value(std::forward<T>(value)) {}
+};
+
+std::unique_ptr<Data::Storage> Data::makeStorage(Type type, int size)
 {
-  swap(other);
+  if( size < 0 ) {
+    throw Exception("Invalid data size");
+  }
+
+  switch( type ) {
+    case Data::TypeNone:
+      return std::make_unique<Storage>();
+    case Data::TypeString: {
+      Data::String value;
+      value.reserve(static_cast<std::size_t>(size));
+      return std::make_unique<Storage>(std::move(value));
+    }
+    case Data::TypeList:
+      return std::make_unique<Storage>(List());
+    case Data::TypeMap: {
+      Data::Map value;
+      value.reserve(static_cast<std::size_t>(size));
+      return std::make_unique<Storage>(std::move(value));
+    }
+    case Data::TypeArray: {
+      Data::Array value;
+      value.reserve(static_cast<std::size_t>(size));
+      return std::make_unique<Storage>(std::move(value));
+    }
+    case Data::TypeLambda:
+      return std::make_unique<Storage>(std::shared_ptr<Lambda>());
+    case Data::TypeBoolean:
+      return std::make_unique<Storage>(false);
+    case Data::TypeInteger:
+      return std::make_unique<Storage>(std::int64_t(0));
+    case Data::TypeDouble:
+      return std::make_unique<Storage>(0.0);
+  }
+
+  throw Exception("Unknown data type");
 }
 
-Data& Data::operator=(Data&& other) noexcept
+namespace {
+
+const char * typeDescription(Data::Type type)
+{
+  switch( type ) {
+    case Data::TypeNone:
+      return "null";
+    case Data::TypeString:
+      return "string";
+    case Data::TypeList:
+      return "list";
+    case Data::TypeMap:
+      return "object";
+    case Data::TypeArray:
+      return "array";
+    case Data::TypeLambda:
+      return "lambda";
+    case Data::TypeBoolean:
+      return "boolean";
+    case Data::TypeInteger:
+      return "integer";
+    case Data::TypeDouble:
+      return "floating-point";
+  }
+  return "unknown";
+}
+
+} // namespace
+
+Data::Data() : storage_(std::make_unique<Storage>()) {}
+
+Data::Data(Type type, int size) : storage_(makeStorage(type, size)) {}
+
+Data::Data(std::unique_ptr<Storage> storage) noexcept :
+    storage_(std::move(storage)) {}
+
+Data::Data(const Data& other) :
+    storage_(other.storage_ == nullptr
+        ? std::make_unique<Storage>()
+        : std::make_unique<Storage>(*other.storage_)) {}
+
+Data& Data::operator=(const Data& other)
 {
   if( this != &other ) {
-    Data previous(std::move(other));
-    swap(previous);
+    Data copy(other);
+    swap(copy);
   }
   return *this;
 }
 
+Data::Data(Data&& other) noexcept = default;
+
+Data& Data::operator=(Data&& other) noexcept = default;
+
+Data::~Data() = default;
+
+Data Data::null()
+{
+  return Data();
+}
+
+Data Data::boolean(bool value)
+{
+  return Data(std::make_unique<Storage>(value));
+}
+
+Data Data::integer(std::int64_t value)
+{
+  return Data(std::make_unique<Storage>(value));
+}
+
+Data Data::floating(double value)
+{
+  if( !std::isfinite(value) ) {
+    throw Exception("Invalid floating-point data");
+  }
+  return Data(std::make_unique<Storage>(value));
+}
+
+Data Data::string(std::string value)
+{
+  return Data(std::make_unique<Storage>(std::move(value)));
+}
+
+Data Data::list(List values)
+{
+  return Data(std::make_unique<Storage>(std::move(values)));
+}
+
+Data Data::array(Array values)
+{
+  return Data(std::make_unique<Storage>(std::move(values)));
+}
+
+Data Data::object(Map values)
+{
+  return Data(std::make_unique<Storage>(std::move(values)));
+}
+
+Data Data::lambda(std::unique_ptr<Lambda> value)
+{
+  return sharedLambda(std::shared_ptr<Lambda>(std::move(value)));
+}
+
+Data Data::sharedLambda(std::shared_ptr<Lambda> value)
+{
+  if( value == nullptr ) {
+    throw Exception("Empty lambda data");
+  }
+  return Data(std::make_unique<Storage>(std::move(value)));
+}
+
+void Data::init(Type type, int size)
+{
+  Data replacement(makeStorage(type, size));
+  swap(replacement);
+}
+
+Data::Type Data::type() const noexcept
+{
+  static_assert(std::variant_size<Storage::Value>::value == 9,
+      "Update Data::type() when adding a storage alternative");
+
+  if( storage_ == nullptr ) {
+    return TypeNone;
+  }
+
+  switch( storage_->value.index() ) {
+    case 0:
+      return TypeNone;
+    case 1:
+      return TypeString;
+    case 2:
+      return TypeList;
+    case 3:
+      return TypeMap;
+    case 4:
+      return TypeArray;
+    case 5:
+      return TypeLambda;
+    case 6:
+      return TypeBoolean;
+    case 7:
+      return TypeInteger;
+    case 8:
+      return TypeDouble;
+  }
+
+  return TypeNone;
+}
+
+int Data::isEmpty() const noexcept
+{
+  switch( type() ) {
+    case TypeNone:
+      return 1;
+    case TypeString:
+      return std::get<String>(storage_->value).empty() ? 1 : 0;
+    case TypeList:
+      return std::get<List>(storage_->value).empty() ? 1 : 0;
+    case TypeMap:
+      return std::get<Map>(storage_->value).empty() ? 1 : 0;
+    case TypeArray:
+      return std::get<Array>(storage_->value).empty() ? 1 : 0;
+    case TypeLambda:
+      return std::get<std::shared_ptr<Lambda> >(storage_->value) == nullptr
+          ? 1 : 0;
+    case TypeBoolean:
+      return std::get<bool>(storage_->value) ? 0 : 1;
+    case TypeInteger:
+    case TypeDouble:
+      return 0;
+  }
+  return 1;
+}
+
+Data::Storage& Data::requireStorage(Type expected, const char * description)
+{
+  if( type() != expected ) {
+    throw Exception(std::string("Data is not ") + description);
+  }
+  return *storage_;
+}
+
+const Data::Storage& Data::requireStorage(
+    Type expected, const char * description) const
+{
+  if( type() != expected ) {
+    throw Exception(std::string("Data is not ") + description);
+  }
+  return *storage_;
+}
+
+Data::String& Data::stringValue()
+{
+  return std::get<String>(requireStorage(TypeString, "a string").value);
+}
+
+const Data::String& Data::stringValue() const
+{
+  return std::get<String>(requireStorage(TypeString, "a string").value);
+}
+
+bool Data::booleanValue() const
+{
+  return std::get<bool>(requireStorage(TypeBoolean, "a boolean").value);
+}
+
+std::int64_t Data::integerValue() const
+{
+  return std::get<std::int64_t>(
+      requireStorage(TypeInteger, "an integer").value);
+}
+
+double Data::floatingValue() const
+{
+  return std::get<double>(
+      requireStorage(TypeDouble, "a floating-point number").value);
+}
+
+const Data::List& Data::listItems() const
+{
+  return std::get<List>(requireStorage(TypeList, "a list").value);
+}
+
+const Data::Array& Data::arrayItems() const
+{
+  return std::get<Array>(requireStorage(TypeArray, "an array").value);
+}
+
+const Data::Map& Data::objectItems() const
+{
+  return std::get<Map>(requireStorage(TypeMap, "an object").value);
+}
+
+Lambda * Data::lambdaValue() const noexcept
+{
+  if( type() != TypeLambda ) {
+    return nullptr;
+  }
+  return std::get<std::shared_ptr<Lambda> >(storage_->value).get();
+}
+
+std::string Data::toString() const
+{
+  switch( type() ) {
+    case TypeNone:
+      return std::string();
+    case TypeString:
+      return stringValue();
+    case TypeBoolean:
+      return booleanValue() ? "true" : std::string();
+    case TypeInteger:
+      return std::to_string(integerValue());
+    case TypeDouble: {
+      if( !storage_->scalarSpelling.empty() ) {
+        return storage_->scalarSpelling;
+      }
+      std::ostringstream stream;
+      stream.imbue(std::locale::classic());
+      stream << std::setprecision(std::numeric_limits<double>::max_digits10)
+             << floatingValue();
+      return stream.str();
+    }
+    case TypeList:
+    case TypeMap:
+    case TypeArray:
+    case TypeLambda:
+      throw Exception(std::string("Cannot render ") +
+          typeDescription(type()) + " data as a scalar");
+  }
+  throw Exception("Unknown data type");
+}
+
+Data& Data::set(std::string key, Data value)
+{
+  Map& values = std::get<Map>(requireStorage(TypeMap, "an object").value);
+  values.insert_or_assign(std::move(key), std::move(value));
+  return *this;
+}
+
+Data& Data::push_back(Data value)
+{
+  if( type() == TypeList ) {
+    std::get<List>(storage_->value).push_back(std::move(value));
+  } else if( type() == TypeArray ) {
+    std::get<Array>(storage_->value).push_back(std::move(value));
+  } else {
+    throw Exception("Data is not a list or array");
+  }
+  return *this;
+}
+
+const Data * Data::find(const std::string& key) const noexcept
+{
+  if( type() != TypeMap ) {
+    return nullptr;
+  }
+  const Map& values = std::get<Map>(storage_->value);
+  const Map::const_iterator found = values.find(key);
+  return found == values.end() ? nullptr : &found->second;
+}
+
 void Data::swap(Data& other) noexcept
 {
-  using std::swap;
-  swap(type, other.type);
-  swap(length, other.length);
-  swap(val, other.val);
-  data.swap(other.data);
-  children.swap(other.children);
-  array.swap(other.array);
-  swap(lambda, other.lambda);
+  storage_.swap(other.storage_);
 }
-
-
-Data::~Data()
-{
-  switch( this->type ) {
-    case Data::TypeString:
-      delete val;
-      break;
-    case Data::TypeMap:
-      if( data.size() > 0 ) {
-        Data::Map::iterator dataIt;
-        for ( dataIt = data.begin() ; dataIt != data.end(); dataIt++ ) {
-          delete (*dataIt).second;
-        }
-        data.clear();
-      }
-      break;
-    case Data::TypeList:
-      if( children.size() > 0 ) {
-        Data::List::iterator childrenIt;
-        for ( childrenIt = children.begin() ; childrenIt != children.end(); childrenIt++ ) {
-          delete *childrenIt;
-        }
-        children.clear();
-      }
-    case Data::TypeArray:
-      if( array.size() > 0 ) {
-        Data::Array::iterator arrayIt;
-        for ( arrayIt = array.begin() ; arrayIt != array.end(); arrayIt++ ) {
-          delete *arrayIt;
-        }
-        array.clear();
-      }
-      break;
-    case Data::TypeLambda:
-      delete lambda;
-      break;
-  }
-}
-
-void Data::init(Data::Type type, int size) {
-  this->type = type;
-  this->length = size;
-  switch( type ) {
-    case Data::TypeString:
-      val = new std::string();
-      val->reserve(size);
-      break;
-    case Data::TypeMap:
-      // Do nothing
-      break;
-    case Data::TypeList:
-      // Do nothing
-      break;
-    case Data::TypeArray:
-      this->array.reserve(size);
-      break;
-    case Data::TypeLambda:
-      // Do nothing
-      break;
-  }
-};
-
-int Data::isEmpty()
-{
-  int ret = 0;
-  switch( type ) {
-    default:
-    case Data::TypeNone:
-      ret = 1;
-      break;
-    case Data::TypeString:
-      if( val == NULL || val->length() <= 0 ) {
-        ret = 1;
-      }
-      break;
-    case Data::TypeList:
-      if( children.size() <= 0 ) {
-        ret = 1;
-      }
-      break;
-    case Data::TypeMap:
-      if( data.size() <= 0 ) {
-        ret = 1;
-      }
-      break;
-    case Data::TypeArray:
-      if( length <= 0 ) {
-        ret = 1;
-      }
-      break;
-    case Data::TypeLambda:
-      if( lambda == NULL ) {
-        ret = 1;
-      }
-      break;
-  }
-  return ret;
-}
-
-
-
-
-
-Data * searchStack(Stack<Data *> * stack, std::string * key)
-{
-  // Resolve up the data stack
-  Data * ref = NULL;
-  Data::Map::iterator d_it;
-  int i;
-  Data ** _stackPos = stack->end();
-  for( i = 0; i < stack->size(); i++, _stackPos-- ) {
-    if( (*_stackPos) == NULL ) continue;
-    if( (*_stackPos)->type == Data::TypeMap ) {
-      d_it = (*_stackPos)->data.find(*key);
-      if( d_it != (*_stackPos)->data.end() ) {
-        ref = d_it->second;
-        if( ref != NULL ) {
-          break;
-        }
-      }
-    }
-  }
-  return ref;
-}
-
-Data * searchStackNR(Stack<Data *> * stack, std::string * key)
-{
-  Data * ref = NULL;
-  Data * back = stack->back();
-  Data::Map::iterator d_it;
-  if( back != NULL && back->type == Data::TypeMap ) {
-    d_it = back->data.find(*key);
-    if( d_it != back->data.end() ) {
-      ref = d_it->second;
-      if( ref != NULL ) {
-        return ref;
-      }
-    }
-  }
-  return NULL;
-}
-
-
 
 // Data integrations
 
 #if defined(MUSTACHE_HAVE_LIBJSON)
-static void _createFromJSON(Data * data, struct json_object * object)
+Data Data::fromJSON(const char * string)
 {
-  switch( json_object_get_type(object) ) {
-    case json_type_null:
-      data->type = Data::TypeString;
-      data->val = new std::string("");
-      break;
-    case json_type_boolean:
-      data->type = Data::TypeString;
-      if( 0 == (int) json_object_get_boolean(object) ) {
-        data->val = new std::string("");
-      } else {
-        data->val = new std::string("true");
-      }
-      break;
-    case json_type_double:
-    case json_type_int:
-    case json_type_string:
-      data->type = Data::TypeString;
-      data->val = new std::string(json_object_get_string(object));
-      break;
-    case json_type_object: {
-      data->type = Data::TypeMap;
-      std::string ckey;
-      json_object_object_foreach(object, key, value)
-      {
-        ckey.assign(key);
-        std::unique_ptr<Data> ownedChild(new Data());
-        _createFromJSON(ownedChild.get(), value);
-        if( data->data.insert(std::make_pair(ckey, ownedChild.get())).second ) {
-          ownedChild.release();
-        }
-      }
-      break;
-    }
-    case json_type_array: {
-      int len = json_object_array_length(object);
-      data->init(Data::TypeArray, len);
-      
-      struct json_object * array_item;
-      for( int i = 0; i < len; i++ ) {
-        array_item = json_object_array_get_idx(object, i);
-        std::unique_ptr<Data> ownedChild(new Data());
-        _createFromJSON(ownedChild.get(), array_item);
-        data->array.push_back(ownedChild.get());
-        ownedChild.release();
-      }
-      data->length = static_cast<int>(data->array.size());
-      break;
-    }
-    default: {
-      throw Exception("Unknown json type");
-    }
+  if( string == nullptr ) {
+    throw Exception("Missing JSON data");
   }
+
+  const std::size_t length = std::char_traits<char>::length(string);
+  if( length >= static_cast<std::size_t>(
+          std::numeric_limits<int>::max()) ) {
+    throw Exception("JSON input is too large");
+  }
+
+  std::unique_ptr<json_tokener, decltype(&json_tokener_free)> tokener(
+      json_tokener_new(), &json_tokener_free);
+  if( tokener == nullptr ) {
+    throw Exception("Failed to initialize JSON parser");
+  }
+  json_tokener_set_flags(tokener.get(), JSON_TOKENER_STRICT);
+
+  std::unique_ptr<json_object, decltype(&json_object_put)> result(
+      json_tokener_parse_ex(tokener.get(), string,
+          static_cast<int>(length + 1)),
+      &json_object_put);
+  if( json_tokener_get_error(tokener.get()) != json_tokener_success ||
+      tokener->char_offset != static_cast<int>(length) ) {
+    throw Exception("Invalid JSON data");
+  }
+
+  if( result == nullptr ) {
+    return Data::null();
+  }
+
+  const auto convert = [](const auto& self, json_object * object) -> Data {
+    if( object == nullptr ) {
+      return Data::null();
+    }
+
+    switch( json_object_get_type(object) ) {
+      case json_type_null:
+        return Data::null();
+      case json_type_boolean:
+        return Data::boolean(json_object_get_boolean(object) != 0);
+      case json_type_double: {
+        Data value(std::make_unique<Storage>(
+            json_object_get_double(object)));
+        value.storage_->scalarSpelling = json_object_get_string(object);
+        return value;
+      }
+      case json_type_int: {
+        const std::int64_t value = json_object_get_int64(object);
+        if( std::to_string(value) != json_object_get_string(object) ) {
+          throw Exception("JSON integer is outside the supported range");
+        }
+        return Data::integer(value);
+      }
+      case json_type_string:
+        return Data::string(std::string(
+            json_object_get_string(object), static_cast<std::size_t>(
+                json_object_get_string_len(object))));
+      case json_type_object: {
+        Data value = Data::object();
+        json_object_object_foreach(object, key, child)
+        {
+          value.set(key, self(self, child));
+        }
+        return value;
+      }
+      case json_type_array: {
+        const std::size_t childCount = json_object_array_length(object);
+        if( childCount > static_cast<std::size_t>(
+                std::numeric_limits<int>::max()) ) {
+          throw Exception("JSON array is too large");
+        }
+        Data value(Data::TypeArray, static_cast<int>(childCount));
+        for( std::size_t i = 0; i < childCount; ++i ) {
+          value.push_back(self(
+              self, json_object_array_get_idx(object, i)));
+        }
+        return value;
+      }
+    }
+
+    throw Exception("Unknown json type");
+  };
+
+  return convert(convert, result.get());
 }
 
 Data * Data::createFromJSON(const char * string)
 {
-  struct json_object * result = json_tokener_parse((char *) string);
-  if( result == NULL ) {
-    throw Exception("Invalid JSON data");
-  }
-  std::unique_ptr<Data> data(new Data());
-  try {
-    _createFromJSON(data.get(), result);
-  } catch( ... ) {
-    json_object_put(result);
-    throw;
-  }
-  json_object_put(result);
-  return data.release();
+  return new Data(fromJSON(string));
 }
 #else
-Data * Data::createFromJSON(const char * string)
+Data Data::fromJSON(const char *)
 {
   throw Exception("JSON support not enabled");
+}
+
+Data * Data::createFromJSON(const char * string)
+{
+  return new Data(fromJSON(string));
 }
 #endif
 
 #if defined(MUSTACHE_HAVE_LIBYAML)
-static void _createFromYAML(Data * data, yaml_document_t * document, yaml_node_t * node)
+namespace {
+
+Data createFromYAMLNode(
+    yaml_document_t * document, yaml_node_t * node)
 {
+  if( node == nullptr ) {
+    throw Exception("Missing yaml node");
+  }
+
   switch( node->type ) {
-    case YAML_SCALAR_NODE: {
-      char * value = reinterpret_cast<char *>(node->data.scalar.value);
-      data->type = Data::TypeString;
-      data->val = new std::string(value);
-      break;
-    }
+    case YAML_SCALAR_NODE:
+      return Data::string(std::string(
+          reinterpret_cast<char *>(node->data.scalar.value),
+          node->data.scalar.length));
     case YAML_MAPPING_NODE: {
-      data->type = Data::TypeMap;
-      std::string ckey;
-      yaml_node_pair_t * pair;
-      for( pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; pair++ ) {
-        yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
-        yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
-        char * keyValue = reinterpret_cast<char *>(keyNode->data.scalar.value);
-        
-        ckey.assign(keyValue);
-        std::unique_ptr<Data> ownedChild(new Data());
-        _createFromYAML(ownedChild.get(), document, valueNode);
-        if( data->data.insert(std::make_pair(ckey, ownedChild.get())).second ) {
-          ownedChild.release();
+      Data result = Data::object();
+      for( yaml_node_pair_t * pair = node->data.mapping.pairs.start;
+          pair < node->data.mapping.pairs.top; ++pair ) {
+        yaml_node_t * keyNode =
+            yaml_document_get_node(document, pair->key);
+        yaml_node_t * valueNode =
+            yaml_document_get_node(document, pair->value);
+        if( keyNode == nullptr || keyNode->type != YAML_SCALAR_NODE ) {
+          throw Exception("Invalid yaml object key");
         }
+        std::string key(
+            reinterpret_cast<char *>(keyNode->data.scalar.value),
+            keyNode->data.scalar.length);
+        result.set(std::move(key), createFromYAMLNode(document, valueNode));
       }
-      break;
+      return result;
     }
     case YAML_SEQUENCE_NODE: {
-      int len = (node->data.sequence.items.top - node->data.sequence.items.start);
-      data->init(Data::TypeArray, len);
-      
-      yaml_node_item_t * item;
-      for( item = node->data.sequence.items.start; item < node->data.sequence.items.top; item++ ) {
-        yaml_node_t * valueNode = yaml_document_get_node(document, *item);
-        std::unique_ptr<Data> ownedChild(new Data());
-        _createFromYAML(ownedChild.get(), document, valueNode);
-        data->array.push_back(ownedChild.get());
-        ownedChild.release();
+      const std::size_t length = static_cast<std::size_t>(
+          node->data.sequence.items.top - node->data.sequence.items.start);
+      if( length > static_cast<std::size_t>(
+              std::numeric_limits<int>::max()) ) {
+        throw Exception("YAML array is too large");
       }
-      data->length = static_cast<int>(data->array.size());
-      break;
+      Data result(Data::TypeArray, static_cast<int>(length));
+      for( yaml_node_item_t * item = node->data.sequence.items.start;
+          item < node->data.sequence.items.top; ++item ) {
+        result.push_back(createFromYAMLNode(
+            document, yaml_document_get_node(document, *item)));
+      }
+      return result;
     }
-    default: {
+    default:
       throw Exception("Unknown yaml type");
-    }
   }
 }
 
-Data * Data::createFromYAML(const char * string)
+} // namespace
+
+Data Data::fromYAML(const char * string)
 {
+  if( string == nullptr ) {
+    throw Exception("Missing YAML data");
+  }
+
   yaml_parser_t parser;
   yaml_document_t document;
   if( yaml_parser_initialize(&parser) == 0 ) {
     throw Exception("Failed to initialize yaml parser");
   }
-  
-  const unsigned char * input = reinterpret_cast<const unsigned char *>(string);
-  
-  yaml_parser_set_input_string(&parser, input, strlen(string));
-  if( 0 == yaml_parser_load(&parser, &document) ) {
+
+  const unsigned char * input =
+      reinterpret_cast<const unsigned char *>(string);
+  yaml_parser_set_input_string(&parser, input, std::char_traits<char>::length(string));
+  if( yaml_parser_load(&parser, &document) == 0 ) {
     yaml_parser_delete(&parser);
     throw Exception("Failed to parse yaml document");
   }
 
-  std::unique_ptr<Data> data(new Data());
   try {
     yaml_node_t * root = yaml_document_get_root_node(&document);
-    if( root == NULL ) {
+    if( root == nullptr ) {
       throw Exception("Empty yaml document");
     }
-    _createFromYAML(data.get(), &document, root);
+    Data data = createFromYAMLNode(&document, root);
+    yaml_document_delete(&document);
+    yaml_parser_delete(&parser);
+    return data;
   } catch( ... ) {
     yaml_document_delete(&document);
     yaml_parser_delete(&parser);
     throw;
   }
+}
 
-  yaml_document_delete(&document);
-  yaml_parser_delete(&parser);
-
-  return data.release();
+Data * Data::createFromYAML(const char * string)
+{
+  return new Data(fromYAML(string));
 }
 #else
-Data * Data::createFromYAML(const char * string)
+Data Data::fromYAML(const char *)
 {
   throw Exception("YAML support not enabled");
 }
+
+Data * Data::createFromYAML(const char * string)
+{
+  return new Data(fromYAML(string));
+}
 #endif
 
-
-} // namespace Mustache
+} // namespace mustache

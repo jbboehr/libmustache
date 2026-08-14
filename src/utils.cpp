@@ -80,9 +80,14 @@ void htmlspecialchars(std::string * str)
 
 void htmlspecialchars_append(std::string * str, std::string * buf)
 {
+  htmlspecialchars_append(*str, buf);
+}
+
+void htmlspecialchars_append(const std::string& str, std::string * buf)
+{
   int pos = 0;
-  int len = str->length();
-  char * chr = (char *) str->c_str();
+  int len = str.length();
+  const char * chr = str.c_str();
   for( pos = 0; pos < len; pos++, chr++ ) {
     switch( *chr ) {
       case '&':

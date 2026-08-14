@@ -1,10 +1,10 @@
 #include "mustache_config.h"
 
 #include <cstdio>
-#include <locale>
+#include <limits>
 #include <memory>
-#include <sstream>
 #include <string>
+#include <utility>
 
 #include "mustache.hpp"
 
@@ -59,6 +59,14 @@ void expectEqual(
   ++failures;
 }
 
+void expect(bool condition, const char * message)
+{
+  if( !condition ) {
+    std::fprintf(stderr, "%s\n", message);
+    ++failures;
+  }
+}
+
 std::string renderScalar(mustache::Data * data, const std::string& name)
 {
   const std::string lookup = name.empty() ? "." : name;
@@ -73,44 +81,67 @@ std::string renderScalar(mustache::Data * data, const std::string& name)
   return output;
 }
 
+std::string renderUnescaped(mustache::Data * data, const std::string& name)
+{
+  const std::string lookup = name.empty() ? "." : name;
+  std::string tmpl = "{{{" + lookup + "}}}";
+  mustache::Mustache mustache;
+  mustache::Node root;
+  mustache.tokenize(&tmpl, &root);
+
+  std::string output;
+  mustache.render(&root, data, NULL, &output);
+  return output;
+}
+
 void expectDirectString(
     const char * label, const std::string& value, const std::string& expected)
 {
-  mustache::Data data(mustache::Data::TypeString,
-      static_cast<int>(value.size()));
-  data.val->assign(value);
+  mustache::Data data = mustache::Data::string(value);
   expectEqual(label, renderScalar(&data, ""), expected);
 }
 
-void expectJSONDecimal(const std::string& actual, double expected)
+void expectJSONRejected(const char * label, const char * input)
 {
-  const std::string::size_type separator = actual.find('|');
-  if( separator == std::string::npos || actual.substr(separator) != "|Y|" ) {
-    std::fprintf(stderr,
-        "JSON decimal failed\n  expected: numeric interpolation followed by "
-        "\"|Y|\"\n  actual:   \"%s\"\n",
-        escapeBytes(actual).c_str());
-    ++failures;
-    return;
+  bool rejected = false;
+  try {
+    mustache::Data::fromJSON(input);
+  } catch( const mustache::Exception& ) {
+    rejected = true;
   }
+  if( !rejected ) {
+    std::fprintf(stderr, "%s failed: JSON input was accepted\n", label);
+    ++failures;
+  }
+}
 
-  const std::string number = actual.substr(0, separator);
-  std::istringstream stream(number);
-  stream.imbue(std::locale::classic());
-  double parsed = 0.0;
-  char trailing = '\0';
-  if( !(stream >> parsed) || (stream >> trailing) || parsed != expected ) {
-    std::fprintf(stderr,
-        "JSON decimal failed\n  expected: numeric value %.17g\n  actual:   "
-        "\"%s\"\n", expected, escapeBytes(number).c_str());
-    ++failures;
+template <typename Callable>
+void expectDataException(const char * message, Callable&& callable)
+{
+  bool rejected = false;
+  try {
+    std::forward<Callable>(callable)();
+  } catch( const mustache::Exception& ) {
+    rejected = true;
   }
+  expect(rejected, message);
 }
 
 void testDirectData()
 {
   mustache::Data none;
   expectEqual("direct null", renderScalar(&none, ""), "||N");
+
+  mustache::Data falseValue = mustache::Data::boolean(false);
+  mustache::Data trueValue = mustache::Data::boolean(true);
+  mustache::Data integerValue = mustache::Data::integer(42);
+  mustache::Data decimalValue = mustache::Data::floating(1.5);
+  expectEqual("direct false", renderScalar(&falseValue, ""), "||N");
+  expectEqual("direct true", renderScalar(&trueValue, ""), "true|Y|");
+  expectEqual("direct integer", renderScalar(&integerValue, ""), "42|Y|");
+  expectEqual("direct decimal", renderScalar(&decimalValue, ""), "1.5|Y|");
+  expectEqual(
+      "direct unescaped decimal", renderUnescaped(&decimalValue, ""), "1.5");
 
   expectDirectString("direct empty string", "", "||N");
   expectDirectString("direct zero string", "0", "0|Y|");
@@ -124,6 +155,36 @@ void testDirectData()
   expectedWithNull.append("|Y|");
   expectDirectString(
       "direct string with embedded NUL", withNull, expectedWithNull);
+
+  mustache::Data object = mustache::Data::object({
+      {"name", mustache::Data::string("Ada")},
+      {"values", mustache::Data::array({
+          mustache::Data::integer(1), mustache::Data::integer(2)})}
+  });
+  const mustache::Data * values = object.find("values");
+  expect(values != NULL && values->arrayItems().size() == 2 &&
+          values->arrayItems()[1].integerValue() == 2,
+      "owned Data object/array factories lost nested values");
+
+  bool rejected = false;
+  try {
+    mustache::Data::floating(
+        std::numeric_limits<double>::infinity());
+  } catch( const mustache::Exception& ) {
+    rejected = true;
+  }
+  expect(rejected, "non-finite floating-point Data was accepted");
+
+  mustache::Data scalar = mustache::Data::string("value");
+  expect(scalar.find("missing") == NULL,
+      "finding a member on scalar Data did not return null");
+  expectDataException("setting a member on scalar Data was accepted",
+      [&scalar]() { scalar.set("key", mustache::Data::null()); });
+  expectDataException("appending to scalar Data was accepted",
+      [&scalar]() { scalar.push_back(mustache::Data::null()); });
+  mustache::Data array = mustache::Data::array();
+  expectDataException("array Data converted to a scalar string",
+      [&array]() { static_cast<void>(array.toString()); });
 }
 
 void testJSONData()
@@ -136,10 +197,22 @@ void testJSONData()
       "\"zeroValue\":0,"
       "\"integerValue\":42,"
       "\"decimalValue\":1.50,"
+      "\"pointOne\":0.1,"
+      "\"wholeDecimal\":1.0,"
+      "\"exponent\":1e30,"
+      "\"negativeZero\":-0.0,"
+      "\"overflowingDecimal\":1e999,"
       "\"stringValue\":\"false\","
       "\"emptyValue\":\"\""
       "}";
   std::unique_ptr<mustache::Data> data(mustache::Data::createFromJSON(json));
+
+  expect(data->find("nullValue")->type() == mustache::Data::TypeNone &&
+          data->find("falseValue")->type() == mustache::Data::TypeBoolean &&
+          data->find("integerValue")->type() == mustache::Data::TypeInteger &&
+          data->find("decimalValue")->type() == mustache::Data::TypeDouble &&
+          data->find("stringValue")->type() == mustache::Data::TypeString,
+      "JSON conversion collapsed typed scalars");
 
   expectEqual("JSON null", renderScalar(data.get(), "nullValue"), "||N");
   expectEqual("JSON false", renderScalar(data.get(), "falseValue"), "||N");
@@ -147,26 +220,49 @@ void testJSONData()
   expectEqual("JSON zero", renderScalar(data.get(), "zeroValue"), "0|Y|");
   expectEqual(
       "JSON integer", renderScalar(data.get(), "integerValue"), "42|Y|");
-  // json-c versions differ in whether they preserve a double's lexical form.
-  // The adapter contract here is its numeric value and truthiness, not the
-  // dependency's chosen decimal spelling.
-  expectJSONDecimal(renderScalar(data.get(), "decimalValue"), 1.5);
+  expectEqual("JSON decimal spelling",
+      renderScalar(data.get(), "decimalValue"), "1.50|Y|");
+  expectEqual("JSON point-one spelling",
+      renderScalar(data.get(), "pointOne"), "0.1|Y|");
+  expectEqual("JSON whole-decimal spelling",
+      renderScalar(data.get(), "wholeDecimal"), "1.0|Y|");
+  expectEqual("JSON exponent spelling",
+      renderScalar(data.get(), "exponent"), "1e30|Y|");
+  expectEqual("JSON negative-zero spelling",
+      renderScalar(data.get(), "negativeZero"), "-0.0|Y|");
+  expectEqual("JSON overflowing-decimal spelling",
+      renderScalar(data.get(), "overflowingDecimal"), "1e999|Y|");
+  expectEqual("JSON unescaped decimal spelling",
+      renderUnescaped(data.get(), "decimalValue"), "1.50");
+  mustache::Data copiedDecimal = *data->find("decimalValue");
+  expectEqual("copied JSON decimal spelling",
+      renderScalar(&copiedDecimal, ""), "1.50|Y|");
   expectEqual(
       "JSON string", renderScalar(data.get(), "stringValue"), "false|Y|");
   expectEqual(
       "JSON empty string", renderScalar(data.get(), "emptyValue"), "||N");
 
-  try {
-    std::unique_ptr<mustache::Data> topLevelNull(
-        mustache::Data::createFromJSON("null"));
-    std::fprintf(stderr,
-        "JSON top-level null failed\n  expected: Invalid JSON data exception\n");
-    ++failures;
-  } catch( const mustache::Exception& ) {
-    // json-c represents a valid top-level null with a null pointer. The current
-    // adapter consequently treats it as invalid input; pin that behavior until
-    // the value-model migration changes it deliberately.
-  }
+  std::unique_ptr<mustache::Data> topLevelNull(
+      mustache::Data::createFromJSON("null"));
+  expect(topLevelNull->type() == mustache::Data::TypeNone,
+      "JSON top-level null did not produce typed null data");
+  expectEqual("JSON top-level null", renderScalar(topLevelNull.get(), ""),
+      "||N");
+
+  mustache::Data whitespaceNull = mustache::Data::fromJSON("null \t\r\n");
+  expect(whitespaceNull.type() == mustache::Data::TypeNone,
+      "JSON top-level null with whitespace was rejected");
+
+  expectJSONRejected("JSON null suffix", "nullx");
+  expectJSONRejected("JSON second value after null", "null true");
+  expectJSONRejected("JSON object suffix", "{}garbage");
+  expectJSONRejected("JSON array suffix", "[1,2] trailing");
+  expectJSONRejected("JSON unsigned integer outside signed range",
+      "{\"value\":9223372036854775808}");
+  expectJSONRejected("JSON integer below signed range",
+      "{\"value\":-9223372036854775809}");
+  expectJSONRejected("JSON integer above unsigned range",
+      "{\"value\":18446744073709551616}");
 }
 
 void testYAMLData()
@@ -181,6 +277,10 @@ void testYAMLData()
       "stringValue: \"false\"\n"
       "emptyValue: \"\"\n";
   std::unique_ptr<mustache::Data> data(mustache::Data::createFromYAML(yaml));
+
+  expect(data->find("falseValue")->type() == mustache::Data::TypeString &&
+          data->find("integerValue")->type() == mustache::Data::TypeString,
+      "YAML scalar compatibility unexpectedly changed type behavior");
 
   expectEqual(
       "YAML null", renderScalar(data.get(), "nullValue"), "null|Y|");

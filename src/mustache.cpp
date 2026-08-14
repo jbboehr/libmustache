@@ -40,7 +40,7 @@ void Mustache::tokenize(std::string_view tmpl, Node * root,
   tokenizer.tokenize(tmpl, root, limits);
 }
 
-void Mustache::render(const Node * node, Data * data,
+void Mustache::render(const Node * node, const Data * data,
     const Node::Partials * partials, std::string * output)
 {
   renderer.init(node, data, partials, output);

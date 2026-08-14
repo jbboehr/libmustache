@@ -3,6 +3,7 @@
 #include "./fixtures/lambdas.hpp"
 
 #include <memory>
+#include <utility>
 
 #ifdef _WIN32
 #include <io.h>
@@ -298,21 +299,20 @@ void mustache_spec_parse_data(yaml_document_t * document, yaml_node_t * node, mu
       yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
       yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
       char * keyValue = reinterpret_cast<char *>(keyNode->data.scalar.value);
-      mustache::Data * child = new mustache::Data();
-      mustache_spec_parse_data(document, valueNode, child);
-      data->data.insert(std::pair<std::string,mustache::Data*>(keyValue,child));
+      mustache::Data child;
+      mustache_spec_parse_data(document, valueNode, &child);
+      data->set(keyValue, std::move(child));
     }
   } else if( node->type == YAML_SEQUENCE_NODE ) {
     yaml_node_item_t * item;
     int nItems = node->data.sequence.items.top - node->data.sequence.items.start;
     data->init(mustache::Data::TypeArray, nItems);
     for( item = node->data.sequence.items.start; item < node->data.sequence.items.top; item ++) {
-      mustache::Data * child = new mustache::Data();
-      data->array.push_back(child);
+      mustache::Data child;
       yaml_node_t * valueNode = yaml_document_get_node(document, *item);
-      mustache_spec_parse_data(document, valueNode, child);
+      mustache_spec_parse_data(document, valueNode, &child);
+      data->push_back(std::move(child));
     }
-    data->length = data->array.size();
   } else if( node->type == YAML_SCALAR_NODE ) {
     char * keyValue = reinterpret_cast<char *>(node->data.scalar.value);
     if( strcmp(keyValue, "0") == 0 ||
@@ -321,9 +321,9 @@ void mustache_spec_parse_data(yaml_document_t * document, yaml_node_t * node, mu
     } else if (strcmp(keyValue, "null") == 0) {
       data->init(mustache::Data::TypeNone, 0);
     } else {
-      data->init(mustache::Data::TypeString, node->data.scalar.length);
-      data->val->assign(keyValue);
-      mustache::trimDecimal(*(data->val));
+      std::string value(keyValue, node->data.scalar.length);
+      mustache::trimDecimal(value);
+      *data = mustache::Data::string(std::move(value));
     }
   }
 }

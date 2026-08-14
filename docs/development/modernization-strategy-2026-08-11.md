@@ -284,19 +284,31 @@ fuzzer completes its CI smoke test and documented extended sanitizer run.
 
 ## Phase 5: Replace `Data` with an owned value model
 
-The new representation should distinguish conceptually between:
+**Status: owned representation implemented on the 0.6 development branch;
+JSON parser replacement, resource limits, and fuzzing remain.**
+
+`Data` now uses private variant-backed storage. Strings and recursive
+containers are values, no child is owned through a raw pointer, container
+sizes come from their containers, typed scalar factories preserve JSON type
+information, and copies deep-copy the value tree. Lambda factories accept an
+RAII handle; copied data trees deliberately share the callback. Rendering is
+const with respect to the data tree, while callbacks remain callable and may
+retain their own state. The former public representation fields are not part
+of ABI 6. As the intentional scalar-model correction anticipated by the
+characterization suite, valid top-level JSON `null` now produces a null value
+instead of being mistaken for a parse failure.
+
+The representation distinguishes between:
 
 ```text
 null | boolean | integer | floating point | string | array | object | lambda
 ```
 
-`std::variant` is a likely implementation tool, but the recursive container
-layout must be standards-valid on libstdc++, libc++, and MSVC. In particular,
-the design must not directly instantiate `std::map<std::string, Data>` while
-`Data` is incomplete. Validate the chosen wrapper or indirection model with all
-supported standard libraries before making it public.
+The implementation uses an opaque storage object containing `std::variant`,
+so recursive containers are instantiated only after `Data` is complete. This
+layout must remain covered on libstdc++, libc++, and MSVC.
 
-The representation should have these properties:
+The representation has these properties:
 
 - strings are owned by value;
 - arrays and objects own their child values;
@@ -329,11 +341,12 @@ change with explicit compatibility tests.
 
 ### Replace the json-c adapter
 
-The Nix build currently obtains json-c 0.18 from the pinned nixpkgs input, but
-the CMake and Autotools checks do not declare a minimum json-c version. This
-means compatibility tests must not accidentally treat behavior introduced by
-a newer json-c release, such as a particular floating-point spelling, as a
-libmustache guarantee.
+The Nix build currently obtains json-c 0.18 from the pinned nixpkgs input.
+CMake, Autotools, installed CMake consumers, and pkg-config consumers now
+require json-c 0.12 or newer so the compatibility adapter can preserve the
+dependency's parsed floating-point spelling while retaining typed numeric
+values. The replacement parser must make that formatting contract independent
+of dependency-specific behavior.
 
 It is acceptable to raise the temporary minimum json-c version when a concrete
 security fix, API requirement, or supported-platform policy justifies it. Such
@@ -381,6 +394,10 @@ values, and limit exhaustion with stable library errors. Parser defaults are
 defense in depth, not the public resource-limit policy. Add a JSON fuzz target
 and retain a differential corpus across json-c and the replacement until every
 intentional compatibility difference has been reviewed and recorded.
+
+The same limits must cover YAML conversion. In particular, YAML aliases must
+have cycle detection and share the node-expansion budget so cyclic anchors and
+alias amplification cannot recurse indefinitely or exhaust memory.
 
 **Definition of done:** JSON, YAML, and direct construction use the owned value
 model; no owning raw pointer or separate length remains; the recursive layout

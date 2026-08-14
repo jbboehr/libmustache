@@ -57,12 +57,12 @@ CompiledTemplate Mustache::compile(
 }
 
 std::string Mustache::render(
-    const CompiledTemplate& compiled, Data& data) const
+    const CompiledTemplate& compiled, const Data& data) const
 {
   return render(compiled, data, PartialMap());
 }
 
-std::string Mustache::render(const CompiledTemplate& compiled, Data& data,
+std::string Mustache::render(const CompiledTemplate& compiled, const Data& data,
     const PartialMap& partials) const
 {
   if( compiled.empty() ) {
@@ -100,13 +100,13 @@ CompiledTemplate compile(
   return mustache.compile(source, limits);
 }
 
-std::string render(const CompiledTemplate& compiled, Data& data)
+std::string render(const CompiledTemplate& compiled, const Data& data)
 {
   Mustache mustache;
   return mustache.render(compiled, data);
 }
 
-std::string render(const CompiledTemplate& compiled, Data& data,
+std::string render(const CompiledTemplate& compiled, const Data& data,
     const PartialMap& partials)
 {
   Mustache mustache;

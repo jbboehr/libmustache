@@ -10,10 +10,10 @@
 #include "node.hpp"
 #include "renderer.hpp"
 
-static_assert(!std::is_copy_constructible<mustache::Data>::value,
-    "mustache::Data must not be copy constructible");
-static_assert(!std::is_copy_assignable<mustache::Data>::value,
-    "mustache::Data must not be copy assignable");
+static_assert(std::is_copy_constructible<mustache::Data>::value,
+    "mustache::Data must be safely copy constructible");
+static_assert(std::is_copy_assignable<mustache::Data>::value,
+    "mustache::Data must be safely copy assignable");
 static_assert(std::is_nothrow_move_constructible<mustache::Data>::value,
     "mustache::Data must be nothrow move constructible");
 static_assert(std::is_nothrow_move_assignable<mustache::Data>::value,
@@ -68,87 +68,83 @@ void expect(bool condition, const char * message)
   }
 }
 
-mustache::Data * makeStringData(const std::string& value)
-{
-  mustache::Data * data = new mustache::Data(
-      mustache::Data::TypeString, static_cast<int>(value.size()));
-  data->val->assign(value);
-  return data;
-}
-
-void testDataMoveConstruction()
+void testDataCopyAndMoveConstruction()
 {
   mustache::Data source(mustache::Data::TypeMap, 0);
-  source.data["name"] = makeStringData("libmustache");
-  mustache::Data * values = new mustache::Data(mustache::Data::TypeArray, 1);
-  values->array.push_back(makeStringData("rock hard"));
-  source.data["values"] = values;
+  source.set("name", mustache::Data::string("libmustache"));
+  mustache::Data values = mustache::Data::array();
+  values.push_back(mustache::Data::string("rock hard"));
+  source.set("values", std::move(values));
+
+  mustache::Data copy(source);
+  source.set("name", mustache::Data::string("changed"));
+  const mustache::Data * copiedName = copy.find("name");
+  expect(copiedName != NULL && copiedName->stringValue() == "libmustache",
+      "Data copy construction did not deeply copy object values");
 
   mustache::Data moved(std::move(source));
 
-  expect(source.type == mustache::Data::TypeNone,
+  expect(source.type() == mustache::Data::TypeNone,
       "Data move construction did not reset the source type");
-  expect(source.data.empty(),
-      "Data move construction left owned map entries in the source");
-  expect(moved.type == mustache::Data::TypeMap,
+  expect(moved.type() == mustache::Data::TypeMap,
       "Data move construction did not transfer the type");
-  expect(moved.data.size() == 2,
+  expect(moved.objectItems().size() == 2,
       "Data move construction did not transfer map entries");
-  mustache::Data::Map::iterator name = moved.data.find("name");
-  expect(name != moved.data.end() && name->second != NULL &&
-          name->second->val != NULL && *name->second->val == "libmustache",
+  const mustache::Data * name = moved.find("name");
+  expect(name != NULL && name->stringValue() == "changed",
       "Data move construction did not preserve a string value");
-  mustache::Data::Map::iterator nested = moved.data.find("values");
-  expect(nested != moved.data.end() && nested->second != NULL &&
-          nested->second->array.size() == 1 &&
-          nested->second->array.front() != NULL &&
-          nested->second->array.front()->val != NULL &&
-          *nested->second->array.front()->val == "rock hard",
+  const mustache::Data * nested = moved.find("values");
+  expect(nested != NULL && nested->arrayItems().size() == 1 &&
+          nested->arrayItems().front().stringValue() == "rock hard",
       "Data move construction did not preserve nested ownership");
 }
 
 void testDataMoveAssignment()
 {
   mustache::Data source(mustache::Data::TypeList, 0);
-  source.children.push_back(makeStringData("new"));
+  source.push_back(mustache::Data::string("new"));
 
-  mustache::Data destination(mustache::Data::TypeString, 3);
-  destination.val->assign("old");
+  mustache::Data destination = mustache::Data::string("old");
   destination = std::move(source);
 
-  expect(source.type == mustache::Data::TypeNone,
+  expect(source.type() == mustache::Data::TypeNone,
       "Data move assignment did not reset the source type");
-  expect(source.children.empty(),
-      "Data move assignment left owned list entries in the source");
-  expect(destination.type == mustache::Data::TypeList,
+  expect(destination.type() == mustache::Data::TypeList,
       "Data move assignment did not transfer the type");
-  expect(destination.children.size() == 1 &&
-          *destination.children.front()->val == "new",
+  expect(destination.listItems().size() == 1 &&
+          destination.listItems().front().stringValue() == "new",
       "Data move assignment did not transfer list ownership");
 }
 
-void testDataLambdaMoveAssignment()
+void testDataLambdaOwnership()
 {
   int destructions = 0;
   {
-    mustache::Data source(mustache::Data::TypeLambda, 0);
-    source.lambda = new CountingLambda(&destructions);
-    mustache::Data destination(mustache::Data::TypeLambda, 0);
-    destination.lambda = new CountingLambda(&destructions);
+    mustache::Data source = mustache::Data::lambda(
+        std::make_unique<CountingLambda>(&destructions));
+    mustache::Data shared(source);
+    expect(source.lambdaValue() == shared.lambdaValue(),
+        "Data copying did not explicitly share lambda ownership");
+    expect(shared.lambdaValue()->invoke() == "lambda",
+        "a copied Data lambda could not be invoked");
+
+    mustache::Data destination = mustache::Data::lambda(
+        std::make_unique<CountingLambda>(&destructions));
 
     destination = std::move(source);
 
     expect(destructions == 1,
         "Data move assignment did not destroy the destination lambda");
-    expect(source.type == mustache::Data::TypeNone && source.lambda == NULL,
+    expect(source.type() == mustache::Data::TypeNone &&
+            source.lambdaValue() == NULL,
         "Data lambda move assignment did not reset the source");
-    expect(destination.type == mustache::Data::TypeLambda &&
-            destination.lambda != NULL &&
-            destination.lambda->invoke() == "lambda",
+    expect(destination.type() == mustache::Data::TypeLambda &&
+            destination.lambdaValue() != NULL &&
+            destination.lambdaValue()->invoke() == "lambda",
         "Data lambda move assignment did not transfer ownership");
   }
   expect(destructions == 2,
-      "Data lambda move assignment did not destroy the transferred lambda");
+      "Data lambda sharing did not destroy each callback exactly once");
 }
 
 void testNodeMoveConstruction()
@@ -256,9 +252,9 @@ void testOwnedNodeRendering()
 
 int main()
 {
-  testDataMoveConstruction();
+  testDataCopyAndMoveConstruction();
   testDataMoveAssignment();
-  testDataLambdaMoveAssignment();
+  testDataLambdaOwnership();
   testNodeMoveConstruction();
   testNodeMoveAssignment();
   testOwnedNodeRendering();

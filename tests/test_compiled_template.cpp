@@ -24,12 +24,9 @@ void expect(bool condition, const char * message)
   }
 }
 
-mustache::Data * makeStringData(std::string_view value)
+mustache::Data makeStringData(std::string_view value)
 {
-  std::unique_ptr<mustache::Data> data(new mustache::Data(
-      mustache::Data::TypeString, static_cast<int>(value.size())));
-  data->val->assign(value.data(), value.size());
-  return data.release();
+  return mustache::Data::string(std::string(value));
 }
 
 void testHandleOwnershipAndReuse()
@@ -50,11 +47,12 @@ void testHandleOwnershipAndReuse()
   expect(copy && moved, "copying or moving lost the compiled template");
 
   mustache::Data first(mustache::Data::TypeMap, 0);
-  first.data["name"] = makeStringData("Ada");
+  first.set("name", makeStringData("Ada"));
   mustache::Data second(mustache::Data::TypeMap, 0);
-  second.data["name"] = makeStringData("Grace");
+  second.set("name", makeStringData("Grace"));
+  const mustache::Data copiedData(first);
 
-  expect(mustache::render(copy, first) == "Hello Ada",
+  expect(mustache::render(copy, copiedData) == "Hello Ada",
       "a copied template did not own its parsed source");
   expect(mustache::render(moved, second) == "Hello Grace",
       "an immutable template could not be reused with new data");
@@ -68,7 +66,7 @@ void testMemberConfigurationAndLimits()
   mustache::CompiledTemplate compiled = engine.compile("<%name%>");
 
   mustache::Data data(mustache::Data::TypeMap, 0);
-  data.data["name"] = makeStringData("configured");
+  data.set("name", makeStringData("configured"));
   expect(engine.render(compiled, data) == "configured",
       "member compilation ignored configured delimiters");
 
@@ -94,7 +92,7 @@ void testCompiledPartials()
   partials.emplace("inner", mustache::compile("{{name}}"));
 
   mustache::Data data(mustache::Data::TypeMap, 0);
-  data.data["name"] = makeStringData("rock");
+  data.set("name", makeStringData("rock"));
   expect(mustache::render(root, data, partials) == "ArockB|",
       "compiled partial lookup or nesting failed");
 
@@ -118,7 +116,7 @@ void testEmbeddedNulAndEmptyHandle()
       mustache::compile(std::string_view(source, sizeof(source)));
 
   mustache::Data data(mustache::Data::TypeMap, 0);
-  data.data["name"] = makeStringData("ok");
+  data.set("name", makeStringData("ok"));
   expect(mustache::render(compiled, data) ==
           std::string(expected, sizeof(expected)),
       "compiled template input lost its explicit length");

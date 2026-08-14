@@ -64,14 +64,15 @@ class Mustache {
         const Tokenizer::Limits& limits);
     
     //! Utility method for Renderer::init() and Renderer::render()
-    void render(const Node * node, Data * data,
+    void render(const Node * node, const Data * data,
         const Node::Partials * partials, std::string * output);
 
     //! Renders an immutable compiled template
-    std::string render(const CompiledTemplate& compiled, Data& data) const;
+    std::string render(
+        const CompiledTemplate& compiled, const Data& data) const;
 
     //! Renders an immutable compiled template with compiled partials
-    std::string render(const CompiledTemplate& compiled, Data& data,
+    std::string render(const CompiledTemplate& compiled, const Data& data,
         const PartialMap& partials) const;
     
     //! Utility method for Tokenizer::setStartSequence()
@@ -155,10 +156,10 @@ CompiledTemplate compile(
     std::string_view source, const Tokenizer::Limits& limits);
 
 //! Renders a compiled template with no partials
-std::string render(const CompiledTemplate& compiled, Data& data);
+std::string render(const CompiledTemplate& compiled, const Data& data);
 
 //! Renders a compiled template with compiled partials
-std::string render(const CompiledTemplate& compiled, Data& data,
+std::string render(const CompiledTemplate& compiled, const Data& data,
     const PartialMap& partials);
 
 

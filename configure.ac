@@ -131,7 +131,9 @@ AS_IF([test "x$enable_gprof" = "xyes"], [
 AC_ARG_WITH([mustache-spec],
     [AS_HELP_STRING([--with-mustache-spec=SPEC_LOCATION],
         [location of the mustache specification @<:@default=./spec/specs@>:@])])
+mustache_spec_enabled=no
 AS_IF([test "x$with_mustache_spec" != "xno"], [
+    mustache_spec_enabled=yes
     AS_IF([test -n "$with_mustache_spec"], [
         AS_IF([test -f "$with_mustache_spec/comments.yml"], [
             AC_SUBST([MUSTACHE_SPEC_DIR], [$with_mustache_spec])
@@ -142,11 +144,13 @@ AS_IF([test "x$with_mustache_spec" != "xno"], [
         AC_SUBST([MUSTACHE_SPEC_DIR], ['$(top_srcdir)/spec/specs'])
     ])
 ])
+AM_CONDITIONAL([MUSTACHE_SPEC_ENABLED],
+    [test "x$mustache_spec_enabled" = "xyes"])
 
-PKG_CHECK_MODULES([JSON], [json-c], [
+PKG_CHECK_MODULES([JSON], [json-c >= 0.12], [
     AC_DEFINE([HAVE_LIBJSON], [1], [Defined if json-c is enabled])
 ], [
-    AC_MSG_ERROR([json-c is required])
+    AC_MSG_ERROR([json-c >= 0.12 is required])
 ])
 PKG_CHECK_MODULES([YAML], [yaml-0.1], [
     AC_DEFINE([HAVE_LIBYAML], [1], [Defined if libyaml is enabled])
