@@ -18,8 +18,17 @@ test_compiled_template_SOURCES = test_compiled_template.cpp
 EXTRA_DIST = \
 	fuzz_node_unserialize.cpp \
 	fuzz_tokenizer.cpp \
+	fuzz_data_parser.cpp \
 	fuzz/node_unserialize.dict \
 	fuzz/tokenizer.dict \
+	fuzz/data_parser.dict \
+	fuzz/corpus/data_parser/json-deep \
+	fuzz/corpus/data_parser/json-nul-key \
+	fuzz/corpus/data_parser/json-object \
+	fuzz/corpus/data_parser/json-trailing \
+	fuzz/corpus/data_parser/yaml-alias \
+	fuzz/corpus/data_parser/yaml-cycle \
+	fuzz/corpus/data_parser/yaml-multiple-documents \
 	fuzz/corpus/node_unserialize/deeply-nested \
 	fuzz/corpus/node_unserialize/oversized-child-region \
 	fuzz/corpus/node_unserialize/php-variable \

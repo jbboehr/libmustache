@@ -32,7 +32,7 @@ option(MUSTACHE_ENABLE_TESTS "Build and register the test suite" ${MUSTACHE_IS_T
 option(MUSTACHE_ENABLE_HARDENING "Enable supported compiler and linker hardening" ON)
 option(MUSTACHE_ENABLE_ASSERTIONS "Enable standard-library runtime assertions" ON)
 option(MUSTACHE_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
-option(MUSTACHE_ENABLE_FUZZING "Build the Clang libFuzzer target and smoke test" OFF)
+option(MUSTACHE_ENABLE_FUZZING "Build the Clang libFuzzer targets and smoke tests" OFF)
 
 if(MUSTACHE_ENABLE_FUZZING)
     if(NOT MUSTACHE_ENABLE_TESTS)

@@ -284,8 +284,9 @@ fuzzer completes its CI smoke test and documented extended sanitizer run.
 
 ## Phase 5: Replace `Data` with an owned value model
 
-**Status: owned representation implemented on the 0.6 development branch;
-JSON parser replacement, resource limits, and fuzzing remain.**
+**Status: owned representation and shared JSON/YAML resource policy
+implemented on the 0.6 development branch; replacing json-c and completing
+the extended parser-fuzz acceptance run remain.**
 
 `Data` now uses private variant-backed storage. Strings and recursive
 containers are values, no child is owned through a raw pointer, container
@@ -338,6 +339,40 @@ rules. The new model should preserve scalar type information internally while
 initially reproducing the characterized rendering behavior. Any correction to
 truthiness or scalar formatting must be a separately documented behavior
 change with explicit compatibility tests.
+
+`Data::ParseLimits` now applies the same public policy to length-aware JSON
+and YAML parsing. The defaults are 64 MiB of input, 32 value
+nodes along a root-to-leaf path, 100,000 expanded value nodes, 64 MiB of
+aggregate strings and object keys, and 100,000 aggregate container entries.
+Every field is a hard maximum and zero never means unlimited. The root counts
+as the first value node. Preserved JSON floating-point spellings count as
+string bytes. A separate implementation safety ceiling rejects paths beyond
+256 value nodes even when a caller configures a higher maximum.
+
+YAML aliases are expanded into independent owned values. Each expansion
+shares the node, string-byte, and container-entry budgets, while active-path
+tracking rejects recursive aliases before conversion can recurse indefinitely.
+JSON and YAML structural preflight passes enforce the policy before their
+dependency parsers construct complete documents; conversion independently
+rechecks the produced value tree and YAML alias expansion. Both adapters
+explicitly reject raw embedded NULs. Escaped NULs remain supported in JSON
+string values, but are rejected in JSON object keys until the json-c adapter
+is replaced because its object iterator does not expose key lengths. JSON
+rejects trailing input.
+YAML rejects a second document marker, including an empty additional document,
+and distinguishes malformed content after an explicit document end. This is a
+deliberate tightening from ABI 5, which ignored content following the first
+YAML document. The 32-node default preserves json-c's former default nesting
+envelope and introduces a corresponding limit for YAML.
+`fuzz_data_parser` runs both length-aware adapters with constrained budgets;
+its committed corpus includes valid typed JSON, trailing JSON, an escaped-NUL
+JSON key, ordinary YAML aliases, recursive aliases, and multiple documents.
+Its sanitizer-backed
+smoke run is part of `nix build .#checks.x86_64-linux.libmustache-fuzz`. An
+extended acceptance run should invoke it with `-max_total_time=3600`, the
+committed data-parser dictionary, and the copied corpus in the build tree.
+Post-parse validation and deep-copy failures remain visible to libFuzzer
+rather than being treated as expected parser rejection.
 
 ### Replace the json-c adapter
 

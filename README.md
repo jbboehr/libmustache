@@ -157,6 +157,42 @@ the callback through an internal RAII handle. The pointer-returning
 facades, but new code should use the value-returning `fromJSON()` and
 `fromYAML()` forms.
 
+Both parsers accept explicitly sized `std::string_view` input and a shared
+resource policy:
+
+```cpp
+mustache::Data::ParseLimits limits;
+limits.maxInputBytes = 1024 * 1024;
+limits.maxNestingDepth = 32;
+limits.maxNodes = 10000;
+limits.maxStringBytes = 1024 * 1024;
+limits.maxContainerEntries = 10000;
+
+mustache::Data data = mustache::Data::fromJSON(input, limits);
+```
+
+The defaults are 64 MiB of input, 32 value nodes along a
+root-to-leaf path, 100,000 expanded value nodes, 64 MiB of aggregate string
+and object-key bytes, and 100,000 aggregate container entries. Every field is
+a hard maximum; zero never means unlimited. JSON object keys and preserved
+floating-point spellings count toward string bytes. YAML aliases are expanded
+into owned values, so every expansion counts again toward nodes, strings, and
+container entries; recursive aliases are rejected. A bounded preflight pass
+applies the policy before json-c or libyaml constructs a complete document,
+and conversion independently rechecks the resulting value tree. Parsing
+retains an implementation safety ceiling of 256 value nodes along any path
+even if a caller supplies a higher nesting limit.
+
+Explicitly sized input containing raw NUL bytes is rejected with a dedicated
+error. JSON strings may contain an escaped `\u0000` and retain its byte, but
+JSON object keys containing an escaped NUL are rejected because the current
+json-c object iterator does not expose key lengths. JSON also rejects trailing
+non-whitespace input. YAML accepts one document only: a second document marker
+is rejected even when the additional document is empty, while malformed
+content after an explicit document end is reported as trailing content. This
+single-document rule is stricter than ABI 5, which ignored input after the
+first YAML document.
+
 Code migrating from ABI 5 should replace direct representation access as
 follows:
 

@@ -85,7 +85,10 @@ int main()
         mustache::Node::unserialize(
             serial->data(), serial->size(), 0, &position, limits));
 
-    const mustache::Data scalar = mustache::Data::string("compiled");
+    mustache::Data::ParseLimits dataLimits;
+    const char jsonData[] = {'"', 'c', 'o', 'm', 'p', 'i', 'l', 'e', 'd', '"'};
+    const mustache::Data scalar = mustache::Data::fromJSON(
+        std::string_view(jsonData, sizeof(jsonData)), dataLimits);
     mustache::CompiledTemplate compiled = mustache::compile("[{{>value}}]");
     mustache::PartialMap partials;
     partials.emplace("value", mustache::compile("{{.}}"));

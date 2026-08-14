@@ -64,6 +64,9 @@ if(MUSTACHE_ENABLE_FUZZING)
     add_executable(fuzz_tokenizer fuzz_tokenizer.cpp)
     mustache_configure_fuzz_target(fuzz_tokenizer)
 
+    add_executable(fuzz_data_parser fuzz_data_parser.cpp)
+    mustache_configure_fuzz_target(fuzz_data_parser)
+
     set(MUSTACHE_FUZZ_CORPUS_SOURCE
         "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus/node_unserialize")
     set(MUSTACHE_FUZZ_CORPUS_BINARY
@@ -76,11 +79,19 @@ if(MUSTACHE_ENABLE_FUZZING)
         "${CMAKE_CURRENT_BINARY_DIR}/fuzz-corpus/tokenizer")
     set(MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS
         "${CMAKE_CURRENT_BINARY_DIR}/fuzz-artifacts/tokenizer")
+    set(MUSTACHE_DATA_FUZZ_CORPUS_SOURCE
+        "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus/data_parser")
+    set(MUSTACHE_DATA_FUZZ_CORPUS_BINARY
+        "${CMAKE_CURRENT_BINARY_DIR}/fuzz-corpus/data_parser")
+    set(MUSTACHE_DATA_FUZZ_ARTIFACTS
+        "${CMAKE_CURRENT_BINARY_DIR}/fuzz-artifacts/data_parser")
     file(MAKE_DIRECTORY
         "${MUSTACHE_FUZZ_CORPUS_BINARY}"
         "${MUSTACHE_FUZZ_ARTIFACTS}"
         "${MUSTACHE_TOKENIZER_FUZZ_CORPUS_BINARY}"
-        "${MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS}")
+        "${MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS}"
+        "${MUSTACHE_DATA_FUZZ_CORPUS_BINARY}"
+        "${MUSTACHE_DATA_FUZZ_ARTIFACTS}")
     file(COPY "${MUSTACHE_FUZZ_CORPUS_SOURCE}/"
         DESTINATION "${MUSTACHE_FUZZ_CORPUS_BINARY}")
 
@@ -108,6 +119,21 @@ if(MUSTACHE_ENABLE_FUZZING)
             "-artifact_prefix=${MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS}/"
             "${MUSTACHE_TOKENIZER_FUZZ_CORPUS_BINARY}")
     set_tests_properties(fuzz_tokenizer_smoke PROPERTIES
+        LABELS fuzz
+        RUN_SERIAL TRUE
+        TIMEOUT 30)
+
+    file(COPY "${MUSTACHE_DATA_FUZZ_CORPUS_SOURCE}/"
+        DESTINATION "${MUSTACHE_DATA_FUZZ_CORPUS_BINARY}")
+    add_test(NAME fuzz_data_parser_smoke
+        COMMAND fuzz_data_parser
+            -runs=1000
+            -max_len=4096
+            -timeout=5
+            "-dict=${CMAKE_CURRENT_SOURCE_DIR}/fuzz/data_parser.dict"
+            "-artifact_prefix=${MUSTACHE_DATA_FUZZ_ARTIFACTS}/"
+            "${MUSTACHE_DATA_FUZZ_CORPUS_BINARY}")
+    set_tests_properties(fuzz_data_parser_smoke PROPERTIES
         LABELS fuzz
         RUN_SERIAL TRUE
         TIMEOUT 30)

@@ -3,10 +3,12 @@
 
 #include "mustache_config.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <list>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -28,6 +30,28 @@ class Data {
     typedef std::unordered_map<std::string, Data> Map;
     typedef std::list<Data> List;
     typedef std::vector<Data> Array;
+
+    /*! \struct ParseLimits
+        \brief Resource limits for JSON and YAML parsing.
+
+        Every field is an enforced maximum. A zero value therefore rejects
+        any input that consumes that resource; zero never means unlimited.
+        Nesting depth counts value nodes along a root-to-leaf path, including
+        the root. YAML aliases count each expanded value and container entry.
+        The limits are checked before dependency parsers construct complete
+        documents and again while producing the owned value tree. Parsing also
+        retains an implementation safety ceiling of 256 value nodes along any
+        root-to-leaf path.
+    */
+    struct ParseLimits {
+      std::size_t maxInputBytes;
+      std::size_t maxNestingDepth;
+      std::size_t maxNodes;
+      std::size_t maxStringBytes;
+      std::size_t maxContainerEntries;
+
+      ParseLimits();
+    };
 
     //! Enum of the supported data types. Existing values retain their numbers.
     enum Type {
@@ -108,9 +132,23 @@ class Data {
 
     //! Parse into a value. The pointer-returning forms remain for compatibility.
     static Data fromJSON(const char * string);
+    static Data fromJSON(
+        const char * string, const ParseLimits& limits);
+    static Data fromJSON(std::string_view string);
+    static Data fromJSON(
+        std::string_view string, const ParseLimits& limits);
     static Data * createFromJSON(const char * string);
+    static Data * createFromJSON(
+        const char * string, const ParseLimits& limits);
     static Data fromYAML(const char * string);
+    static Data fromYAML(
+        const char * string, const ParseLimits& limits);
+    static Data fromYAML(std::string_view string);
+    static Data fromYAML(
+        std::string_view string, const ParseLimits& limits);
     static Data * createFromYAML(const char * string);
+    static Data * createFromYAML(
+        const char * string, const ParseLimits& limits);
 
     void swap(Data& other) noexcept;
 
