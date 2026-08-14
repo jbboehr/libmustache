@@ -40,6 +40,10 @@ add_executable(test_compiled_template test_compiled_template.cpp)
 target_link_libraries(test_compiled_template PRIVATE mustache_static)
 mustache_apply_build_options(test_compiled_template)
 
+add_executable(test_renderer_safety test_renderer_safety.cpp)
+target_link_libraries(test_renderer_safety PRIVATE mustache_static)
+mustache_apply_build_options(test_renderer_safety)
+
 add_test(NAME spec COMMAND test_spec "${MUSTACHE_SPEC_DIR}")
 add_test(NAME utils COMMAND test_utils)
 add_test(NAME misc COMMAND test_misc)
@@ -49,6 +53,7 @@ add_test(NAME ownership COMMAND test_ownership)
 add_test(NAME length_aware_api COMMAND test_length_aware_api)
 add_test(NAME tokenizer_safety COMMAND test_tokenizer_safety)
 add_test(NAME compiled_template COMMAND test_compiled_template)
+add_test(NAME renderer_safety COMMAND test_renderer_safety)
 
 if(MUSTACHE_ENABLE_FUZZING)
     function(mustache_configure_fuzz_target target)

@@ -74,9 +74,7 @@ JSON/YAML, tokenization failure, and rendering failure.
 The new warning flags expose pre-existing issues. Do not blanket-disable them.
 Review and fix each class before enabling warnings-as-errors:
 
-- the `Data::~Data()` `TypeList` to `TypeArray` fallthrough;
-- `Node` member-initialization order;
-- incomplete enum switches in `Data`, `Node`, and `Renderer`;
+- incomplete enum switches in `Node`;
 - signed/unsigned comparisons and narrowing conversions in data parsing,
   tokenization, deserialization, utilities, the CLI, and tests;
 - the MSVC `test_utils` format mismatch (`%lu` for a `size_t`; use `%zu` or

@@ -2,21 +2,41 @@
 #ifndef MUSTACHE_RENDERER_HPP
 #define MUSTACHE_RENDERER_HPP
 
+#include <cstddef>
 #include <functional>
-#include <iostream>
 #include <map>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "data.hpp"
 #include "exception.hpp"
 #include "node.hpp"
-#include "stack.hpp"
-#include "tokenizer.hpp"
-#include "utils.hpp"
 
 namespace mustache {
 
 class Mustache;
+class Tokenizer;
+
+/*! \struct RenderLimits
+    \brief Resource limits for one render operation.
+
+    Every field is an enforced maximum. A zero value therefore rejects any
+    render that consumes that resource; zero never means unlimited. The root
+    template node counts as the first nesting level and the first node visit.
+    Section text sent to lambdas and template text returned by lambdas share
+    the byte budget across the complete render operation. Lambda-generated
+    AST nodes are charged once when parsed and again when traversed. Nesting
+    is always capped at 256 active nodes to protect the C++ call stack.
+*/
+struct RenderLimits {
+  std::size_t maxOutputBytes;
+  std::size_t maxNestingDepth;
+  std::size_t maxNodeVisits;
+  std::size_t maxLambdaTemplateBytes;
+
+  RenderLimits();
+};
 
 
 /*! \class Renderer
@@ -37,7 +57,7 @@ class Renderer {
     const Data * _data;
     
     //! The data stack
-    Stack<const Data *> _stack;
+    std::vector<const Data *> _stack;
     
     //! Partials
     const Node::Partials * _partials;
@@ -47,9 +67,56 @@ class Renderer {
     
     //! Current output buffer
     std::string * _output;
+
+    //! Resource policy for the current render
+    RenderLimits _limits;
+
+    //! Aggregate work consumed by the current render
+    std::size_t _outputBytes;
+    std::size_t _nodeVisits;
+    std::size_t _lambdaTemplateBytes;
+
+    //! Active recursion level for callback-scoped rendering
+    std::size_t _activeDepth;
+
+    //! Whether a render operation is active
+    bool _rendering;
+
+    //! Number of active section-lambda callback frames
+    std::size_t _lambdaCallbackDepth;
     
     //! Renders a single node
-    void _renderNode(const Node * node);
+    void _renderNode(const Node * node, std::size_t depth);
+
+    //! Renders all children one level below their parent
+    void _renderChildren(const Node * node, std::size_t depth);
+
+    //! Appends bounded output
+    void _append(std::string_view value);
+    void _appendEscaped(std::string_view value);
+
+    //! Accounts for output across every buffer used by this render
+    void _consumeOutputBytes(std::size_t bytes);
+
+    //! Accounts for a lambda-generated template before parsing it
+    void _consumeLambdaTemplate(std::size_t bytes);
+
+    //! Accounts for one renderer or lambda-source node traversal
+    void _consumeNodeVisit();
+
+    //! Parses and charges every node in a lambda-generated AST
+    void _tokenizeLambda(Tokenizer * tokenizer, std::string_view source,
+        Node * root, bool escapeOutput);
+    void _consumeLambdaNodes(const Node * node);
+
+    //! Reconstructs bounded section text for a lambda callback
+    std::string _lambdaSectionText(const Node * node,
+        std::string_view start, std::string_view stop, std::size_t depth);
+    void _appendLambdaNodeTemplate(const Node * node,
+        std::string_view start, std::string_view stop, std::string * output,
+        std::size_t depth);
+    void _appendLambdaTemplate(
+        std::string * output, std::string_view value);
     
     const Data * _lookup(const Node * node);
 
@@ -64,12 +131,12 @@ class Renderer {
     static const int outputBufferLength = 1000;
     
     //! Constructor
-    Renderer() : 
-        _node(NULL), 
-        _data(NULL),
-        _partials(NULL), 
-        _output(NULL), 
-        _strictPaths(false) {};
+    Renderer();
+
+    Renderer(const Renderer&) = delete;
+    Renderer& operator=(const Renderer&) = delete;
+    Renderer(Renderer&&) = delete;
+    Renderer& operator=(Renderer&&) = delete;
     
     //! Destructor
     ~Renderer();
@@ -80,6 +147,11 @@ class Renderer {
     //! Initializes the renderer
     void init(const Node * node, const Data * data,
         const Node::Partials * partials, std::string * output);
+
+    //! Initializes the renderer with an explicit resource policy
+    void init(const Node * node, const Data * data,
+        const Node::Partials * partials, std::string * output,
+        const RenderLimits& limits);
     
     //! Sets the current root token node
     void setNode(const Node * node);
@@ -96,7 +168,12 @@ class Renderer {
     //! Renders using the stored variables
     void render();
 
-    //! Renders the given node to the given output using the stored variables
+    /*! Renders the given node to the given output during a lambda callback.
+
+        This operation is valid only while a section-lambda callback is active
+        on this renderer. A retained renderer pointer is rejected when no such
+        callback is active.
+    */
     void renderForLambda(const Node * node, std::string * output);
 };
 

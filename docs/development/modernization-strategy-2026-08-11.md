@@ -443,6 +443,10 @@ unchanged or record an intentionally approved behavior change.
 
 ## Phase 6: Modernize rendering and lambdas
 
+**Status: renderer resource policy and exception-safe transient state
+implemented on the 0.6 development branch; replacing the retainable legacy
+lambda renderer pointer with a scoped capability remains.**
+
 The renderer should:
 
 - accept `std::string_view` for borrowed input;
@@ -452,11 +456,43 @@ The renderer should:
 - carry explicit recursion and output-size limits; and
 - remain exception-safe when callbacks fail.
 
-Introduce a public `RenderLimits` or equivalent policy object. Before the
-phase is complete, choose numeric library defaults, define whether zero means
-disabled or forbidden, document limit accounting, and specify the exception
-raised on exhaustion. php-mustache may select stricter request-appropriate
-defaults, but it must not depend on undocumented renderer behavior.
+`RenderLimits` now bounds aggregate bytes appended across all render output
+buffers, active node nesting, aggregate node work, and aggregate lambda
+template bytes. The defaults are 64 MiB, 256 active levels, 1,000,000 work
+units, and 64 MiB respectively; every field is a hard maximum and zero is
+never unlimited. The root consumes the first level and work unit. Repeated
+sections, partial expansion, callback helper rendering, section source
+reconstructed for callbacks, and parsed lambda results share the operation's
+counters. Lambda-generated AST nodes are charged once when parsed and again
+when traversed, so unvisited nodes still consume the work budget. An
+independent 256-level implementation ceiling prevents a caller from turning a
+large configured nesting limit into an unbounded C++ call stack.
+
+Output growth, including HTML escaping, is checked before each logical append.
+The compatibility renderer now uses a bounds-safe dynamic lookup stack, clears
+operation counters and borrowed stack entries on every exit path, restores
+temporarily swapped callback output with RAII, and rejects mutation or
+top-level re-entry during a render. Renderer objects are non-copyable and
+non-movable so borrowed operation state cannot be duplicated. The existing
+`renderForLambda()` helper is valid only while a section-lambda callback is
+active and fails cleanly when
+called later on a still-live renderer. That validation narrows the misuse
+window but does not make a retained raw `Renderer*` safe after the renderer
+object itself is destroyed; the scoped-capability replacement below remains
+required.
+
+The public policy, numeric defaults, zero-value behavior, accounting rules,
+and stable exhaustion messages are documented and covered by tests.
+php-mustache may select stricter request-appropriate defaults, but it must not
+depend on undocumented renderer behavior.
+
+The compatibility-only `Node::children_to_template_string()`,
+`Node::to_template_string()`, and installed `Stack` API remain available while
+downstream code migrates. The bounded renderer must not call the unbounded
+`Node` reconstruction helpers. Before the ABI 6 release, either add an
+explicitly bounded replacement and deprecation window or remove these surfaces
+under the source-compatibility schedule in Phase 8; do not maintain duplicate
+renderer and `Node` reconstruction implementations indefinitely.
 
 The php-mustache lambda helper requires special handling. PHP can retain the
 helper beyond the callback window in which its renderer pointer is valid.

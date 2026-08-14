@@ -58,6 +58,14 @@ static_assert(std::is_copy_constructible<mustache::CompiledTemplate>::value,
 static_assert(
     std::is_nothrow_move_constructible<mustache::CompiledTemplate>::value,
     "installed CompiledTemplate must be nothrow move constructible");
+static_assert(!std::is_copy_constructible<mustache::Renderer>::value,
+    "installed Renderer must not copy borrowed operation state");
+static_assert(!std::is_move_constructible<mustache::Renderer>::value,
+    "installed Renderer must not move borrowed operation state");
+static_assert(!std::is_copy_constructible<mustache::Mustache>::value,
+    "installed Mustache must not copy its renderer's borrowed state");
+static_assert(!std::is_move_constructible<mustache::Mustache>::value,
+    "installed Mustache must not move its renderer's borrowed state");
 
 int main()
 {
@@ -92,8 +100,10 @@ int main()
     mustache::CompiledTemplate compiled = mustache::compile("[{{>value}}]");
     mustache::PartialMap partials;
     partials.emplace("value", mustache::compile("{{.}}"));
+    mustache::RenderLimits renderLimits;
+    renderLimits.maxOutputBytes = 10;
     const std::string compiledOutput =
-        mustache::render(compiled, scalar, partials);
+        mustache::render(compiled, scalar, partials, renderLimits);
 
     return decoded->type == mustache::Node::TypeRoot &&
             decoded->children.size() == 1 &&

@@ -193,6 +193,44 @@ content after an explicit document end is reported as trailing content. This
 single-document rule is stricter than ABI 5, which ignored input after the
 first YAML document.
 
+Rendering also uses an explicit hard resource policy:
+
+```cpp
+mustache::RenderLimits limits;
+limits.maxOutputBytes = 1024 * 1024;
+limits.maxNestingDepth = 64;
+limits.maxNodeVisits = 100000;
+limits.maxLambdaTemplateBytes = 1024 * 1024;
+
+std::string output = mustache::render(compiled, data, partials, limits);
+```
+
+The defaults permit 64 MiB of output, 256 active template-node levels,
+1,000,000 aggregate node visits, and 64 MiB of aggregate template text
+processed by lambdas. Every field is a hard maximum and zero never means
+unlimited. The root is the first node visit and first nesting level. Repeated
+list sections, partials, and lambda-generated templates share the node-visit
+budget. Every AST node parsed from lambda output is charged once when parsed
+and again if traversed, including nodes in false sections. Section text sent
+to callbacks and template text returned from callbacks share the
+lambda-template byte budget across the complete render. An implementation
+ceiling rejects nesting beyond 256 active nodes even if a caller configures a
+higher maximum.
+
+For the legacy output-buffer API, `maxOutputBytes` applies to the initial
+top-level buffer plus all bytes appended to every output buffer during the
+render, including buffers passed to `renderForLambda()`. Escaped output is
+sized before it is appended, so exhausting the limit cannot partially append
+one escaped scalar. A failed render can leave the caller's output buffer
+holding a prefix of the intended result; discard or clear it before reuse.
+Limit failures and callback exceptions restore the renderer's internal
+temporary output pointer, lookup stack, and callback state, allowing the
+renderer to be initialized and used again. `Renderer::renderForLambda()` is
+accepted only while a section-lambda callback is active on that renderer; use
+when no callback is active is rejected. `Renderer` and its containing
+`Mustache` facade are non-copyable and non-movable so borrowed operation state
+cannot be duplicated or relocated while active.
+
 Code migrating from ABI 5 should replace direct representation access as
 follows:
 
@@ -216,6 +254,10 @@ Use `Mustache::compile()` when custom delimiters or tokenizer configuration are
 needed. Both member and free `compile()` overloads accept `Tokenizer::Limits`.
 The public `Node` tokenizer and renderer entry points remain available as a
 source-compatibility surface for existing consumers.
+
+`renderer.hpp` no longer supplies incidental declarations from
+`tokenizer.hpp`, `utils.hpp`, or `<iostream>`; consumers using those APIs must
+include their defining headers directly.
 
 `Node` is move-only and owns its complete compatibility AST. Text and dotted
 name components are stored as values; `children`, `child`, and `partials` use

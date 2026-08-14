@@ -1,5 +1,5 @@
 
-check_PROGRAMS = test_utils test_misc test_data_behavior test_node_serialization test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template
+check_PROGRAMS = test_utils test_misc test_data_behavior test_node_serialization test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template test_renderer_safety
 
 if MUSTACHE_SPEC_ENABLED
 check_PROGRAMS += test_spec
@@ -14,6 +14,7 @@ test_ownership_SOURCES = test_ownership.cpp
 test_length_aware_api_SOURCES = test_length_aware_api.cpp
 test_tokenizer_safety_SOURCES = test_tokenizer_safety.cpp
 test_compiled_template_SOURCES = test_compiled_template.cpp
+test_renderer_safety_SOURCES = test_renderer_safety.cpp
 
 EXTRA_DIST = \
 	fuzz_node_unserialize.cpp \
@@ -42,7 +43,7 @@ EXTRA_DIST = \
 	fuzz/corpus/tokenizer/unclosed-tag \
 	fuzz/corpus/tokenizer/valid-section
 
-TESTS = test_utils test_misc test_data_behavior test_node_serialization test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template
+TESTS = test_utils test_misc test_data_behavior test_node_serialization test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template test_renderer_safety
 
 if MUSTACHE_SPEC_ENABLED
 TESTS += test_spec

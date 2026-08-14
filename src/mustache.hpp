@@ -67,13 +67,26 @@ class Mustache {
     void render(const Node * node, const Data * data,
         const Node::Partials * partials, std::string * output);
 
+    //! Utility method for bounded Renderer::init() and Renderer::render()
+    void render(const Node * node, const Data * data,
+        const Node::Partials * partials, std::string * output,
+        const RenderLimits& limits);
+
     //! Renders an immutable compiled template
     std::string render(
         const CompiledTemplate& compiled, const Data& data) const;
 
+    //! Renders an immutable compiled template with resource limits
+    std::string render(const CompiledTemplate& compiled, const Data& data,
+        const RenderLimits& limits) const;
+
     //! Renders an immutable compiled template with compiled partials
     std::string render(const CompiledTemplate& compiled, const Data& data,
         const PartialMap& partials) const;
+
+    //! Renders compiled templates and partials with resource limits
+    std::string render(const CompiledTemplate& compiled, const Data& data,
+        const PartialMap& partials, const RenderLimits& limits) const;
     
     //! Utility method for Tokenizer::setStartSequence()
     void setStartSequence(const std::string& start) {
@@ -158,9 +171,17 @@ CompiledTemplate compile(
 //! Renders a compiled template with no partials
 std::string render(const CompiledTemplate& compiled, const Data& data);
 
+//! Renders a compiled template with explicit resource limits
+std::string render(const CompiledTemplate& compiled, const Data& data,
+    const RenderLimits& limits);
+
 //! Renders a compiled template with compiled partials
 std::string render(const CompiledTemplate& compiled, const Data& data,
     const PartialMap& partials);
+
+//! Renders compiled templates and partials with explicit resource limits
+std::string render(const CompiledTemplate& compiled, const Data& data,
+    const PartialMap& partials, const RenderLimits& limits);
 
 
 } // namespace Mustache

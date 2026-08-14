@@ -59,11 +59,23 @@ CompiledTemplate Mustache::compile(
 std::string Mustache::render(
     const CompiledTemplate& compiled, const Data& data) const
 {
-  return render(compiled, data, PartialMap());
+  return render(compiled, data, PartialMap(), RenderLimits());
+}
+
+std::string Mustache::render(const CompiledTemplate& compiled,
+    const Data& data, const RenderLimits& limits) const
+{
+  return render(compiled, data, PartialMap(), limits);
 }
 
 std::string Mustache::render(const CompiledTemplate& compiled, const Data& data,
     const PartialMap& partials) const
+{
+  return render(compiled, data, partials, RenderLimits());
+}
+
+std::string Mustache::render(const CompiledTemplate& compiled, const Data& data,
+    const PartialMap& partials, const RenderLimits& limits) const
 {
   if( compiled.empty() ) {
     throw Exception("Empty compiled template");
@@ -71,7 +83,8 @@ std::string Mustache::render(const CompiledTemplate& compiled, const Data& data,
 
   std::string output;
   Renderer compiledRenderer;
-  compiledRenderer.init(&compiled.state->root, &data, NULL, &output);
+  compiledRenderer.init(
+      &compiled.state->root, &data, NULL, &output, limits);
   compiledRenderer.setPartialResolver(
       [&partials](const std::string& name) -> const Node * {
         PartialMap::const_iterator partial = partials.find(name);
@@ -107,10 +120,24 @@ std::string render(const CompiledTemplate& compiled, const Data& data)
 }
 
 std::string render(const CompiledTemplate& compiled, const Data& data,
+    const RenderLimits& limits)
+{
+  Mustache mustache;
+  return mustache.render(compiled, data, limits);
+}
+
+std::string render(const CompiledTemplate& compiled, const Data& data,
     const PartialMap& partials)
 {
   Mustache mustache;
   return mustache.render(compiled, data, partials);
+}
+
+std::string render(const CompiledTemplate& compiled, const Data& data,
+    const PartialMap& partials, const RenderLimits& limits)
+{
+  Mustache mustache;
+  return mustache.render(compiled, data, partials, limits);
 }
 
 } // namespace mustache

@@ -47,6 +47,14 @@ void Mustache::render(const Node * node, const Data * data,
   renderer.render();
 }
 
+void Mustache::render(const Node * node, const Data * data,
+    const Node::Partials * partials, std::string * output,
+    const RenderLimits& limits)
+{
+  renderer.init(node, data, partials, output, limits);
+  renderer.render();
+}
+
     
 
 
