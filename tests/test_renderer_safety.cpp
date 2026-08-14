@@ -138,6 +138,133 @@ class CallbackRenderingLambda : public mustache::Lambda {
     }
 };
 
+class ScopedRenderingLambda : public mustache::Lambda {
+  public:
+    ScopedRenderingLambda(mustache::LambdaRenderContext * retained,
+        std::string * observed) : retained(retained), observed(observed) {}
+
+    std::string invoke() override
+    {
+      return std::string();
+    }
+
+    std::string invoke(std::string_view text,
+        mustache::LambdaRenderContext context) override
+    {
+      if( !context.active() ) {
+        throw mustache::Exception(
+            "Scoped lambda received an inactive context");
+      }
+      *retained = context;
+      observed->assign(text.data(), text.size());
+
+      mustache::Node name(mustache::Node::TypeVariable, "name");
+      std::string buffered;
+      context.render(name, buffered);
+      if( context.render(name) != buffered ) {
+        throw mustache::Exception(
+            "Scoped lambda render overloads disagreed");
+      }
+      return buffered;
+    }
+
+  private:
+    mustache::LambdaRenderContext * retained;
+    std::string * observed;
+};
+
+class ThrowingScopedLambda : public mustache::Lambda {
+  public:
+    explicit ThrowingScopedLambda(
+        mustache::LambdaRenderContext * retained) : retained(retained) {}
+
+    std::string invoke() override
+    {
+      return std::string();
+    }
+
+    std::string invoke(std::string_view,
+        mustache::LambdaRenderContext context) override
+    {
+      *retained = context;
+      throw mustache::Exception("Scoped lambda failed");
+    }
+
+  private:
+    mustache::LambdaRenderContext * retained;
+};
+
+class InnerScopedLambda : public mustache::Lambda {
+  public:
+    explicit InnerScopedLambda(
+        mustache::LambdaRenderContext * retained) : retained(retained) {}
+
+    std::string invoke() override
+    {
+      return std::string();
+    }
+
+    std::string invoke(std::string_view,
+        mustache::LambdaRenderContext context) override
+    {
+      *retained = context;
+      return std::string();
+    }
+
+  private:
+    mustache::LambdaRenderContext * retained;
+};
+
+class OuterScopedLambda : public mustache::Lambda {
+  public:
+    OuterScopedLambda(mustache::LambdaRenderContext * retained,
+        mustache::LambdaRenderContext * innerRetained) :
+        retained(retained), innerRetained(innerRetained) {}
+
+    std::string invoke() override
+    {
+      return std::string();
+    }
+
+    std::string invoke(std::string_view,
+        mustache::LambdaRenderContext context) override
+    {
+      *retained = context;
+
+      mustache::Node inner(mustache::Node::TypeSection, "inner");
+      inner.startSequence = "{{";
+      inner.stopSequence = "}}";
+      inner.children.push_back(std::make_unique<mustache::Node>(
+          mustache::Node::TypeStop, "inner"));
+      if( !context.render(inner).empty() ) {
+        throw mustache::Exception(
+            "Nested scoped lambda produced unexpected output");
+      }
+      if( innerRetained->active() ) {
+        throw mustache::Exception(
+            "Nested lambda context remained active after its callback");
+      }
+
+      mustache::Node name(mustache::Node::TypeVariable, "name");
+      bool innerRejected = false;
+      try {
+        static_cast<void>(innerRetained->render(name));
+      } catch( const mustache::Exception& exception ) {
+        innerRejected = std::string(exception.what()) ==
+            "Lambda render context is no longer active";
+      }
+      if( !innerRejected || !context.active() ) {
+        throw mustache::Exception(
+            "Nested lambda contexts were not isolated by callback frame");
+      }
+      return context.render(name);
+    }
+
+  private:
+    mustache::LambdaRenderContext * retained;
+    mustache::LambdaRenderContext * innerRetained;
+};
+
 std::string nestedPartial(std::string inner, std::size_t depth)
 {
   std::string source;
@@ -314,6 +441,71 @@ void testLambdaNodeAccounting()
       });
 }
 
+void testScopedLambdaContext()
+{
+  mustache::LambdaRenderContext inactive;
+  expect(!inactive.active(), "a default lambda context was active");
+  mustache::Node literal(mustache::Node::TypeOutput, "late");
+  expectException("default lambda context",
+      "Lambda render context is no longer active", [&]() {
+        static_cast<void>(inactive.render(literal));
+      });
+
+  mustache::LambdaRenderContext retained;
+  std::string observed;
+  mustache::Data data = mustache::Data::object({
+      {"name", mustache::Data::string("safe")},
+      {"scoped", mustache::Data::lambda(
+          std::make_unique<ScopedRenderingLambda>(&retained, &observed))}
+  });
+  const mustache::CompiledTemplate scoped =
+      mustache::compile("{{#scoped}}original{{/scoped}}");
+  expect(mustache::render(scoped, data) == "safe",
+      "scoped lambda rendering changed callback output");
+  expect(observed == "original",
+      "scoped lambda did not receive exact section text");
+  expect(!retained.active(),
+      "retained lambda context remained active after callback completion");
+  expectException("retained scoped lambda context",
+      "Lambda render context is no longer active", [&]() {
+        static_cast<void>(retained.render(literal));
+      });
+
+  mustache::LambdaRenderContext failed;
+  mustache::Data failureData = mustache::Data::object({
+      {"fail", mustache::Data::lambda(
+          std::make_unique<ThrowingScopedLambda>(&failed))}
+  });
+  const mustache::CompiledTemplate failure =
+      mustache::compile("{{#fail}}{{/fail}}");
+  expectException("throwing scoped lambda", "Scoped lambda failed", [&]() {
+    static_cast<void>(mustache::render(failure, failureData));
+  });
+  expect(!failed.active(),
+      "throwing lambda left its retained context active");
+  expectException("retained context after callback exception",
+      "Lambda render context is no longer active", [&]() {
+        static_cast<void>(failed.render(literal));
+      });
+
+  mustache::LambdaRenderContext outerRetained;
+  mustache::LambdaRenderContext innerRetained;
+  mustache::Data nestedData = mustache::Data::object({
+      {"name", mustache::Data::string("outer")},
+      {"inner", mustache::Data::lambda(
+          std::make_unique<InnerScopedLambda>(&innerRetained))},
+      {"outer", mustache::Data::lambda(
+          std::make_unique<OuterScopedLambda>(
+              &outerRetained, &innerRetained))}
+  });
+  const mustache::CompiledTemplate nested =
+      mustache::compile("{{#outer}}{{/outer}}");
+  expect(mustache::render(nested, nestedData) == "outer",
+      "nested scoped lambda rendering failed");
+  expect(!outerRetained.active() && !innerRetained.active(),
+      "nested lambda contexts survived their callback frames");
+}
+
 void testFailureStateAndCallbackWindow()
 {
   mustache::Renderer * retained = NULL;
@@ -397,6 +589,14 @@ static_assert(!std::is_copy_constructible<mustache::Mustache>::value,
     "Mustache must not copy its renderer's borrowed operation state");
 static_assert(!std::is_move_constructible<mustache::Mustache>::value,
     "Mustache must not move its renderer's borrowed operation state");
+static_assert(
+    std::is_copy_constructible<mustache::LambdaRenderContext>::value,
+    "lambda render contexts must be safely retainable by value");
+static_assert(
+    std::is_nothrow_move_constructible<mustache::LambdaRenderContext>::value,
+    "lambda render contexts must be nothrow movable");
+static_assert(!std::is_abstract<ScopedRenderingLambda>::value,
+    "new lambdas must not need to implement the legacy renderer hook");
 
 int main()
 {
@@ -404,6 +604,7 @@ int main()
   testDepthAndWorkLimits();
   testLambdaTemplateBudget();
   testLambdaNodeAccounting();
+  testScopedLambdaContext();
   testFailureStateAndCallbackWindow();
   return failures == 0 ? 0 : 1;
 }

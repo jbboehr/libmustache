@@ -66,6 +66,13 @@ static_assert(!std::is_copy_constructible<mustache::Mustache>::value,
     "installed Mustache must not copy its renderer's borrowed state");
 static_assert(!std::is_move_constructible<mustache::Mustache>::value,
     "installed Mustache must not move its renderer's borrowed state");
+static_assert(
+    std::is_copy_constructible<mustache::LambdaRenderContext>::value,
+    "installed lambda context must be safely retainable by value");
+static_assert(
+    std::is_nothrow_move_constructible<
+        mustache::LambdaRenderContext>::value,
+    "installed lambda context must be nothrow movable");
 
 int main()
 {
@@ -105,12 +112,22 @@ int main()
     const std::string compiledOutput =
         mustache::render(compiled, scalar, partials, renderLimits);
 
+    mustache::LambdaRenderContext inactiveContext;
+    bool inactiveContextRejected = false;
+    try {
+        static_cast<void>(inactiveContext.render(parsed));
+    } catch (const mustache::Exception& exception) {
+        inactiveContextRejected = std::string(exception.what()) ==
+            "Lambda render context is no longer active";
+    }
+
     return decoded->type == mustache::Node::TypeRoot &&
             decoded->children.size() == 1 &&
             decoded->children.front()->data.has_value() &&
             *decoded->children.front()->data == "owned" &&
             position == serial->size() &&
-            compiledOutput == "[compiled]"
+            compiledOutput == "[compiled]" &&
+            !inactiveContext.active() && inactiveContextRejected
         ? 0
         : 1;
 }

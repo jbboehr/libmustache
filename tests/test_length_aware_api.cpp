@@ -111,6 +111,26 @@ class LegacyLambda : public mustache::Lambda {
     std::string * observed;
 };
 
+class ScopedLambda : public mustache::Lambda {
+  public:
+    explicit ScopedLambda(std::string * observed) : observed(observed) {}
+
+    std::string invoke() override
+    {
+      return std::string();
+    }
+
+    std::string invoke(std::string_view text,
+        mustache::LambdaRenderContext) override
+    {
+      observed->assign(text.data(), text.size());
+      return std::string(text);
+    }
+
+  private:
+    std::string * observed;
+};
+
 void testLengthAwareLambdaText()
 {
   const char source[] = {
@@ -136,6 +156,16 @@ void testLengthAwareLambdaText()
   expect(output == expectedText,
       "lambda output lost its embedded NUL when it was reparsed");
 
+  observed.clear();
+  mustache::Data scopedData(mustache::Data::TypeMap, 0);
+  scopedData.set("call", mustache::Data::lambda(
+      std::make_unique<ScopedLambda>(&observed)));
+  output.clear();
+  mustache.render(&root, &scopedData, NULL, &output);
+  expect(observed == expectedText,
+      "scoped lambda text lost its embedded NUL");
+  expect(output == expectedText,
+      "scoped lambda output lost its embedded NUL when reparsed");
 }
 
 void testExplicitSerializedByteLengths()

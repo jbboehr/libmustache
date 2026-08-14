@@ -611,11 +611,15 @@ void Renderer::_renderNode(const Node * node, std::size_t depth)
                 *node->startSequence, *node->stopSequence, depth);
             std::string invoked;
             {
+              LambdaRenderContext context(this);
               ++_lambdaCallbackDepth;
               const auto callbackGuard = onScopeExit(
-                  [this]() { --_lambdaCallbackDepth; });
+                  [this, &context]() {
+                    context.invalidate();
+                    --_lambdaCallbackDepth;
+                  });
               invoked = val->lambdaValue()->invoke(
-                  std::string_view(text), this);
+                  std::string_view(text), context);
             }
             _consumeLambdaTemplate(invoked.size());
 

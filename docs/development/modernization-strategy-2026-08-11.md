@@ -443,9 +443,10 @@ unchanged or record an intentionally approved behavior change.
 
 ## Phase 6: Modernize rendering and lambdas
 
-**Status: renderer resource policy and exception-safe transient state
-implemented on the 0.6 development branch; replacing the retainable legacy
-lambda renderer pointer with a scoped capability remains.**
+**Status: renderer resource policy, exception-safe transient state, and a
+copyable callback-scoped lambda capability are implemented on the 0.6
+development branch. Migrating downstream bindings off the retainable legacy
+renderer-pointer hook remains.**
 
 The renderer should:
 
@@ -473,13 +474,16 @@ The compatibility renderer now uses a bounds-safe dynamic lookup stack, clears
 operation counters and borrowed stack entries on every exit path, restores
 temporarily swapped callback output with RAII, and rejects mutation or
 top-level re-entry during a render. Renderer objects are non-copyable and
-non-movable so borrowed operation state cannot be duplicated. The existing
-`renderForLambda()` helper is valid only while a section-lambda callback is
-active and fails cleanly when
-called later on a still-live renderer. That validation narrows the misuse
-window but does not make a retained raw `Renderer*` safe after the renderer
-object itself is destroyed; the scoped-capability replacement below remains
-required.
+non-movable so borrowed operation state cannot be duplicated.
+
+Section callbacks now receive a `LambdaRenderContext` on the preferred virtual
+path. Copies share invalidatable frame state, render only while their exact
+callback is active, and fail cleanly after normal return, exceptions, nested
+callback completion, or renderer destruction. The legacy
+`invoke(std::string *, Renderer *)` virtual remains as a source-compatibility
+adapter and `renderForLambda()` remains available for that adapter. Its raw
+pointer must not be retained; downstream bindings must move to the scoped
+context before the legacy hook can be deprecated or removed.
 
 The public policy, numeric defaults, zero-value behavior, accounting rules,
 and stable exhaustion messages are documented and covered by tests.
@@ -495,8 +499,8 @@ under the source-compatibility schedule in Phase 8; do not maintain duplicate
 renderer and `Node` reconstruction implementations indefinitely.
 
 The php-mustache lambda helper requires special handling. PHP can retain the
-helper beyond the callback window in which its renderer pointer is valid.
-Replace that borrowed pointer with a callback-scoped capability that:
+helper beyond the callback window in which its legacy renderer pointer is
+valid. Migrate it to store the library's `LambdaRenderContext`, which:
 
 - is valid only during the lambda invocation;
 - is explicitly invalidated afterward;

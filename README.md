@@ -231,6 +231,30 @@ when no callback is active is rejected. `Renderer` and its containing
 `Mustache` facade are non-copyable and non-movable so borrowed operation state
 cannot be duplicated or relocated while active.
 
+New section lambdas should override the scoped callback overload:
+
+```cpp
+class SectionLambda : public mustache::Lambda {
+  public:
+    std::string invoke() override { return std::string(); }
+
+    std::string invoke(std::string_view,
+        mustache::LambdaRenderContext context) override
+    {
+      mustache::Node name(mustache::Node::TypeVariable, "name");
+      return context.render(name);
+    }
+};
+```
+
+`LambdaRenderContext` is copyable so a binding can retain it safely, but every
+copy becomes inactive when that exact callback frame returns or throws. Later
+calls fail with `Lambda render context is no longer active` without touching
+the former renderer. Context rendering is synchronous and not intended for
+concurrent use. The legacy `invoke(std::string *, Renderer *)` hook and
+`Renderer::renderForLambda()` remain as compatibility adapters; a raw renderer
+pointer obtained through that hook must never be retained.
+
 Code migrating from ABI 5 should replace direct representation access as
 follows:
 
