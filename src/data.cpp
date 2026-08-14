@@ -685,10 +685,12 @@ class JSONPreflight {
     bool parseNumber()
     {
       const std::size_t start = position_;
-      if( consume('-') && position_ >= input_.size() ) {
+      const bool negative = consume('-');
+      if( negative && position_ >= input_.size() ) {
         return false;
       }
 
+      const std::size_t digitsStart = position_;
       if( consume('0') ) {
         if( position_ < input_.size() && isDigit(input_[position_]) ) {
           return false;
@@ -732,6 +734,17 @@ class JSONPreflight {
 
       if( floatingPoint ) {
         budget_.addString(position_ - start);
+      } else {
+        const std::string_view digits =
+            input_.substr(digitsStart, position_ - digitsStart);
+        const std::string_view maximum = negative
+            ? std::string_view("9223372036854775808")
+            : std::string_view("9223372036854775807");
+        if( digits.size() > maximum.size() ||
+            (digits.size() == maximum.size() &&
+             digits.compare(maximum) > 0) ) {
+          throw Exception("JSON integer is outside the supported range");
+        }
       }
       return true;
     }
@@ -885,11 +898,9 @@ Data Data::fromJSON(std::string_view string, const ParseLimits& limits)
         return value;
       }
       case json_type_int: {
-        const std::int64_t value = json_object_get_int64(object);
-        if( std::to_string(value) != json_object_get_string(object) ) {
-          throw Exception("JSON integer is outside the supported range");
-        }
-        return Data::integer(value);
+        // The source preflight validates the original integer spelling before
+        // json-c can clamp an out-of-range value on older releases.
+        return Data::integer(json_object_get_int64(object));
       }
       case json_type_string: {
         const std::size_t length = static_cast<std::size_t>(

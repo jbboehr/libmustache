@@ -277,6 +277,9 @@ void testJSONData()
       "\"trueValue\":true,"
       "\"zeroValue\":0,"
       "\"integerValue\":42,"
+      "\"minimumInteger\":-9223372036854775808,"
+      "\"maximumInteger\":9223372036854775807,"
+      "\"negativeIntegerZero\":-0,"
       "\"decimalValue\":1.50,"
       "\"pointOne\":0.1,"
       "\"wholeDecimal\":1.0,"
@@ -301,6 +304,14 @@ void testJSONData()
   expectEqual("JSON zero", renderScalar(data.get(), "zeroValue"), "0|Y|");
   expectEqual(
       "JSON integer", renderScalar(data.get(), "integerValue"), "42|Y|");
+  expectEqual("JSON minimum integer",
+      renderScalar(data.get(), "minimumInteger"),
+      "-9223372036854775808|Y|");
+  expectEqual("JSON maximum integer",
+      renderScalar(data.get(), "maximumInteger"),
+      "9223372036854775807|Y|");
+  expectEqual("JSON negative integer zero",
+      renderScalar(data.get(), "negativeIntegerZero"), "0|Y|");
   expectEqual("JSON decimal spelling",
       renderScalar(data.get(), "decimalValue"), "1.50|Y|");
   expectEqual("JSON point-one spelling",
