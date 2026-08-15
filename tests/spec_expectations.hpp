@@ -35,22 +35,10 @@ struct SpecSuiteRecord {
   std::size_t files;
 };
 
-static const char partialIndentationReason[] =
-    "standalone partial stripping and indentation are not implemented";
-
 // This is the executable deviation ledger for mustache/spec at 5d3b58e.
 // A known failure that starts passing is an unexpected pass until this entry is
 // removed. A missing or duplicated entry fails the inventory validation.
 static SpecExpectationRecord specExpectations[] = {
-    {"partials.yml", "Standalone Line Endings", SpecExpectedFailure,
-        partialIndentationReason, 1, 0},
-    {"partials.yml", "Standalone Without Previous Line", SpecExpectedFailure,
-        partialIndentationReason, 1, 0},
-    {"partials.yml", "Standalone Without Newline", SpecExpectedFailure,
-        partialIndentationReason, 1, 0},
-    {"partials.yml", "Standalone Indentation", SpecExpectedFailure,
-        partialIndentationReason, 1, 0},
-
     {"sections.yml", "Implicit Iterator - Array", SpecExpectedSkip,
         "nested array iteration is not implemented", 1, 0},
     {"~dynamic-names.yml", NULL, SpecExpectedSkip,

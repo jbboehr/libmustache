@@ -380,6 +380,73 @@ void testDepthAndWorkLimits()
       "default nesting limit rejected a parser-bounded partial chain");
 }
 
+void testPartialIndentationOutputAccounting()
+{
+  const mustache::CompiledTemplate source =
+      mustache::compile(" {{>lines}}\n");
+  mustache::PartialMap partials;
+  partials.emplace("lines", mustache::compile("x\nx"));
+  const mustache::Data data = mustache::Data::null();
+
+  mustache::RenderLimits limits;
+  limits.maxOutputBytes = 5;
+  expect(mustache::render(source, data, partials, limits) == " x\n x",
+      "exact partial-indentation output limit rejected valid output");
+  limits.maxOutputBytes = 4;
+  expectException("partial indentation output limit",
+      "Render output byte limit exceeded", [&]() {
+        static_cast<void>(mustache::render(source, data, partials, limits));
+      });
+
+  mustache::Data lambdaData = mustache::Data::object({
+      {"value", mustache::Data::lambda(
+          std::make_unique<FixedLambda>("a\nb"))}
+  });
+  partials.emplace("lambda", mustache::compile("{{value}}"));
+  expect(mustache::render(mustache::compile("  {{>lambda}}\n"),
+          lambdaData, partials) == "  a\nb",
+      "partial indentation leaked into lambda-generated template lines");
+
+  mustache::Node invalidRoot;
+  invalidRoot.type = mustache::Node::TypeRoot;
+  invalidRoot.children.push_back(std::make_unique<mustache::Node>(
+      mustache::Node::TypeOutput, "x\n",
+      mustache::Node::FlagLambdaOnly | mustache::Node::FlagPartialIndent));
+  invalidRoot.children.push_back(std::make_unique<mustache::Node>(
+      mustache::Node::TypePartial, "lines"));
+  mustache::Mustache engine;
+  std::string output;
+  expectException("manual partial indentation bytes",
+      "Invalid standalone partial indentation metadata", [&]() {
+        engine.render(&invalidRoot, &data, NULL, &output);
+      });
+
+  mustache::Node lambdaRoot;
+  lambdaRoot.type = mustache::Node::TypeRoot;
+  std::unique_ptr<mustache::Node> section =
+      std::make_unique<mustache::Node>(
+          mustache::Node::TypeSection, "section");
+  section->startSequence = "{{";
+  section->stopSequence = "}}";
+  section->children.push_back(std::make_unique<mustache::Node>(
+      mustache::Node::TypeOutput, "\n",
+      mustache::Node::FlagLambdaOnly | mustache::Node::FlagPartialIndent));
+  section->children.push_back(std::make_unique<mustache::Node>(
+      mustache::Node::TypePartial, "lines"));
+  section->children.push_back(std::make_unique<mustache::Node>(
+      mustache::Node::TypeStop, "section"));
+  lambdaRoot.children.push_back(std::move(section));
+  mustache::Data sectionData = mustache::Data::object({
+      {"section", mustache::Data::lambda(
+          std::make_unique<FixedLambda>(""))}
+  });
+  output.clear();
+  expectException("lambda source partial indentation bytes",
+      "Invalid standalone partial indentation metadata", [&]() {
+        engine.render(&lambdaRoot, &sectionData, NULL, &output);
+      });
+}
+
 void testLambdaTemplateBudget()
 {
   mustache::Data data = mustache::Data::object({
@@ -602,6 +669,7 @@ int main()
 {
   testLimitDefaultsAndOutputAccounting();
   testDepthAndWorkLimits();
+  testPartialIndentationOutputAccounting();
   testLambdaTemplateBudget();
   testLambdaNodeAccounting();
   testScopedLambdaContext();

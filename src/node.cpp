@@ -71,11 +71,18 @@ void validateNodeShape(
     throw Exception("Invalid serial node type");
   }
   const size_t validFlags = static_cast<size_t>(Node::FlagEscape) |
-      static_cast<size_t>(Node::FlagLambdaOnly);
+      static_cast<size_t>(Node::FlagLambdaOnly) |
+      static_cast<size_t>(Node::FlagPartialIndent);
   if( (flags & ~validFlags) != 0 ||
       ((flags & static_cast<size_t>(Node::FlagLambdaOnly)) != 0 &&
           (type != Node::TypeOutput ||
-              flags != static_cast<size_t>(Node::FlagLambdaOnly))) ) {
+              (flags != static_cast<size_t>(Node::FlagLambdaOnly) &&
+                  flags != (static_cast<size_t>(Node::FlagLambdaOnly) |
+                      static_cast<size_t>(Node::FlagPartialIndent))))) ||
+      ((flags & static_cast<size_t>(Node::FlagPartialIndent)) != 0 &&
+          (type != Node::TypeOutput ||
+              flags != (static_cast<size_t>(Node::FlagLambdaOnly) |
+                  static_cast<size_t>(Node::FlagPartialIndent)))) ) {
     throw Exception("Invalid serial node flags");
   }
   if( type == Node::TypeRoot ) {
@@ -87,6 +94,33 @@ void validateNodeShape(
   }
   if( children > 0 && !typeAllowsChildren(type) ) {
     throw Exception("Invalid serial node children");
+  }
+}
+
+bool isPartialIndentationMetadata(const Node& node)
+{
+  return node.type == Node::TypeOutput &&
+      node.flags == (Node::FlagLambdaOnly | Node::FlagPartialIndent) &&
+      node.data.has_value() &&
+      std::all_of(node.data->begin(), node.data->end(), [](char value) {
+        return value == ' ' || value == '\t';
+      });
+}
+
+void validatePartialIndentationChildren(const Node::Children& children)
+{
+  for( size_t index = 0; index < children.size(); ++index ) {
+    const Node * child = children[index].get();
+    if( child == NULL ||
+        (child->flags & Node::FlagPartialIndent) == 0 ) {
+      continue;
+    }
+    if( !isPartialIndentationMetadata(*child) ||
+        index + 1 >= children.size() || children[index + 1] == NULL ||
+        children[index + 1]->type != Node::TypePartial ) {
+      throw Exception("Invalid serial partial indentation metadata");
+    }
+    ++index;
   }
 }
 
@@ -165,12 +199,17 @@ void writeUint32(std::vector<uint8_t>& output, size_t pos, size_t value)
 }
 
 void serializeNode(const Node& node, std::vector<uint8_t>& output,
-    SerialState& state, size_t depth)
+    SerialState& state, size_t depth, bool partialIndentationMetadata)
 {
   checkSerialBudget(state, depth);
   validateNodeShape(
       node.type, static_cast<size_t>(node.flags), node.data.has_value(),
       node.children.size());
+  if( (node.flags & Node::FlagPartialIndent) != 0 &&
+      !partialIndentationMetadata ) {
+    throw Exception("Invalid serial partial indentation metadata");
+  }
+  validatePartialIndentationChildren(node.children);
 
   if( node.flags < 0 ) {
     throw Exception("Invalid serial node flags");
@@ -210,7 +249,8 @@ void serializeNode(const Node& node, std::vector<uint8_t>& output,
     if( *it == NULL ) {
       throw Exception("Invalid null serial child");
     }
-    serializeNode(**it, output, state, depth + 1);
+    serializeNode(**it, output, state, depth + 1,
+        isPartialIndentationMetadata(**it));
   }
 
   const size_t childrenSize = output.size() - childrenStart;
@@ -354,6 +394,8 @@ std::unique_ptr<Node> unserializeNode(SerialReader& reader, size_t limit,
         unserializeNode(reader, childrenEnd, state, depth + 1));
   }
 
+  validatePartialIndentationChildren(node->children);
+
   if( reader.position() != childrenEnd ) {
     throw Exception("Invalid serial child size");
   }
@@ -378,6 +420,9 @@ std::unique_ptr<Node> unserializeOwnedRange(const uint8_t * serial,
   SerialState state(limits);
   std::unique_ptr<Node> node(
       unserializeNode(reader, length, state, 0));
+  if( (node->flags & Node::FlagPartialIndent) != 0 ) {
+    throw Exception("Invalid serial partial indentation metadata");
+  }
   if( reader.position() != length ) {
     throw Exception("Trailing serial data");
   }
@@ -610,7 +655,7 @@ std::vector<uint8_t> Node::serializeValue(
   output.reserve(18);
 
   SerialState state(limits);
-  serializeNode(*this, output, state, 0);
+  serializeNode(*this, output, state, 0, false);
   return output;
 }
 

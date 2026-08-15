@@ -7,4 +7,5 @@ value
 <%^missing%>
 fallback
 <%/missing%>
+  <%>partial%>
 after

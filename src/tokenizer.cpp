@@ -52,7 +52,8 @@ bool standaloneLineEnd(
 bool isStandaloneType(Node::Type type)
 {
   return type == Node::TypeSection || type == Node::TypeNegate ||
-      type == Node::TypeStop || type == Node::TypeComment;
+      type == Node::TypeStop || type == Node::TypeComment ||
+      type == Node::TypePartial;
 }
 
 struct ParseFrame {
@@ -77,15 +78,16 @@ Node * appendNode(Node * parent, std::unique_ptr<Node> node,
   return parent->children.back().get();
 }
 
-void appendLambdaOnlyOutput(Node * parent, std::string_view output,
+void appendSourceOnlyOutput(Node * parent, std::string_view output,
+    int flags, bool preserveEmpty,
     std::size_t * nodeCount, const Tokenizer::Limits& limits,
     int lineNo, int charNo)
 {
-  if( output.empty() ) {
+  if( output.empty() && !preserveEmpty ) {
     return;
   }
   appendNode(parent, std::make_unique<Node>(
-      Node::TypeOutput, std::string(output), Node::FlagLambdaOnly),
+      Node::TypeOutput, std::string(output), flags),
       nodeCount, limits, lineNo, charNo);
 }
 
@@ -387,9 +389,16 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root,
         outputBeforeTag.clear();
 
         if( standaloneEnd != std::string_view::npos ) {
-          appendLambdaOnlyOutput(nodeStack.back().node,
+          const int sourceFlags = Node::FlagLambdaOnly |
+              (currentType == Node::TypePartial
+                  ? Node::FlagPartialIndent : Node::FlagNone);
+          // Keep an empty prefix as a boundary marker. It prevents an outer
+          // partial's indentation from leaking onto a stripped tag at column
+          // zero and carries zero-byte indentation for standalone partials.
+          appendSourceOnlyOutput(nodeStack.back().node,
               tmpl.substr(tagStart - tagIndentationBytes,
                   tagIndentationBytes),
+              sourceFlags, true,
               &nodeCount, limits, startLineNo, startCharNo);
         }
 
@@ -459,9 +468,10 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root,
         }
 
         if( standaloneEnd != std::string_view::npos ) {
-          appendLambdaOnlyOutput(nodeStack.back().node,
+          appendSourceOnlyOutput(nodeStack.back().node,
               tmpl.substr(pos + tmpStopL,
                   standaloneEnd - (pos + tmpStopL)),
+              Node::FlagLambdaOnly, false,
               &nodeCount, limits, lineNo, charNo);
         }
         // Clear buffer

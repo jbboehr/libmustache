@@ -97,7 +97,11 @@ class Node {
 
       // Internal output retained only when reconstructing section text for
       // lambda callbacks. Normal rendering suppresses these nodes.
-      FlagLambdaOnly = 2
+      FlagLambdaOnly = 2,
+
+      // Internal source metadata immediately preceding a standalone partial.
+      // The output node's data contains the partial's local indentation.
+      FlagPartialIndent = 4
     };
     
     //! The type from Node::Type

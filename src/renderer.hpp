@@ -9,6 +9,7 @@
 #include <map>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "data.hpp"
@@ -52,6 +53,15 @@ class Renderer {
   private:
     typedef std::function<const Node *(const std::string&)> PartialResolver;
 
+    struct IndentationFrame {
+      explicit IndentationFrame(
+          std::vector<std::string_view> components = {}) :
+          components(std::move(components)), atLineStart(true) {}
+
+      std::vector<std::string_view> components;
+      bool atLineStart;
+    };
+
     //! The root token node
     const Node * _node;
     
@@ -78,6 +88,9 @@ class Renderer {
     std::size_t _nodeVisits;
     std::size_t _lambdaTemplateBytes;
 
+    //! Source-line state scoped to the currently rendered partial
+    std::vector<IndentationFrame> _indentationStack;
+
     //! Active recursion level for callback-scoped rendering
     std::size_t _activeDepth;
 
@@ -88,7 +101,9 @@ class Renderer {
     std::size_t _lambdaCallbackDepth;
     
     //! Renders a single node
-    void _renderNode(const Node * node, std::size_t depth);
+    void _renderNode(const Node * node, std::size_t depth,
+        const std::string * partialIndentation = NULL,
+        bool partialIndentationMetadata = false);
 
     //! Renders all children one level below their parent
     void _renderChildren(const Node * node, std::size_t depth);
@@ -96,6 +111,12 @@ class Renderer {
     //! Appends bounded output
     void _append(std::string_view value);
     void _appendEscaped(std::string_view value);
+
+    //! Applies indentation to literal partial source, never dynamic values
+    void _appendTemplateOutput(std::string_view value);
+    void _appendIndentation(const IndentationFrame& frame);
+    void _consumeTemplateSource(std::string_view value);
+    void _beginTemplateTag();
 
     //! Accounts for output across every buffer used by this render
     void _consumeOutputBytes(std::size_t bytes);

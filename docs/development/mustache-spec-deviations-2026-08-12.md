@@ -23,12 +23,12 @@ or a change in the pinned suite inventory fails the test executable.
 | Delimiters | 14 | 0 | 0 | 14 |
 | Interpolation | 39 | 0 | 0 | 39 |
 | Inverted sections | 22 | 0 | 0 | 22 |
-| Partials | 7 | 0 | 4 | 11 |
+| Partials | 11 | 0 | 0 | 11 |
 | Sections | 29 | 1 | 0 | 30 |
 | Dynamic names | 0 | 21 | 0 | 21 |
 | Inheritance | 0 | 22 | 0 | 22 |
 | Lambdas | 10 | 0 | 0 | 10 |
-| **Total** | **133** | **44** | **4** | **181** |
+| **Total** | **137** | **44** | **0** | **181** |
 
 CI succeeds only when there are zero unexpected failures and zero unexpected
 passes. Known failures remain visible in the summary and are not counted as
@@ -36,13 +36,11 @@ passes.
 
 ## Known conformance failures
 
-The remaining four executed failures are the partial standalone and
-indentation cases. Standalone section, inverted-section, closing, comment, and
-delimiter-change tags are stripped with exact LF, CRLF, beginning-of-input,
-and end-of-input behavior. Standalone partial lines are not yet removed, and
-their indentation is not yet propagated to every rendered partial line. The
-complete list of suite and test names is kept in the executable ledger rather
-than duplicated here.
+There are no known failures among the core tests that are executed. Standalone
+section, inverted-section, closing, comment, delimiter-change, and partial
+tags are stripped with exact LF, CRLF, beginning-of-input, and end-of-input
+behavior. Standalone partial indentation is applied to template lines without
+incorrectly indenting line endings introduced by rendered data.
 
 ## Explicitly unsupported cases
 

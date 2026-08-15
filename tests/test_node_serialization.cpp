@@ -368,6 +368,32 @@ void testStrictDecoderValidation()
       mustache::Node::TypeContainer, 0, false, "", noChildren),
       "pointer-backed container nodes must be rejected");
 
+  const std::vector<uint8_t> partialIndent = makeSerialNode(
+      mustache::Node::TypeOutput,
+      mustache::Node::FlagLambdaOnly | mustache::Node::FlagPartialIndent,
+      true, "  ", noChildren);
+  expectInvalid(partialIndent,
+      "top-level standalone partial metadata must be rejected");
+
+  std::vector<std::vector<uint8_t> > invalidPartialMetadataChildren;
+  invalidPartialMetadataChildren.push_back(partialIndent);
+  invalidPartialMetadataChildren.push_back(makeSerialNode(
+      mustache::Node::TypeVariable, 0, true, "value", noChildren));
+  expectInvalid(makeSerialNode(mustache::Node::TypeRoot, 0, false, "",
+      invalidPartialMetadataChildren),
+      "decoded standalone partial metadata accepted a non-partial successor");
+
+  std::vector<std::vector<uint8_t> > invalidPartialBytesChildren;
+  invalidPartialBytesChildren.push_back(makeSerialNode(
+      mustache::Node::TypeOutput,
+      mustache::Node::FlagLambdaOnly | mustache::Node::FlagPartialIndent,
+      true, "x\n", noChildren));
+  invalidPartialBytesChildren.push_back(makeSerialNode(
+      mustache::Node::TypePartial, 0, true, "partial", noChildren));
+  expectInvalid(makeSerialNode(mustache::Node::TypeRoot, 0, false, "",
+      invalidPartialBytesChildren),
+      "decoded standalone partial metadata accepted non-indent bytes");
+
   std::vector<std::vector<uint8_t> > child;
   child.push_back(makeSerialNode(
       mustache::Node::TypeOutput, 0, true, "x", noChildren));
@@ -477,6 +503,34 @@ void testComplexTokenizerCompatibility()
       decoded->serialize());
   expectBytes(*serializedAgain, *serial,
       "complex tokenizer output must retain its exact legacy bytes");
+}
+
+void testStandalonePartialMetadataRoundTrip()
+{
+  std::string source("  {{>partial}}\n");
+  mustache::Mustache engine;
+  mustache::Node root;
+  engine.tokenize(&source, &root);
+
+  const std::vector<uint8_t> serial = root.serializeValue();
+  std::unique_ptr<mustache::Node> decoded =
+      mustache::Node::unserializeOwned(byteView(serial));
+  expect(decoded->to_template_string("{{", "}}") == source,
+      "serialized standalone partial metadata lost template source");
+
+  mustache::Node::Partials partials;
+  std::unique_ptr<mustache::Node> partial =
+      std::make_unique<mustache::Node>();
+  std::string partialSource("x\ny");
+  engine.tokenize(&partialSource, partial.get());
+  partials.emplace("partial", std::move(partial));
+  const mustache::Data data = mustache::Data::null();
+  std::string output;
+  engine.render(decoded.get(), &data, &partials, &output);
+  expect(output == "  x\n  y",
+      "serialized standalone partial metadata did not affect rendering");
+  expectBytes(decoded->serializeValue(), serial,
+      "standalone partial metadata did not round-trip byte-for-byte");
 }
 
 void testDecoderDepthLimit()
@@ -603,6 +657,34 @@ void testSerializerValidation()
   expectSerializeInvalid(misplacedLambdaFlag,
       "lambda-only flags on non-output nodes must not be serialized");
 
+  mustache::Node misplacedPartialIndent(
+      mustache::Node::TypeOutput, "  ",
+      mustache::Node::FlagLambdaOnly | mustache::Node::FlagPartialIndent);
+  expectSerializeInvalid(misplacedPartialIndent,
+      "standalone partial metadata without a following partial serialized");
+
+  mustache::Node unpairedPartialIndent;
+  unpairedPartialIndent.type = mustache::Node::TypeRoot;
+  unpairedPartialIndent.children.push_back(std::make_unique<mustache::Node>(
+      mustache::Node::TypeOutput, "  ",
+      mustache::Node::FlagLambdaOnly | mustache::Node::FlagPartialIndent));
+  unpairedPartialIndent.children.push_back(std::make_unique<mustache::Node>(
+      mustache::Node::TypeVariable, "value"));
+  expectSerializeInvalid(unpairedPartialIndent,
+      "standalone partial metadata accepted a non-partial successor");
+
+  mustache::Node invalidPartialIndentBytes;
+  invalidPartialIndentBytes.type = mustache::Node::TypeRoot;
+  invalidPartialIndentBytes.children.push_back(
+      std::make_unique<mustache::Node>(mustache::Node::TypeOutput, " \n",
+          mustache::Node::FlagLambdaOnly |
+              mustache::Node::FlagPartialIndent));
+  invalidPartialIndentBytes.children.push_back(
+      std::make_unique<mustache::Node>(
+          mustache::Node::TypePartial, "partial"));
+  expectSerializeInvalid(invalidPartialIndentBytes,
+      "standalone partial metadata serialized non-indent bytes");
+
   mustache::Node missingData;
   missingData.type = mustache::Node::TypeVariable;
   expectSerializeInvalid(missingData,
@@ -672,6 +754,7 @@ int main()
   testStrictDecoderValidation();
   testOffsetAndScalarCompatibility();
   testComplexTokenizerCompatibility();
+  testStandalonePartialMetadataRoundTrip();
   testDecoderDepthLimit();
   testSerializationLimits();
   testSerializerValidation();

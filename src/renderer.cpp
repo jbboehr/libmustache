@@ -53,6 +53,33 @@ std::string_view escapedValue(char value)
   }
 }
 
+bool isPartialIndentation(std::string_view value)
+{
+  return std::all_of(value.begin(), value.end(), [](char character) {
+    return character == ' ' || character == '\t';
+  });
+}
+
+bool validatePartialIndentationAt(
+    const Node::Children& children, std::size_t index)
+{
+  const Node * child = children[index].get();
+  if( child == NULL ||
+      (child->flags & Node::FlagPartialIndent) == 0 ) {
+    return false;
+  }
+  if( child->type != Node::TypeOutput ||
+      child->flags !=
+          (Node::FlagLambdaOnly | Node::FlagPartialIndent) ||
+      !child->data.has_value() ||
+      !isPartialIndentation(*child->data) ||
+      index + 1 >= children.size() || children[index + 1] == NULL ||
+      children[index + 1]->type != Node::TypePartial ) {
+    throw Exception("Invalid standalone partial indentation metadata");
+  }
+  return true;
+}
+
 } // namespace
 
 RenderLimits::RenderLimits() :
@@ -97,6 +124,7 @@ void Renderer::clear()
   _outputBytes = 0;
   _nodeVisits = 0;
   _lambdaTemplateBytes = 0;
+  _indentationStack.clear();
   _activeDepth = 0;
   _rendering = false;
   _lambdaCallbackDepth = 0;
@@ -185,11 +213,13 @@ void Renderer::render()
   _outputBytes = _output->size();
   _nodeVisits = 0;
   _lambdaTemplateBytes = 0;
+  _indentationStack.clear();
   _activeDepth = 0;
   _lambdaCallbackDepth = 0;
   _stack.clear();
   const auto renderGuard = onScopeExit([this]() {
     _stack.clear();
+    _indentationStack.clear();
     _activeDepth = 0;
     _lambdaCallbackDepth = 0;
     _rendering = false;
@@ -226,12 +256,23 @@ void Renderer::renderForLambda(const Node * node, std::string * output)
   if( _output->size() > _limits.maxOutputBytes ) {
     throw Exception("Render output byte limit exceeded");
   }
+  _indentationStack.emplace_back();
+  const auto indentationGuard = onScopeExit(
+      [this]() { _indentationStack.pop_back(); });
   _renderNode(node, _activeDepth + 1);
 }
 
 void Renderer::_renderChildren(const Node * node, std::size_t depth)
 {
-  for( const std::unique_ptr<Node>& child : node->children ) {
+  for( std::size_t index = 0; index < node->children.size(); ++index ) {
+    const std::unique_ptr<Node>& child = node->children[index];
+    if( validatePartialIndentationAt(node->children, index) ) {
+      _renderNode(child.get(), depth + 1, NULL, true);
+      _renderNode(node->children[index + 1].get(), depth + 1,
+          &*child->data);
+      ++index;
+      continue;
+    }
     _renderNode(child.get(), depth + 1);
   }
 }
@@ -283,6 +324,69 @@ void Renderer::_appendEscaped(std::string_view value)
     } else {
       _output->append(escaped.data(), escaped.size());
     }
+  }
+}
+
+void Renderer::_appendTemplateOutput(std::string_view value)
+{
+  if( _indentationStack.empty() ) {
+    _append(value);
+    return;
+  }
+
+  IndentationFrame& frame = _indentationStack.back();
+  std::size_t offset = 0;
+  while( offset < value.size() ) {
+    if( frame.atLineStart ) {
+      _appendIndentation(frame);
+      frame.atLineStart = false;
+    }
+
+    const std::size_t newline = value.find('\n', offset);
+    if( newline == std::string_view::npos ) {
+      _append(value.substr(offset));
+      return;
+    }
+    _append(value.substr(offset, newline - offset + 1));
+    frame.atLineStart = true;
+    offset = newline + 1;
+  }
+}
+
+void Renderer::_appendIndentation(const IndentationFrame& frame)
+{
+  for( const std::string_view component : frame.components ) {
+    _append(component);
+  }
+}
+
+void Renderer::_consumeTemplateSource(std::string_view value)
+{
+  if( _indentationStack.empty() ) {
+    return;
+  }
+
+  IndentationFrame& frame = _indentationStack.back();
+  if( value.empty() ) {
+    // Empty lambda-only nodes are explicit standalone-prefix markers.
+    frame.atLineStart = false;
+    return;
+  }
+  for( const char character : value ) {
+    frame.atLineStart = character == '\n';
+  }
+}
+
+void Renderer::_beginTemplateTag()
+{
+  if( _indentationStack.empty() ) {
+    return;
+  }
+
+  IndentationFrame& frame = _indentationStack.back();
+  if( frame.atLineStart ) {
+    _appendIndentation(frame);
+    frame.atLineStart = false;
   }
 }
 
@@ -441,9 +545,10 @@ void Renderer::_appendLambdaNodeTemplate(const Node * node,
   }
 
   if( appendChildren ) {
-    for( const std::unique_ptr<Node>& child : node->children ) {
+    for( std::size_t index = 0; index < node->children.size(); ++index ) {
+      validatePartialIndentationAt(node->children, index);
       _appendLambdaNodeTemplate(
-          child.get(), start, stop, output, depth + 1);
+          node->children[index].get(), start, stop, output, depth + 1);
     }
   }
 }
@@ -452,7 +557,9 @@ std::string Renderer::_lambdaSectionText(const Node * node,
     std::string_view start, std::string_view stop, std::size_t depth)
 {
   std::string output;
-  for( const std::unique_ptr<Node>& child : node->children ) {
+  for( std::size_t index = 0; index < node->children.size(); ++index ) {
+    validatePartialIndentationAt(node->children, index);
+    const std::unique_ptr<Node>& child = node->children[index];
     if( child == NULL ) {
       throw Exception("Invalid null child node");
     }
@@ -470,7 +577,9 @@ std::string Renderer::_lambdaSectionText(const Node * node,
   return output;
 }
 
-void Renderer::_renderNode(const Node * node, std::size_t depth)
+void Renderer::_renderNode(const Node * node, std::size_t depth,
+    const std::string * partialIndentation,
+    bool partialIndentationMetadata)
 {
   if( node == NULL ) {
     throw Exception("Empty tree node");
@@ -480,6 +589,15 @@ void Renderer::_renderNode(const Node * node, std::size_t depth)
     throw Exception("Render nesting limit exceeded");
   }
   _consumeNodeVisit();
+
+  if( (node->flags & Node::FlagPartialIndent) != 0 &&
+      (!partialIndentationMetadata || node->type != Node::TypeOutput ||
+          node->flags !=
+              (Node::FlagLambdaOnly | Node::FlagPartialIndent) ||
+          !node->data.has_value() ||
+          !isPartialIndentation(*node->data)) ) {
+    throw Exception("Invalid standalone partial indentation metadata");
+  }
 
   const std::size_t parentDepth = _activeDepth;
   _activeDepth = depth;
@@ -512,9 +630,12 @@ void Renderer::_renderNode(const Node * node, std::size_t depth)
 
   switch( node->type ) {
     case Node::TypeNone:
+      break;
+
     case Node::TypeComment:
     case Node::TypeStop:
     case Node::TypeInlinePartial:
+      _beginTemplateTag();
       break;
 
     case Node::TypeRoot:
@@ -522,9 +643,12 @@ void Renderer::_renderNode(const Node * node, std::size_t depth)
       break;
 
     case Node::TypeOutput:
-      if( node->data.has_value() &&
-          !(node->flags & Node::FlagLambdaOnly) ) {
-        _append(*node->data);
+      if( node->data.has_value() ) {
+        if( node->flags & Node::FlagLambdaOnly ) {
+          _consumeTemplateSource(*node->data);
+        } else {
+          _appendTemplateOutput(*node->data);
+        }
       }
       break;
 
@@ -537,6 +661,7 @@ void Renderer::_renderNode(const Node * node, std::size_t depth)
 
     case Node::TypeTag:
     case Node::TypeVariable:
+      _beginTemplateTag();
       if( !valIsEmpty ) {
         switch( val->type() ) {
           case Data::TypeString:
@@ -565,6 +690,9 @@ void Renderer::_renderNode(const Node * node, std::size_t depth)
             Node nodeFromLambda;
             _tokenizeLambda(&tokenizer, invoked, &nodeFromLambda,
                 node->flags & Node::FlagEscape);
+            _indentationStack.emplace_back();
+            const auto indentationGuard = onScopeExit(
+                [this]() { _indentationStack.pop_back(); });
             _renderNode(&nodeFromLambda, depth + 1);
             break;
           }
@@ -578,12 +706,14 @@ void Renderer::_renderNode(const Node * node, std::size_t depth)
       break;
 
     case Node::TypeNegate:
+      _beginTemplateTag();
       if( valIsEmpty ) {
         _renderChildren(node, depth);
       }
       break;
 
     case Node::TypeSection:
+      _beginTemplateTag();
       if( !valIsEmpty ) {
         switch( val->type() ) {
           case Data::TypeString:
@@ -630,6 +760,9 @@ void Renderer::_renderNode(const Node * node, std::size_t depth)
             Node nodeFromLambda;
             _tokenizeLambda(&tokenizer, invoked, &nodeFromLambda,
                 node->flags & Node::FlagEscape);
+            _indentationStack.emplace_back();
+            const auto indentationGuard = onScopeExit(
+                [this]() { _indentationStack.pop_back(); });
             _renderNode(&nodeFromLambda, depth + 1);
             break;
           }
@@ -640,12 +773,29 @@ void Renderer::_renderNode(const Node * node, std::size_t depth)
       break;
 
     case Node::TypePartial: {
+      _beginTemplateTag();
+      std::vector<std::string_view> indentation;
+      if( partialIndentation != NULL ) {
+        if( !_indentationStack.empty() ) {
+          indentation = _indentationStack.back().components;
+        }
+        if( !partialIndentation->empty() ) {
+          indentation.push_back(*partialIndentation);
+        }
+      }
+      const auto renderPartial = [this, depth, &indentation](
+          const Node * partial) {
+        _indentationStack.emplace_back(std::move(indentation));
+        const auto indentationGuard = onScopeExit(
+            [this]() { _indentationStack.pop_back(); });
+        _renderNode(partial, depth + 1);
+      };
       bool partialFound = false;
       if( _partialResolver ) {
         const Node * partial = _partialResolver(*node->data);
         if( partial != NULL ) {
           partialFound = true;
-          _renderNode(partial, depth + 1);
+          renderPartial(partial);
         }
       }
       if( !partialFound && _partials != NULL ) {
@@ -653,14 +803,14 @@ void Renderer::_renderNode(const Node * node, std::size_t depth)
             _partials->find(*node->data);
         if( partial != _partials->end() && partial->second != NULL ) {
           partialFound = true;
-          _renderNode(partial->second.get(), depth + 1);
+          renderPartial(partial->second.get());
         }
       }
       if( !partialFound && !_node->partials.empty() ) {
         const Node::Partials::const_iterator partial =
             _node->partials.find(*node->data);
         if( partial != _node->partials.end() && partial->second != NULL ) {
-          _renderNode(partial->second.get(), depth + 1);
+          renderPartial(partial->second.get());
         }
       }
       break;

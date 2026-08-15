@@ -481,6 +481,15 @@ temporarily swapped callback output with RAII, and rejects mutation or
 top-level re-entry during a render. Renderer objects are non-copyable and
 non-movable so borrowed operation state cannot be duplicated.
 
+Standalone partial tags retain their local indentation in validated,
+serializable AST metadata. The metadata consumes the ordinary parser,
+serializer, and renderer node budgets. Rendering applies the indentation only
+to literal template lines, so newlines introduced by variables or lambda
+results are not altered. Nested standalone partials compose borrowed
+indentation components instead of repeatedly copying cumulative prefixes, and
+every emitted indentation byte consumes the aggregate output budget. Inline
+partials and lambda-generated templates use isolated source-line state.
+
 Section callbacks now receive a `LambdaRenderContext` on the preferred virtual
 path. Copies share invalidatable frame state, render only while their exact
 callback is active, and fail cleanly after normal return, exceptions, nested

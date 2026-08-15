@@ -359,6 +359,25 @@ void testStandaloneTagStripping()
   limits.maxNodes = 2;
   expectLimitFailure(" \t{{! comment }}\n", limits, "node count limit",
       "lambda-only standalone source nodes bypassed the parser node limit");
+
+  limits.maxNodes = 3;
+  tokenizer.tokenize("  {{>partial}}\n", &root, limits);
+  expect(root.children.size() == 3 &&
+          root.children[0]->type == mustache::Node::TypeOutput &&
+          root.children[0]->flags ==
+              (mustache::Node::FlagLambdaOnly |
+                  mustache::Node::FlagPartialIndent) &&
+          root.children[0]->data.has_value() &&
+          *root.children[0]->data == "  " &&
+          root.children[1]->type == mustache::Node::TypePartial &&
+          root.children[1]->data.has_value() &&
+          *root.children[1]->data == "partial" &&
+          root.children[2]->type == mustache::Node::TypeOutput &&
+          root.children[2]->flags == mustache::Node::FlagLambdaOnly,
+      "standalone partial indentation was not retained as bounded metadata");
+  limits.maxNodes = 2;
+  expectLimitFailure("{{>partial}}\n", limits, "node count limit",
+      "zero-byte standalone partial metadata bypassed the node limit");
 }
 
 void testRepeatedInlineTagsUseBoundedForwardWork()

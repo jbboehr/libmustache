@@ -107,6 +107,45 @@ void testCompiledPartials()
   expect(rejected, "a referenced empty compiled partial was accepted");
 }
 
+void testStandalonePartialIndentation()
+{
+  mustache::Data data = mustache::Data::object({
+      {"content", mustache::Data::string("<\n->")}
+  });
+  mustache::PartialMap partials;
+  partials.emplace("partial",
+      mustache::compile("|\n{{{content}}}\n|\n"));
+
+  const mustache::CompiledTemplate canonical =
+      mustache::compile("\\\n {{>partial}}\n/\n");
+  expect(mustache::render(canonical, data, partials) ==
+          "\\\n |\n <\n->\n |\n/\n",
+      "partial indentation was applied to dynamic value line endings");
+
+  partials.emplace("outer",
+      mustache::compile("A\n {{>inner}}\nB\n"));
+  partials.emplace("inner", mustache::compile("X\nY\n"));
+  const mustache::CompiledTemplate nested =
+      mustache::compile("  {{>outer}}\n");
+  expect(mustache::render(nested, data, partials) ==
+          "  A\n   X\n   Y\n  B\n",
+      "nested standalone partial indentation did not compose");
+
+  partials.emplace("crlf", mustache::compile(">\r\n>"));
+  expect(mustache::render(mustache::compile("|\r\n\t{{>crlf}}\r\n|"),
+          data, partials) == "|\r\n\t>\r\n\t>|",
+      "standalone partial indentation changed CRLF line endings");
+
+  partials.emplace("inline", mustache::compile(">\n>"));
+  expect(mustache::render(mustache::compile("  x{{>inline}}\n"),
+          data, partials) == "  x>\n>\n",
+      "inline partials incorrectly inherited line indentation");
+  expect(mustache::render(mustache::compile(
+          "before\n  {{>missing}}\nafter"), data, partials) ==
+          "before\nafter",
+      "a missing standalone partial left its source line behind");
+}
+
 void testEmbeddedNulAndEmptyHandle()
 {
   const char source[] = {
@@ -148,6 +187,7 @@ int main()
   testHandleOwnershipAndReuse();
   testMemberConfigurationAndLimits();
   testCompiledPartials();
+  testStandalonePartialIndentation();
   testEmbeddedNulAndEmptyHandle();
   return failures == 0 ? 0 : 1;
 }
