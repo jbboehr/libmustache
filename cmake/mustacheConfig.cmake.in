@@ -20,59 +20,18 @@ endif()
 
 if(static IN_LIST mustache_FIND_COMPONENTS)
     if(MSVC)
-        find_package(json-c QUIET CONFIG)
         find_package(yaml QUIET CONFIG)
-        if(TARGET json-c::json-c)
-            set(_mustache_json_target json-c::json-c)
-        elseif(TARGET json-c)
-            set(_mustache_json_target json-c)
-        else()
-            set(_mustache_json_target)
-        endif()
-
-        unset(_mustache_json_version_supported)
-        unset(_mustache_json_version_supported CACHE)
-        if(_mustache_json_target)
-            include(CheckCXXSourceCompiles)
-            set(_mustache_saved_required_libraries
-                "${CMAKE_REQUIRED_LIBRARIES}")
-            set(CMAKE_REQUIRED_LIBRARIES ${_mustache_json_target})
-            check_cxx_source_compiles([=[
-                #include "json_c_version.h"
-                #ifndef JSON_C_MAJOR_VERSION
-                #error json-c version macros are unavailable
-                #endif
-                #ifndef JSON_C_MINOR_VERSION
-                #error json-c version macros are unavailable
-                #endif
-                #if JSON_C_MAJOR_VERSION == 0
-                #if JSON_C_MINOR_VERSION < 12
-                #error json-c 0.12 or newer is required
-                #endif
-                #endif
-                int main() { return 0; }
-            ]=] _mustache_json_version_supported)
-            set(CMAKE_REQUIRED_LIBRARIES
-                "${_mustache_saved_required_libraries}")
-            unset(_mustache_saved_required_libraries)
-        endif()
-
-        if(_mustache_json_version_supported
-                AND (TARGET yaml OR TARGET yaml::yaml))
+        if(TARGET yaml OR TARGET yaml::yaml)
             set(_mustache_static_dependencies_found TRUE)
         else()
             set(_mustache_static_dependencies_found FALSE)
         endif()
-        unset(_mustache_json_target)
-        unset(_mustache_json_version_supported)
-        unset(_mustache_json_version_supported CACHE)
     else()
         find_package(PkgConfig QUIET)
         if(PkgConfig_FOUND)
-            pkg_check_modules(JSONC QUIET IMPORTED_TARGET "json-c>=0.12")
             pkg_check_modules(YAML QUIET IMPORTED_TARGET yaml-0.1)
         endif()
-        if(PkgConfig_FOUND AND JSONC_FOUND AND YAML_FOUND)
+        if(PkgConfig_FOUND AND YAML_FOUND)
             set(_mustache_static_dependencies_found TRUE)
         else()
             set(_mustache_static_dependencies_found FALSE)
@@ -87,7 +46,7 @@ if(static IN_LIST mustache_FIND_COMPONENTS)
         if(mustache_FIND_REQUIRED_static)
             set(mustache_FOUND FALSE)
             set(mustache_NOT_FOUND_MESSAGE
-                "The mustache static component requires json-c >= 0.12 and yaml-0.1")
+                "The mustache static component requires yaml-0.1")
             return()
         endif()
     endif()

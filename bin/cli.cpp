@@ -67,7 +67,7 @@ void showVersion(std::ostream& output)
   output
       << "mustachec " << mustache_version() << '\n';
 #ifdef MUSTACHE_HAVE_LIBJSON
-  output << "JSON support: json-c\n";
+  output << "JSON support: nlohmann/json\n";
 #else
   output << "JSON support: none\n";
 #endif

@@ -38,9 +38,10 @@ class Data {
         any input that consumes that resource; zero never means unlimited.
         Nesting depth counts value nodes along a root-to-leaf path, including
         the root. YAML aliases count each expanded value and container entry.
-        The limits are checked before dependency parsers construct complete
-        documents and again while producing the owned value tree. Parsing also
-        retains an implementation safety ceiling of 256 value nodes along any
+        JSON applies the limits while SAX events construct the owned value
+        tree. YAML checks them before its dependency constructs a complete
+        document and again during conversion. Parsing also retains an
+        implementation safety ceiling of 256 value nodes along any
         root-to-leaf path.
     */
     struct ParseLimits {
@@ -153,10 +154,20 @@ class Data {
     void swap(Data& other) noexcept;
 
   private:
+    class JSONDataBuilder;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 
     explicit Data(std::unique_ptr<Storage> storage) noexcept;
+#if defined(__GNUC__) && !defined(_WIN32)
+    __attribute__((visibility("hidden")))
+#endif
+    static Data parsedFloating(double value, std::string spelling);
+#if defined(__GNUC__) && !defined(_WIN32)
+    __attribute__((visibility("hidden")))
+#endif
+    static Data parseJSON(
+        std::string_view string, const ParseLimits& limits);
     static std::unique_ptr<Storage> makeStorage(Type type, int size);
     Storage& requireStorage(Type expected, const char * description);
     const Storage& requireStorage(

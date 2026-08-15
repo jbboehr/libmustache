@@ -284,9 +284,9 @@ fuzzer completes its CI smoke test and documented extended sanitizer run.
 
 ## Phase 5: Replace `Data` with an owned value model
 
-**Status: owned representation and shared JSON/YAML resource policy
-implemented on the 0.6 development branch; replacing json-c and completing
-the extended parser-fuzz acceptance run remain.**
+**Status: owned representation, shared JSON/YAML resource policy, and the
+nlohmann/json SAX replacement are implemented and verified on the 0.6
+development branch.**
 
 `Data` now uses private variant-backed storage. Strings and recursive
 containers are values, no child is owned through a raw pointer, container
@@ -352,13 +352,14 @@ string bytes. A separate implementation safety ceiling rejects paths beyond
 YAML aliases are expanded into independent owned values. Each expansion
 shares the node, string-byte, and container-entry budgets, while active-path
 tracking rejects recursive aliases before conversion can recurse indefinitely.
-JSON and YAML structural preflight passes enforce the policy before their
-dependency parsers construct complete documents; conversion independently
-rechecks the produced value tree and YAML alias expansion. Both adapters
-explicitly reject raw embedded NULs. Escaped NULs remain supported in JSON
-string values, but are rejected in JSON object keys until the json-c adapter
-is replaced because its object iterator does not expose key lengths. JSON
-rejects trailing input.
+JSON is built directly into owned values by a bounded nlohmann/json SAX
+adapter, so it retains no dependency DOM. YAML structural preflight enforces
+the policy before libyaml constructs a complete document; conversion
+independently rechecks the produced value tree and YAML alias expansion. Both
+adapters explicitly reject raw embedded NULs. Escaped NULs are supported and
+budgeted by decoded length in JSON string values and object keys. JSON rejects
+invalid UTF-8, byte-order marks, unsupported numeric values, and trailing
+input.
 YAML rejects a second document marker, including an empty additional document,
 and distinguishes malformed content after an explicit document end. This is a
 deliberate tightening from ABI 5, which ignored content following the first
@@ -366,43 +367,37 @@ YAML document. The 32-node default preserves json-c's former default nesting
 envelope and introduces a corresponding limit for YAML.
 `fuzz_data_parser` runs both length-aware adapters with constrained budgets;
 its committed corpus includes valid typed JSON, trailing JSON, an escaped-NUL
-JSON key, ordinary YAML aliases, recursive aliases, and multiple documents.
-Its sanitizer-backed
-smoke run is part of `nix build .#checks.x86_64-linux.libmustache-fuzz`. An
-extended acceptance run should invoke it with `-max_total_time=3600`, the
-committed data-parser dictionary, and the copied corpus in the build tree.
-Post-parse validation and deep-copy failures remain visible to libFuzzer
-rather than being treated as expected parser rejection.
+JSON key, duplicate JSON keys, floating-point overflow, ordinary YAML aliases,
+recursive aliases, and multiple documents.
+Its sanitizer-backed smoke run is part of
+`nix build .#checks.x86_64-linux.libmustache-fuzz`. The recorded extended
+acceptance run used `-max_total_time=3600`, `-max_len=4096`, the committed
+data-parser dictionary, and a copied corpus in the build tree. It completed
+52,093,639 executions in 3,601 seconds under ASan/UBSan without a crash,
+sanitizer finding, or invariant failure. Post-parse budget validation and
+deep-copy failures remain visible to libFuzzer rather than being treated as
+expected parser rejection.
 
-### Replace the json-c adapter
+### JSON adapter selection and replacement
 
-The Nix build currently obtains json-c 0.18 from the pinned nixpkgs input.
-CMake, Autotools, installed CMake consumers, and pkg-config consumers now
-require json-c 0.12 or newer so the compatibility adapter can preserve the
-dependency's parsed floating-point spelling while retaining typed numeric
-values. The replacement parser must make that formatting contract independent
-of dependency-specific behavior.
+The implementation spike and decision record are in
+[json-parser-evaluation-2026-08-14.md](json-parser-evaluation-2026-08-14.md).
+nlohmann/json 3.10.5 or newer was selected and the former json-c adapter was
+removed. The replacement uses nlohmann/json's SAX callbacks to construct
+`Data` directly and preserves finite floating-point token spelling without a
+temporary parser DOM.
 
-It is acceptable to raise the temporary minimum json-c version when a concrete
-security fix, API requirement, or supported-platform policy justifies it. Such
-a change must be applied consistently to CMake, Autotools, Nix, vcpkg, CI, and
-installed-consumer metadata. The minimum must not be raised solely to make a
-characterization test pass; version-dependent formatting should instead be
-tested semantically or recorded as dependency-specific behavior.
+The parser is a private header-only build dependency. CMake's build interface,
+Autotools compile flags, and Nix `buildInputs` make it available to the private
+`json_parser.cpp` adapter, but the installed static target and pkg-config file
+do not require it. This is an intentional improvement over json-c, whose link
+dependency was exposed to static consumers.
 
-Replace json-c while introducing the owned `Data` representation rather than
-as an isolated rewrite. This keeps parser behavior changes adjacent to the
-typed scalar model and avoids translating from one unsafe intermediate
-representation into another. Preserve `Data::createFromJSON` as a compatibility
-facade, but make the parser an implementation detail that produces a complete
-temporary value and publishes it only after successful validation and
-conversion.
+`Data::createFromJSON` remains a compatibility facade. The parser is an
+implementation detail, and no partial root is published after syntax,
+allocation, numeric-range, encoding, or resource-limit failure.
 
-Boost.JSON is the leading replacement candidate because it offers RAII-owned
-values, strict parsing, explicit nesting limits, error-code APIs, and support
-for C++11 and later. Before selecting it, compare it with nlohmann/json and the
-existing json-c adapter using a small implementation spike. The comparison
-must cover:
+The spike covered:
 
 - Linux, macOS, and MSVC packaging and installed-consumer behavior;
 - shared and static linking, including whether parser dependencies leak into
@@ -410,25 +405,32 @@ must cover:
 - strict JSON and UTF-8 handling;
 - integer, floating-point, negative-zero, and overflow behavior;
 - duplicate object keys and exact trailing-input rejection;
-- parse errors and allocation-failure cleanup;
-- compile time, binary size, parse time, allocations, and peak memory; and
+- parse-error and exception-path cleanup under sanitizers;
+- compile time, compiler peak memory, binary size, and raw parse-and-walk
+  throughput; and
 - maintenance cost and the process for receiving dependency security updates.
 
-Do not select simdjson without a demonstrated workload need; its parser-owned
-view lifetimes add complexity that is unnecessary for the CLI and do not help
-the PHP extension's usual direct conversion path. Prefer a simple temporary
-DOM followed by transactional conversion into owned `Data`. A direct SAX
-builder may be considered only if profiling shows the temporary DOM to be a
-material cost and the builder can preserve the same validation and exception-
-safety guarantees.
+simdjson and yyjson remain documented performance fallbacks. They materially
+outperformed nlohmann/json in the synthetic parse-and-walk benchmark, but both
+introduce compiled dependencies and would affect only the JSON adapter. The
+current PHP zval conversion bypasses that adapter. Do not reopen the choice
+unless an end-to-end supported workload actually invokes JSON parsing and
+attributes material request-level cost to it.
 
-Whichever parser is selected, libmustache must impose its own input-byte,
+The direct SAX builder is justified independently of microbenchmark speed:
+nlohmann/json's DOM does not retain the original floating-point token, while
+its SAX callback supplies that token. The builder also enforces aggregate
+budgets during construction and avoids a second full owned tree.
+
+Libmustache imposes its own input-byte,
 nesting-depth, node-count, aggregate-string-byte, and allocation budgets. The
-adapter must reject trailing input, invalid encodings, unsupported numeric
-values, and limit exhaustion with stable library errors. Parser defaults are
-defense in depth, not the public resource-limit policy. Add a JSON fuzz target
-and retain a differential corpus across json-c and the replacement until every
-intentional compatibility difference has been reviewed and recorded.
+adapter rejects trailing input, invalid encodings, unsupported numeric values,
+and limit exhaustion with stable library errors. Parser defaults are defense in
+depth, not the public resource-limit policy. The JSON fuzz target retains a
+behavior corpus covering the former json-c contract. The reviewed differences
+are recorded in the parser evaluation: non-finite numeric results and invalid
+UTF-8 are now rejected, while escaped-NUL object keys are now preserved
+correctly by length.
 
 The same limits must cover YAML conversion. In particular, YAML aliases must
 have cycle detection and share the node-expansion budget so cyclic anchors and

@@ -1,5 +1,6 @@
 #include "mustache_config.h"
 
+#include <clocale>
 #include <cstdio>
 #include <limits>
 #include <memory>
@@ -285,7 +286,6 @@ void testJSONData()
       "\"wholeDecimal\":1.0,"
       "\"exponent\":1e30,"
       "\"negativeZero\":-0.0,"
-      "\"overflowingDecimal\":1e999,"
       "\"stringValue\":\"false\","
       "\"emptyValue\":\"\""
       "}";
@@ -322,8 +322,6 @@ void testJSONData()
       renderScalar(data.get(), "exponent"), "1e30|Y|");
   expectEqual("JSON negative-zero spelling",
       renderScalar(data.get(), "negativeZero"), "-0.0|Y|");
-  expectEqual("JSON overflowing-decimal spelling",
-      renderScalar(data.get(), "overflowingDecimal"), "1e999|Y|");
   expectEqual("JSON unescaped decimal spelling",
       renderUnescaped(data.get(), "decimalValue"), "1.50");
   mustache::Data copiedDecimal = *data->find("decimalValue");
@@ -355,6 +353,74 @@ void testJSONData()
       "{\"value\":-9223372036854775809}");
   expectJSONRejected("JSON integer above unsigned range",
       "{\"value\":18446744073709551616}");
+  expectJSONRejected("JSON floating-point overflow",
+      "{\"value\":1e999}");
+  expectJSONRejected("JSON NaN extension", "{\"value\":NaN}");
+  expectJSONRejected("JSON infinity extension", "{\"value\":Infinity}");
+  expectJSONRejected("JSON comments", "{/* comment */\"value\":1}");
+
+  mustache::Data duplicateKeys = mustache::Data::fromJSON(
+      "{\"key\":1,\"key\":2}");
+  expect(duplicateKeys.find("key") != NULL &&
+          duplicateKeys.find("key")->integerValue() == 2,
+      "JSON duplicate-key last-value behavior changed");
+
+  const std::string invalidUTF8("{\"key\":\"\xc3\x28\"}", 12);
+  expectJSONRejected("JSON invalid UTF-8", invalidUTF8,
+      mustache::Data::ParseLimits(), "Invalid JSON data");
+  const std::string byteOrderMark("\xef\xbb\xbf{}", 5);
+  expectJSONRejected("JSON byte-order mark", byteOrderMark,
+      mustache::Data::ParseLimits(), "Invalid JSON data");
+}
+
+void testJSONNumericLocale()
+{
+  const char * currentLocale = std::setlocale(LC_NUMERIC, NULL);
+  if( currentLocale == NULL ) {
+    std::fprintf(stderr, "could not read the current numeric locale\n");
+    ++failures;
+    return;
+  }
+  const std::string savedLocale(currentLocale);
+
+  const char * commaLocales[] = {
+      "de_DE.UTF-8", "de_DE.utf8", "de_DE",
+      "fr_FR.UTF-8", "fr_FR.utf8", "fr_FR"
+  };
+  bool commaLocaleAvailable = false;
+  for( const char * locale : commaLocales ) {
+    if( std::setlocale(LC_NUMERIC, locale) != NULL ) {
+      const std::lconv * conventions = std::localeconv();
+      if( conventions != NULL && conventions->decimal_point != NULL &&
+          conventions->decimal_point[0] != '.' ) {
+        commaLocaleAvailable = true;
+        break;
+      }
+    }
+  }
+
+  if( commaLocaleAvailable ) {
+    try {
+      mustache::Data data = mustache::Data::fromJSON(
+          "{\"decimal\":1.50,\"exponent\":1.50e2}");
+      expectEqual("locale-independent JSON decimal spelling",
+          data.find("decimal")->toString(), "1.50");
+      expectEqual("locale-independent JSON exponent spelling",
+          data.find("exponent")->toString(), "1.50e2");
+      expect(data.find("decimal")->floatingValue() == 1.5 &&
+              data.find("exponent")->floatingValue() == 150.0,
+          "numeric locale changed parsed JSON floating-point values");
+    } catch( const mustache::Exception& exception ) {
+      std::fprintf(stderr,
+          "locale-independent JSON parsing failed: %s\n", exception.what());
+      ++failures;
+    }
+  }
+
+  if( std::setlocale(LC_NUMERIC, savedLocale.c_str()) == NULL ) {
+    std::fprintf(stderr, "could not restore the numeric locale\n");
+    ++failures;
+  }
 }
 
 void testYAMLData()
@@ -486,17 +552,28 @@ void testParseLimits()
   expectJSONRejected("JSON implementation nesting ceiling",
       nestedJSONArray(256), limits, "JSON nesting limit exceeded");
 
-  expectJSONRejected("JSON object key starting with escaped NUL",
-      "{\"\\u0000AAAA\":0}", defaults,
-      "JSON object keys may not contain NUL");
-  expectJSONRejected("JSON object key containing escaped NUL",
-      "{\"a\\u0000b\":0}", defaults,
-      "JSON object keys may not contain NUL");
+  const std::string escapedNulKeys =
+      "{\"\\u0000AAAA\":0,\"a\\u0000b\":1}";
+  limits = defaults;
+  limits.maxStringBytes = 8;
+  mustache::Data nulKeys = mustache::Data::fromJSON(
+      escapedNulKeys, limits);
+  const std::string leadingNulKey("\0AAAA", 5);
+  const std::string embeddedNulKey("a\0b", 3);
+  expect(nulKeys.objectItems().size() == 2 &&
+          nulKeys.find(leadingNulKey) != NULL &&
+          nulKeys.find(leadingNulKey)->integerValue() == 0 &&
+          nulKeys.find(embeddedNulKey) != NULL &&
+          nulKeys.find(embeddedNulKey)->integerValue() == 1,
+      "JSON escaped-NUL object keys were not preserved by length");
+  limits.maxStringBytes = 7;
+  expectJSONRejected("JSON NUL keys use the decoded string budget",
+      escapedNulKeys, limits, "JSON string byte limit exceeded");
   limits = defaults;
   limits.maxStringBytes = 0;
-  expectJSONRejected("JSON NUL key cannot bypass a zero string budget",
+  expectJSONRejected("JSON NUL key obeys a zero string budget",
       "{\"\\u0000AAAA\":0}", limits,
-      "JSON object keys may not contain NUL");
+      "JSON string byte limit exceeded");
 
   const std::string escapedNulValue = "{\"key\":\"a\\u0000b\"}";
   limits = exactParseLimits(escapedNulValue.size());
@@ -644,6 +721,7 @@ int main()
 {
   testDirectData();
   testJSONData();
+  testJSONNumericLocale();
   testYAMLData();
   testParseLimits();
   return failures == 0 ? 0 : 1;

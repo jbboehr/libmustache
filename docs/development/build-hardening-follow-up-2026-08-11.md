@@ -39,8 +39,9 @@ risks: [Repository review](repository-review-2026-08-11.md).
   2025-11-19 (`da1f056dc0775ac651bea7e3fbbf4066146a55f3`).
 - Installed CMake exports are component-aware. The default `shared` component
   has no consume-time dependency-metadata requirement; the `static` component
-  locates json-c and libyaml while respecting `QUIET`, `REQUIRED`, and optional
-  component semantics.
+  locates libyaml while respecting `QUIET`, `REQUIRED`, and optional component
+  semantics. nlohmann/json is a private header-only build dependency and does
+  not appear in either installed component.
 - CMake top-level builds retain the CLI and test defaults, while embedded
   `add_subdirectory()` builds default both off. A dedicated fixture prevents
   regressions in this policy.
@@ -103,6 +104,15 @@ Review and fix each class before enabling warnings-as-errors:
 The deserialization warnings must be handled together with full buffer-boundary
 validation. Merely changing integer types would leave the security issue
 described in the repository review unresolved.
+
+### 2. Replace broad Windows symbol auto-export
+
+CMake's `WINDOWS_EXPORT_ALL_SYMBOLS` compatibility mode still publishes
+library implementation symbols unnecessarily. Replace it with explicit public
+API annotations in a dedicated ABI-boundary slice, using
+`GenerateExportHeader` or an equivalent checked-in macro. The private JSON
+adapter is already isolated from the DLL export scan, so its header-only parser
+machinery is not exposed while this broader migration remains.
 
 ## Verified non-issues
 

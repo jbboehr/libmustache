@@ -191,7 +191,7 @@ void testHelpAndVersion()
       std::string("mustachec ") + mustache_version() + "\n") == 0,
       "version omitted the executable name or package version");
 #ifdef MUSTACHE_HAVE_LIBJSON
-  expect(version.output.find("JSON support: json-c\n") != std::string::npos,
+  expect(version.output.find("JSON support: nlohmann/json\n") != std::string::npos,
       "version reported the wrong JSON adapter");
 #else
   expect(version.output.find("JSON support: none\n") != std::string::npos,

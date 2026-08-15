@@ -18,6 +18,7 @@ PKG_PROG_PKG_CONFIG
 MUSTACHE_CXXFLAGS=
 MUSTACHE_CPPFLAGS=
 MUSTACHE_LDFLAGS=
+MUSTACHE_JSON_CXXFLAGS=
 
 AC_CACHE_CHECK([for a $CXX option that enables C++17],
     [mustache_cv_cxx17_flag], [
@@ -74,6 +75,31 @@ AC_DEFINE([CXX_STANDARD], [17], [Required C++ standard version])
 AC_DEFINE([HAVE_CXX17], [1], [Define if the compiler supports C++17])
 AC_DEFINE([HAVE_CXX11], [1],
     [Deprecated compatibility alias; C++17 support includes C++11])
+
+AC_CACHE_CHECK([whether $CXX supports private C++ symbol visibility],
+    [mustache_cv_cxx_visibility_hidden], [
+    mustache_save_CXXFLAGS=$CXXFLAGS
+    CXXFLAGS="$CXXFLAGS -Werror -fvisibility=hidden -fvisibility-inlines-hidden"
+    AC_COMPILE_IFELSE([
+        AC_LANG_PROGRAM([[
+            template <typename T> class HiddenValue {
+              public:
+                T value;
+            };
+        ]], [[
+            HiddenValue<int> value = {1};
+            return value.value == 1 ? 0 : 1;
+        ]])
+    ], [mustache_cv_cxx_visibility_hidden=yes],
+       [mustache_cv_cxx_visibility_hidden=no])
+    CXXFLAGS=$mustache_save_CXXFLAGS
+])
+AS_IF([test "x$mustache_cv_cxx_visibility_hidden" = "xyes"], [
+    MUSTACHE_JSON_CXXFLAGS="-fvisibility=hidden -fvisibility-inlines-hidden"
+], [
+    AC_MSG_ERROR([the C++ compiler must support private symbol visibility])
+])
+AC_SUBST([MUSTACHE_JSON_CXXFLAGS])
 
 AC_ARG_ENABLE([debug],
     [AS_HELP_STRING([--enable-debug], [enable debug mode])],
@@ -147,10 +173,10 @@ AS_IF([test "x$with_mustache_spec" != "xno"], [
 AM_CONDITIONAL([MUSTACHE_SPEC_ENABLED],
     [test "x$mustache_spec_enabled" = "xyes"])
 
-PKG_CHECK_MODULES([JSON], [json-c >= 0.12], [
-    AC_DEFINE([HAVE_LIBJSON], [1], [Defined if json-c is enabled])
+PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.10.5], [
+    AC_DEFINE([HAVE_LIBJSON], [1], [Defined if JSON support is enabled])
 ], [
-    AC_MSG_ERROR([json-c >= 0.12 is required])
+    AC_MSG_ERROR([nlohmann_json >= 3.10.5 is required])
 ])
 PKG_CHECK_MODULES([YAML], [yaml-0.1], [
     AC_DEFINE([HAVE_LIBYAML], [1], [Defined if libyaml is enabled])

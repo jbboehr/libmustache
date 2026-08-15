@@ -25,6 +25,8 @@ EXTRA_DIST = \
 	fuzz/tokenizer.dict \
 	fuzz/data_parser.dict \
 	fuzz/corpus/data_parser/json-deep \
+	fuzz/corpus/data_parser/json-duplicate-keys \
+	fuzz/corpus/data_parser/json-floating-overflow \
 	fuzz/corpus/data_parser/json-nul-key \
 	fuzz/corpus/data_parser/json-object \
 	fuzz/corpus/data_parser/json-trailing \
@@ -58,7 +60,7 @@ clean-local:
 	rm -rf logs
 
 AM_CXXFLAGS = @MUSTACHE_CXXFLAGS@
-AM_CPPFLAGS = @MUSTACHE_CPPFLAGS@ -I$(top_builddir)/src -I$(top_srcdir)/src $(JSON_CFLAGS) $(YAML_CFLAGS)
+AM_CPPFLAGS = @MUSTACHE_CPPFLAGS@ -I$(top_builddir)/src -I$(top_srcdir)/src $(YAML_CFLAGS)
 test_cli_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/bin
 AM_LDFLAGS = @MUSTACHE_LDFLAGS@
-LDADD = $(top_builddir)/src/libmustache.la $(JSON_LIBS) $(YAML_LIBS)
+LDADD = $(top_builddir)/src/libmustache.la $(YAML_LIBS)

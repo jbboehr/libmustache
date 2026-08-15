@@ -8,7 +8,7 @@
   automake,
   autoreconfHook,
   cmake ? null,
-  json_c,
+  nlohmann_json,
   libyaml,
   mustache_spec,
   gitignoreFilterWith,
@@ -56,7 +56,8 @@ stdenv.mkDerivation (finalAttrs: {
   separateDebugInfo = debugSupport;
   dontStrip = sanitizerSupport || fuzzSupport;
 
-  propagatedBuildInputs = [json_c libyaml];
+  buildInputs = [nlohmann_json];
+  propagatedBuildInputs = [libyaml];
   nativeBuildInputs =
     lib.optional checkSupport mustache_spec
     ++ lib.optionals cmakeSupport [cmake]

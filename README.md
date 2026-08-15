@@ -13,7 +13,7 @@ as an ordinary C++ library.
 ## Requirements
 
 - A C++17 compiler
-- json-c 0.12 or newer
+- nlohmann/json 3.10.5 or newer (build only)
 - libyaml
 - CMake 3.18 or Autoconf 2.69 with Automake and Libtool
 
@@ -52,8 +52,9 @@ find_package(mustache 0.6 CONFIG REQUIRED)
 target_link_libraries(example PRIVATE mustache::mustache)
 ```
 
-Static consumers request the static component, which also locates json-c and
-libyaml:
+Static consumers request the static component, which also locates libyaml.
+The header-only JSON parser is compiled entirely into libmustache and is not
+required when consuming an installed library:
 
 ```cmake
 find_package(mustache 0.6 CONFIG REQUIRED COMPONENTS static)
@@ -176,21 +177,21 @@ and object-key bytes, and 100,000 aggregate container entries. Every field is
 a hard maximum; zero never means unlimited. JSON object keys and preserved
 floating-point spellings count toward string bytes. YAML aliases are expanded
 into owned values, so every expansion counts again toward nodes, strings, and
-container entries; recursive aliases are rejected. A bounded preflight pass
-applies the policy before json-c or libyaml constructs a complete document,
-and conversion independently rechecks the resulting value tree. Parsing
-retains an implementation safety ceiling of 256 value nodes along any path
-even if a caller supplies a higher nesting limit.
+container entries; recursive aliases are rejected. JSON is converted directly
+into owned values by a bounded SAX adapter, without an intermediate DOM. YAML
+uses a bounded structural preflight before libyaml constructs its document and
+rechecks the policy during conversion. Parsing retains an implementation
+safety ceiling of 256 value nodes along any path even if a caller supplies a
+higher nesting limit.
 
 Explicitly sized input containing raw NUL bytes is rejected with a dedicated
-error. JSON strings may contain an escaped `\u0000` and retain its byte, but
-JSON object keys containing an escaped NUL are rejected because the current
-json-c object iterator does not expose key lengths. JSON also rejects trailing
-non-whitespace input. YAML accepts one document only: a second document marker
-is rejected even when the additional document is empty, while malformed
-content after an explicit document end is reported as trailing content. This
-single-document rule is stricter than ABI 5, which ignored input after the
-first YAML document.
+error. JSON strings and object keys may contain an escaped `\u0000` and retain
+its byte. JSON also rejects invalid UTF-8, byte-order marks, non-finite numeric
+results, and trailing non-whitespace input. YAML accepts one document only: a
+second document marker is rejected even when the additional document is empty,
+while malformed content after an explicit document end is reported as trailing
+content. This single-document rule is stricter than ABI 5, which ignored input
+after the first YAML document.
 
 Rendering also uses an explicit hard resource policy:
 

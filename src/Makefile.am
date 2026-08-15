@@ -17,6 +17,15 @@ mustacheinclude_HEADERS = \
 	utils.hpp \
 	mustache_config.h
 
+noinst_LTLIBRARIES = libmustache_json_adapter.la
+libmustache_json_adapter_la_SOURCES = json_parser.cpp
+libmustache_json_adapter_la_CXXFLAGS = \
+	@MUSTACHE_CXXFLAGS@ \
+	@MUSTACHE_JSON_CXXFLAGS@
+libmustache_json_adapter_la_CPPFLAGS = \
+	@MUSTACHE_CPPFLAGS@ \
+	$(NLOHMANN_JSON_CFLAGS)
+
 lib_LTLIBRARIES = libmustache.la
 libmustache_la_SOURCES = \
 	compiled_template.cpp \
@@ -39,7 +48,7 @@ libmustache_la_SOURCES = \
 	utils.hpp \
 	mustache_config.h
 
-libmustache_la_LIBADD = $(JSON_LIBS) $(YAML_LIBS)
+libmustache_la_LIBADD = libmustache_json_adapter.la $(YAML_LIBS)
 
 # https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 libmustache_la_LDFLAGS = \
@@ -47,5 +56,5 @@ libmustache_la_LDFLAGS = \
 	-version-info 6:0:0
 
 AM_CXXFLAGS = @MUSTACHE_CXXFLAGS@
-AM_CPPFLAGS = @MUSTACHE_CPPFLAGS@ $(JSON_CFLAGS) $(YAML_CFLAGS)
+AM_CPPFLAGS = @MUSTACHE_CPPFLAGS@ $(YAML_CFLAGS)
 AM_LDFLAGS = @MUSTACHE_LDFLAGS@

@@ -68,12 +68,14 @@ jobs:
             "${{ matrix.compiler.package }}" \
             autoconf \
             automake \
-            libjson-c-dev \
+            nlohmann-json3-dev \
             libtool \
             libyaml-dev \
+            locales \
             m4 \
             make \
             pkg-config
+          sudo locale-gen de_DE.UTF-8
 
       - name: Generate configure script
         run: autoreconf --force --install --verbose
@@ -101,6 +103,22 @@ jobs:
             -t tests/fixtures/standard.mustache \
             -d tests/fixtures/standard.json)
           test -n "$rendered"
+
+      - name: Verify private JSON symbols
+        run: |
+          shared_library="$RUNNER_TEMP/libmustache/lib/libmustache.so"
+          static_library="$RUNNER_TEMP/libmustache/lib/libmustache.a"
+          exported_json_symbols=$(nm -D --defined-only "$shared_library" |
+            c++filt |
+            grep -E 'nlohmann|JSONDataBuilder|Data::parseJSON|Data::parsedFloating' || true)
+          test -z "$exported_json_symbols"
+          visible_static_json_symbols=$(readelf --syms --wide "$static_library" |
+            c++filt |
+            awk '$5 ~ /^(GLOBAL|WEAK)$/ && $6 != "HIDDEN" &&
+              /nlohmann|JSONDataBuilder|Data::parseJSON|Data::parsedFloating/ {
+                print
+              }')
+          test -z "$visible_static_json_symbols"
 
       - name: Verify distribution archive
         working-directory: build-autotools
@@ -138,7 +156,7 @@ jobs:
           sudo apt-get install --yes \
             "${{ matrix.compiler.package }}" \
             cmake \
-            libjson-c-dev \
+            nlohmann-json3-dev \
             libyaml-dev \
             ninja-build \
             pkg-config
@@ -198,7 +216,7 @@ jobs:
           persist-credentials: false
 
       - name: Install dependencies
-        run: brew install json-c libyaml ninja pkg-config
+        run: brew install nlohmann-json libyaml ninja pkg-config
 
       - name: Configure, build, test, and install
         run: |
@@ -265,7 +283,7 @@ jobs:
             autoconf \
             automake \
             cmake \
-            libjson-c-dev \
+            nlohmann-json3-dev \
             libtool \
             libyaml-dev \
             m4 \
