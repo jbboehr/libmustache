@@ -88,7 +88,10 @@ jobs:
         working-directory: build-autotools
         run: |
           make --jobs="$(nproc)"
-          make check
+          if ! make check; then
+            find tests -type f -name '*.log' -print -exec cat {} \;
+            exit 1
+          fi
           make install
 
       - name: Verify installed command

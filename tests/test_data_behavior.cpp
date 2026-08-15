@@ -601,8 +601,10 @@ void testParseLimits()
 
   mustache::Data endedYAML = mustache::Data::fromYAML(
       "key: value\n...\n");
+  // YAML 1.1 keeps this directive characterization compatible with libyaml
+  // 0.2.2, which remains part of the supported Ubuntu 22.04 build matrix.
   mustache::Data directedYAML = mustache::Data::fromYAML(
-      "%YAML 1.2\n---\nkey: value\n...\n");
+      "%YAML 1.1\n---\nkey: value\n...\n");
   expect(endedYAML.find("key") != NULL &&
           directedYAML.find("key") != NULL,
       "valid YAML document markers or directives were rejected");
