@@ -1,5 +1,5 @@
 
-check_PROGRAMS = test_utils test_misc test_data_behavior test_node_serialization test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template test_renderer_safety
+check_PROGRAMS = test_utils test_misc test_data_behavior test_node_serialization test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template test_renderer_safety test_cli
 
 if MUSTACHE_SPEC_ENABLED
 check_PROGRAMS += test_spec
@@ -15,6 +15,7 @@ test_length_aware_api_SOURCES = test_length_aware_api.cpp
 test_tokenizer_safety_SOURCES = test_tokenizer_safety.cpp
 test_compiled_template_SOURCES = test_compiled_template.cpp
 test_renderer_safety_SOURCES = test_renderer_safety.cpp
+test_cli_SOURCES = test_cli.cpp ../bin/cli.cpp ../bin/cli.hpp
 
 EXTRA_DIST = \
 	fuzz_node_unserialize.cpp \
@@ -43,7 +44,7 @@ EXTRA_DIST = \
 	fuzz/corpus/tokenizer/unclosed-tag \
 	fuzz/corpus/tokenizer/valid-section
 
-TESTS = test_utils test_misc test_data_behavior test_node_serialization test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template test_renderer_safety
+TESTS = test_utils test_misc test_data_behavior test_node_serialization test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template test_renderer_safety test_cli
 
 if MUSTACHE_SPEC_ENABLED
 TESTS += test_spec
@@ -58,5 +59,6 @@ clean-local:
 
 AM_CXXFLAGS = @MUSTACHE_CXXFLAGS@
 AM_CPPFLAGS = @MUSTACHE_CPPFLAGS@ -I$(top_builddir)/src -I$(top_srcdir)/src $(JSON_CFLAGS) $(YAML_CFLAGS)
+test_cli_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/bin
 AM_LDFLAGS = @MUSTACHE_LDFLAGS@
 LDADD = $(top_builddir)/src/libmustache.la $(JSON_LIBS) $(YAML_LIBS)

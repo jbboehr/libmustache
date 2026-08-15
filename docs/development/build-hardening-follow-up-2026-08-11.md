@@ -13,8 +13,8 @@ risks: [Repository review](repository-review-2026-08-11.md).
 - The CMake package template, downstream consumer, and vcpkg manifest are now
   tracked build inputs, so an ordinary Git-backed `nix build .#...` includes
   them.
-- The CMake minimum is 3.18, matching its use of `find_path(... REQUIRED)` and
-  `find_library(... REQUIRED)`.
+- The CMake minimum is consistently 3.18 across the project and its integration
+  fixtures.
 - The flake applies its package-only source filter before passing the source to
   the derivation. Documentation, workflow, and Nix-only edits no longer
   invalidate the library derivations.
@@ -56,20 +56,36 @@ risks: [Repository review](repository-review-2026-08-11.md).
   and ABI/soname versions aligned. The README now documents every supported
   build path; the obsolete Doxygen configuration was removed.
 
+## Completed source-hardening follow-up
+
+### Make command-line failures controlled and testable
+
+`mustachec` is now explicitly render-only and its help, accepted options, and
+README agree. The controller uses local RAII state, bounded file reads, owned
+`Data`, immutable `CompiledTemplate` and `PartialMap` values, and the modern
+length-aware parse/render APIs. A data file is optional and omitted data is a
+null value. The unimplemented compile and execute modes are no longer
+advertised; the old `-r` human-readable option remains temporarily as a
+deprecated, warning no-op for command-line compatibility.
+
+All library, standard, and unknown exceptions are contained at the command
+boundary and become prefixed diagnostics with nonzero exit status. Portable
+C++ regression tests exercise successful JSON/YAML rendering, partials, output
+files, optional null data, empty templates, invalid options and bounded repeat
+counts, missing and empty files, invalid JSON/YAML, tokenization failure,
+recursive-partial rendering failure, buffered output failure, exact binary
+input/output, truncation, and read-buffer boundaries under both CMake and
+Autotools. Output files are opened in binary mode so rendered bytes are not
+subject to newline translation. The argument controller is tested directly so
+these cases do not require BATS or another Unix-only shell dependency;
+installed executable smoke tests retain process-level coverage.
+
+The custom argument parser also removes the Windows-only `getopt` build and
+vcpkg dependency.
+
 ## Remaining actionable work
 
-### 1. Make command-line failures controlled and testable
-
-`mustachec` still throws a bare integer when a file cannot be opened, and only
-the data parser is currently protected by an exception handler. A missing
-template or empty input can therefore terminate the process with `SIGABRT`.
-
-Replace the integer exception with a typed exception, cover the complete
-operation in `main`, print a concise diagnostic, and return a nonzero exit code.
-Add CLI regression tests for missing template/data files, empty input, invalid
-JSON/YAML, tokenization failure, and rendering failure.
-
-### 2. Resolve compiler warnings as correctness work
+### 1. Resolve compiler warnings as correctness work
 
 The new warning flags expose pre-existing issues. Do not blanket-disable them.
 Review and fix each class before enabling warnings-as-errors:

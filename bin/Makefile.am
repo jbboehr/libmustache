@@ -1,7 +1,7 @@
 
 bin_PROGRAMS = mustachec
 
-mustachec_SOURCES = mustache.cpp
+mustachec_SOURCES = mustache.cpp cli.cpp cli.hpp
 
 AM_CXXFLAGS = @MUSTACHE_CXXFLAGS@
 AM_CPPFLAGS = @MUSTACHE_CPPFLAGS@ -I$(top_builddir)/src -I$(top_srcdir)/src

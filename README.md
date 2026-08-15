@@ -16,7 +16,6 @@ as an ordinary C++ library.
 - json-c 0.12 or newer
 - libyaml
 - CMake 3.18 or Autoconf 2.69 with Automake and Libtool
-- getopt on Windows when building `mustachec`
 
 Clone the specification submodule when tests are required:
 
@@ -304,13 +303,31 @@ cmake --install build --config Release --prefix artifacts
 
 ## Command-line use
 
+`mustachec` is a render-only command. It requires a template; when `-d` is
+omitted, the template is rendered against null data. When a data file is given,
+its format is selected case-insensitively from `.json`, `.yml`, or `.yaml`.
+
 ```sh
 mustachec -t template.mustache -d data.json
 mustachec -t template.mustache -d data.yml
+mustachec -t template.mustache -d data.json \
+  -l header=header.mustache -l footer=footer.mustache
+mustachec -t template.mustache -d data.json -o rendered.txt
 mustachec -v
 ```
 
-Run `mustachec -h` for the complete option list.
+`-l name=file` adds a named partial and may be repeated. `-n count` repeats the
+render from 1 to 1,000,000 times for benchmarking and writes only the final
+result. `-o` opens the destination in binary mode and writes the rendered bytes
+verbatim, without newline translation. The legacy `-r` option is accepted as a
+deprecated no-op and emits a warning. Long option names are also available;
+run `mustachec -h` for the complete list.
+
+An empty template is valid and produces empty output. Missing files, an empty
+explicit data file, unsupported data-file extensions, malformed templates or
+data, recursive partial exhaustion, and file I/O failures produce a concise
+diagnostic on standard error and a nonzero exit status. Input parsing and
+rendering use the library's documented default resource limits.
 
 ## Credits
 
