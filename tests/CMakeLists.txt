@@ -65,6 +65,26 @@ if(WIN32)
             "-DCRLF_SPEC_DIR=${CMAKE_CURRENT_BINARY_DIR}/spec-crlf"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_spec_crlf.cmake")
 endif()
+if(MSVC)
+    get_filename_component(MUSTACHE_MSVC_TOOL_DIR
+        "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    if(CMAKE_DUMPBIN AND EXISTS "${CMAKE_DUMPBIN}")
+        set(MUSTACHE_EXPORT_INSPECTOR "${CMAKE_DUMPBIN}")
+    else()
+        find_program(MUSTACHE_EXPORT_INSPECTOR
+            NAMES dumpbin dumpbin.exe llvm-readobj llvm-readobj.exe
+            HINTS "${MUSTACHE_MSVC_TOOL_DIR}")
+    endif()
+    if(NOT MUSTACHE_EXPORT_INSPECTOR)
+        message(FATAL_ERROR
+            "dumpbin or llvm-readobj is required to audit the Windows DLL export boundary")
+    endif()
+    add_test(NAME windows_exports
+        COMMAND "${CMAKE_COMMAND}"
+            "-DEXPORT_INSPECTOR=${MUSTACHE_EXPORT_INSPECTOR}"
+            "-DMUSTACHE_DLL=$<TARGET_FILE:mustache>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/check_windows_exports.cmake")
+endif()
 add_test(NAME utils COMMAND test_utils)
 add_test(NAME misc COMMAND test_misc)
 add_test(NAME data_behavior COMMAND test_data_behavior)

@@ -20,12 +20,13 @@ in
     libmustacheSrc ? ./.,
     checkSupport ? true,
     cmakeSupport ? false,
+    staticOnlySupport ? false,
     debugSupport ? false,
     sanitizerSupport ? false,
     fuzzSupport ? false,
   }:
     pkgs.callPackage ./nix/derivation.nix {
       inherit stdenv mustache_spec libmustacheSrc;
-      inherit checkSupport cmakeSupport debugSupport sanitizerSupport fuzzSupport;
+      inherit checkSupport cmakeSupport staticOnlySupport debugSupport sanitizerSupport fuzzSupport;
       inherit gitignoreFilterWith;
     }

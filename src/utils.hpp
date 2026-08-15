@@ -2,6 +2,8 @@
 #ifndef MUSTACHE_UTILS_HPP
 #define MUSTACHE_UTILS_HPP
 
+#include "mustache_export.hpp"
+
 #include <string>
 #include <vector>
 
@@ -19,13 +21,14 @@ const std::string specialChars("&\"'<>");
   /param str The string to strip
   /param trimChars The charaters to strip
 */
-void stripWhitespace(std::string& str, const std::string& chars = whiteSpaces);
+MUSTACHE_API void stripWhitespace(
+    std::string& str, const std::string& chars = whiteSpaces);
 
 //! Trim trailing zeros from a decimal-like string
 /*!
   /param str The string to trim
 */
-void trimDecimal(std::string& str);
+MUSTACHE_API void trimDecimal(std::string& str);
 
 //! Trim a string (right)
 /*!
@@ -33,7 +36,8 @@ void trimDecimal(std::string& str);
   /param str The string to trim
   /param trimChars The charaters to trim off
 */
-void trimRight(std::string& str, const std::string& trimChars = whiteSpaces);
+MUSTACHE_API void trimRight(
+    std::string& str, const std::string& trimChars = whiteSpaces);
 
 //! Trim a string (left)
 /*!
@@ -41,7 +45,8 @@ void trimRight(std::string& str, const std::string& trimChars = whiteSpaces);
   /param str The string to trim
   /param trimChars The charaters to trim off
 */
-void trimLeft(std::string& str, const std::string& trimChars = whiteSpaces);
+MUSTACHE_API void trimLeft(
+    std::string& str, const std::string& trimChars = whiteSpaces);
 
 //! Trim a string
 /*!
@@ -49,14 +54,15 @@ void trimLeft(std::string& str, const std::string& trimChars = whiteSpaces);
   /param str The string to trim
   /param trimChars The charaters to trim off
 */
-void trim(std::string& str, const std::string& trimChars = whiteSpaces);
+MUSTACHE_API void trim(
+    std::string& str, const std::string& trimChars = whiteSpaces);
 
 //! Escape special HTML charcters.
 /*!
   Not multibyte safe
   /param str The string to escape
 */
-void htmlspecialchars(std::string * str);
+MUSTACHE_API void htmlspecialchars(std::string * str);
 
 //! Escape special HTML charcters and append to string.
 /*!
@@ -64,10 +70,12 @@ void htmlspecialchars(std::string * str);
   /param str The string to escape
   /param buf The string to append to
 */
-void htmlspecialchars_append(std::string * str, std::string * buf);
+MUSTACHE_API void htmlspecialchars_append(
+    std::string * str, std::string * buf);
 
 //! Const-safe overload for owned scalar values.
-void htmlspecialchars_append(const std::string& str, std::string * buf);
+MUSTACHE_API void htmlspecialchars_append(
+    const std::string& str, std::string * buf);
 
 //! Explode a string.
 /*!
@@ -76,7 +84,8 @@ void htmlspecialchars_append(const std::string& str, std::string * buf);
   /param str The string to explode
   /param arr The chunks are stored here
 */
-void explode(const std::string &delimiter, const std::string &str, std::vector<std::string> * arr);
+MUSTACHE_API void explode(const std::string &delimiter,
+    const std::string &str, std::vector<std::string> * arr);
 
 //! Tokenize a string (strtok for std::string)
 /*!
@@ -85,7 +94,8 @@ void explode(const std::string &delimiter, const std::string &str, std::vector<s
   /param delimiters The delimiters to tokenize by
   /param tokens The tokens are stored here
 */
-void stringTok(const std::string &str, const std::string &delimiters, std::vector<std::string> * tokens);
+MUSTACHE_API void stringTok(const std::string &str,
+    const std::string &delimiters, std::vector<std::string> * tokens);
 
 
 } // namespace Mustache

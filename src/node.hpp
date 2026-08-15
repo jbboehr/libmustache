@@ -2,6 +2,8 @@
 #ifndef MUSTACHE_NODE_HPP
 #define MUSTACHE_NODE_HPP
 
+#include "mustache_export.hpp"
+
 #include <cstddef>
 #include <map>
 #include <memory>
@@ -40,7 +42,7 @@ class Node {
       std::size_t maxDataPartsPerNode;
       std::size_t maxDataParts;
 
-      SerializationLimits();
+      MUSTACHE_API SerializationLimits();
     };
     
     //! Enum of token types
@@ -119,50 +121,56 @@ class Node {
     // Node owns its AST storage and must never be shallow-copied.
     Node(const Node&) = delete;
     Node& operator=(const Node&) = delete;
-    Node(Node&& other) noexcept;
-    Node& operator=(Node&& other) noexcept;
+    MUSTACHE_API Node(Node&& other) noexcept;
+    MUSTACHE_API Node& operator=(Node&& other) noexcept;
         
     
     //! Destructor
-    ~Node();
+    MUSTACHE_API ~Node();
 
-    std::string children_to_template_string(
+    MUSTACHE_API std::string children_to_template_string(
         const std::string& start, const std::string& stop) const;
     
     //! Set data
-    void setData(const std::string& value);
+    MUSTACHE_API void setData(const std::string& value);
     
     //! Serialize
-    std::vector<uint8_t> * serialize() const;
+    MUSTACHE_API std::vector<uint8_t> * serialize() const;
 
     //! Serialize with explicit resource limits
-    std::vector<uint8_t> * serialize(
+    MUSTACHE_API std::vector<uint8_t> * serialize(
         const SerializationLimits& limits) const;
 
-    std::string to_template_string(
+    MUSTACHE_API std::string to_template_string(
         const std::string& start, const std::string& stop) const;
     
     //! Unserialize
-    static Node * unserialize(std::vector<uint8_t> & serial, size_t offset, size_t * vpos);
+    static MUSTACHE_API Node * unserialize(
+        std::vector<uint8_t> & serial, size_t offset, size_t * vpos);
 
     //! Unserialize with explicit resource limits
-    static Node * unserialize(std::vector<uint8_t> & serial, size_t offset,
-        size_t * vpos, const SerializationLimits& limits);
+    static MUSTACHE_API Node * unserialize(
+        std::vector<uint8_t> & serial, size_t offset, size_t * vpos,
+        const SerializationLimits& limits);
 
     //! Unserialize an explicitly sized byte range
-    static Node * unserialize(const uint8_t * serial, size_t length,
+    static MUSTACHE_API Node * unserialize(const uint8_t * serial,
+        size_t length,
         size_t offset, size_t * vpos);
 
     //! Unserialize an explicitly sized byte range with resource limits
-    static Node * unserialize(const uint8_t * serial, size_t length,
+    static MUSTACHE_API Node * unserialize(const uint8_t * serial,
+        size_t length,
         size_t offset, size_t * vpos, const SerializationLimits& limits);
 
     //! Unserialize bytes held in a string view
-    static Node * unserialize(std::string_view serial, size_t offset,
+    static MUSTACHE_API Node * unserialize(
+        std::string_view serial, size_t offset,
         size_t * vpos);
 
     //! Unserialize bytes held in a string view with resource limits
-    static Node * unserialize(std::string_view serial, size_t offset,
+    static MUSTACHE_API Node * unserialize(
+        std::string_view serial, size_t offset,
         size_t * vpos, const SerializationLimits& limits);
 
   private:

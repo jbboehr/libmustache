@@ -20,6 +20,7 @@ EXTRA_DIST = \
 	nix/derivation.nix \
 	scripts/check-version-consistency.sh \
 	spec/specs \
+	tests/check_windows_exports.cmake \
 	tests/cmake-consumer/CMakeLists.txt \
 	tests/cmake-consumer/main.cpp \
 	tests/cmake-find-quiet/CMakeLists.txt \

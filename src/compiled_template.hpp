@@ -1,6 +1,8 @@
 #ifndef MUSTACHE_COMPILED_TEMPLATE_HPP
 #define MUSTACHE_COMPILED_TEMPLATE_HPP
 
+#include "mustache_export.hpp"
+
 #include <map>
 #include <memory>
 #include <string>
@@ -18,18 +20,21 @@ class Mustache;
 */
 class CompiledTemplate {
   public:
-    CompiledTemplate() noexcept;
-    CompiledTemplate(const CompiledTemplate& other) noexcept;
-    CompiledTemplate& operator=(const CompiledTemplate& other) noexcept;
-    CompiledTemplate(CompiledTemplate&& other) noexcept;
-    CompiledTemplate& operator=(CompiledTemplate&& other) noexcept;
-    ~CompiledTemplate();
+    MUSTACHE_API CompiledTemplate() noexcept;
+    MUSTACHE_API CompiledTemplate(
+        const CompiledTemplate& other) noexcept;
+    MUSTACHE_API CompiledTemplate& operator=(
+        const CompiledTemplate& other) noexcept;
+    MUSTACHE_API CompiledTemplate(CompiledTemplate&& other) noexcept;
+    MUSTACHE_API CompiledTemplate& operator=(
+        CompiledTemplate&& other) noexcept;
+    MUSTACHE_API ~CompiledTemplate();
 
     //! Returns true when this handle contains no compiled template.
-    bool empty() const noexcept;
+    MUSTACHE_API bool empty() const noexcept;
 
     //! Tests whether this handle contains a compiled template.
-    explicit operator bool() const noexcept;
+    explicit MUSTACHE_API operator bool() const noexcept;
 
   private:
     struct State;

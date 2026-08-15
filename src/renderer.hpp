@@ -2,6 +2,8 @@
 #ifndef MUSTACHE_RENDERER_HPP
 #define MUSTACHE_RENDERER_HPP
 
+#include "mustache_export.hpp"
+
 #include <cstddef>
 #include <functional>
 #include <map>
@@ -35,7 +37,7 @@ struct RenderLimits {
   std::size_t maxNodeVisits;
   std::size_t maxLambdaTemplateBytes;
 
-  RenderLimits();
+  MUSTACHE_API RenderLimits();
 };
 
 
@@ -131,7 +133,7 @@ class Renderer {
     static const int outputBufferLength = 1000;
     
     //! Constructor
-    Renderer();
+    MUSTACHE_API Renderer();
 
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
@@ -139,34 +141,34 @@ class Renderer {
     Renderer& operator=(Renderer&&) = delete;
     
     //! Destructor
-    ~Renderer();
+    MUSTACHE_API ~Renderer();
     
     //! Clears any assigned values
-    void clear();
+    MUSTACHE_API void clear();
     
     //! Initializes the renderer
-    void init(const Node * node, const Data * data,
+    MUSTACHE_API void init(const Node * node, const Data * data,
         const Node::Partials * partials, std::string * output);
 
     //! Initializes the renderer with an explicit resource policy
-    void init(const Node * node, const Data * data,
+    MUSTACHE_API void init(const Node * node, const Data * data,
         const Node::Partials * partials, std::string * output,
         const RenderLimits& limits);
     
     //! Sets the current root token node
-    void setNode(const Node * node);
+    MUSTACHE_API void setNode(const Node * node);
     
     //! Sets the current root data node
-    void setData(const Data * data);
+    MUSTACHE_API void setData(const Data * data);
     
     //! Sets the current partials
-    void setPartials(const Node::Partials * partials);
+    MUSTACHE_API void setPartials(const Node::Partials * partials);
     
     //! Sets the current output buffer
-    void setOutput(std::string * output);
+    MUSTACHE_API void setOutput(std::string * output);
     
     //! Renders using the stored variables
-    void render();
+    MUSTACHE_API void render();
 
     /*! Renders the given node to the given output during a lambda callback.
 
@@ -174,7 +176,8 @@ class Renderer {
         on this renderer. A retained renderer pointer is rejected when no such
         callback is active.
     */
-    void renderForLambda(const Node * node, std::string * output);
+    MUSTACHE_API void renderForLambda(
+        const Node * node, std::string * output);
 };
 
 

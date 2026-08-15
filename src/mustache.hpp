@@ -3,6 +3,7 @@
 #define MUSTACHE_HPP
 
 #include "mustache_config.h"
+#include "mustache_export.hpp"
 
 #include <stdint.h>
 #include <iostream>
@@ -21,8 +22,8 @@
 #include "utils.hpp"
 
 
-extern "C" const char * mustache_version();
-extern "C" int mustache_version_int();
+extern "C" MUSTACHE_API const char * mustache_version();
+extern "C" MUSTACHE_API int mustache_version_int();
 
 
 namespace mustache {
@@ -43,49 +44,52 @@ class Mustache {
     Renderer renderer;
     
     //! Utility method for Tokenizer::tokenize()
-    void tokenize(std::string * tmpl, Node * root);
+    MUSTACHE_API void tokenize(std::string * tmpl, Node * root);
 
     //! Utility method for Tokenizer::tokenize() with resource limits
-    void tokenize(std::string * tmpl, Node * root,
+    MUSTACHE_API void tokenize(std::string * tmpl, Node * root,
         const Tokenizer::Limits& limits);
 
     //! Utility method for Tokenizer::tokenize()
-    void tokenize(std::string_view tmpl, Node * root);
+    MUSTACHE_API void tokenize(std::string_view tmpl, Node * root);
 
     //! Utility method for Tokenizer::tokenize() with resource limits
-    void tokenize(std::string_view tmpl, Node * root,
+    MUSTACHE_API void tokenize(std::string_view tmpl, Node * root,
         const Tokenizer::Limits& limits);
 
     //! Compiles an immutable template handle
-    CompiledTemplate compile(std::string_view source);
+    MUSTACHE_API CompiledTemplate compile(std::string_view source);
 
     //! Compiles an immutable template handle with resource limits
-    CompiledTemplate compile(std::string_view source,
+    MUSTACHE_API CompiledTemplate compile(std::string_view source,
         const Tokenizer::Limits& limits);
     
     //! Utility method for Renderer::init() and Renderer::render()
-    void render(const Node * node, const Data * data,
+    MUSTACHE_API void render(const Node * node, const Data * data,
         const Node::Partials * partials, std::string * output);
 
     //! Utility method for bounded Renderer::init() and Renderer::render()
-    void render(const Node * node, const Data * data,
+    MUSTACHE_API void render(const Node * node, const Data * data,
         const Node::Partials * partials, std::string * output,
         const RenderLimits& limits);
 
     //! Renders an immutable compiled template
-    std::string render(
+    MUSTACHE_API std::string render(
         const CompiledTemplate& compiled, const Data& data) const;
 
     //! Renders an immutable compiled template with resource limits
-    std::string render(const CompiledTemplate& compiled, const Data& data,
+    MUSTACHE_API std::string render(
+        const CompiledTemplate& compiled, const Data& data,
         const RenderLimits& limits) const;
 
     //! Renders an immutable compiled template with compiled partials
-    std::string render(const CompiledTemplate& compiled, const Data& data,
+    MUSTACHE_API std::string render(
+        const CompiledTemplate& compiled, const Data& data,
         const PartialMap& partials) const;
 
     //! Renders compiled templates and partials with resource limits
-    std::string render(const CompiledTemplate& compiled, const Data& data,
+    MUSTACHE_API std::string render(
+        const CompiledTemplate& compiled, const Data& data,
         const PartialMap& partials, const RenderLimits& limits) const;
     
     //! Utility method for Tokenizer::setStartSequence()
@@ -162,25 +166,29 @@ class Mustache {
 };
 
 //! Compiles a template with default tokenizer settings
-CompiledTemplate compile(std::string_view source);
+MUSTACHE_API CompiledTemplate compile(std::string_view source);
 
 //! Compiles a template with explicit resource limits
-CompiledTemplate compile(
+MUSTACHE_API CompiledTemplate compile(
     std::string_view source, const Tokenizer::Limits& limits);
 
 //! Renders a compiled template with no partials
-std::string render(const CompiledTemplate& compiled, const Data& data);
+MUSTACHE_API std::string render(
+    const CompiledTemplate& compiled, const Data& data);
 
 //! Renders a compiled template with explicit resource limits
-std::string render(const CompiledTemplate& compiled, const Data& data,
+MUSTACHE_API std::string render(
+    const CompiledTemplate& compiled, const Data& data,
     const RenderLimits& limits);
 
 //! Renders a compiled template with compiled partials
-std::string render(const CompiledTemplate& compiled, const Data& data,
+MUSTACHE_API std::string render(
+    const CompiledTemplate& compiled, const Data& data,
     const PartialMap& partials);
 
 //! Renders compiled templates and partials with explicit resource limits
-std::string render(const CompiledTemplate& compiled, const Data& data,
+MUSTACHE_API std::string render(
+    const CompiledTemplate& compiled, const Data& data,
     const PartialMap& partials, const RenderLimits& limits);
 
 

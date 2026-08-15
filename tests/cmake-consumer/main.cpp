@@ -30,6 +30,10 @@
 #ifndef MUSTACHE_HAVE_CXX11
 #error "The deprecated C++11 compatibility macro must remain defined"
 #endif
+#if defined(MUSTACHE_EXPECT_STATIC_DEFINE) && \
+        !defined(MUSTACHE_STATIC_DEFINE)
+#error "The installed static target must define MUSTACHE_STATIC_DEFINE"
+#endif
 
 static_assert(std::is_copy_constructible<mustache::Data>::value,
     "mustache::Data must be safely copy constructible");
@@ -74,6 +78,14 @@ static_assert(
         mustache::LambdaRenderContext>::value,
     "installed lambda context must be nothrow movable");
 
+class ConsumerLambda final : public mustache::Lambda {
+  public:
+    std::string invoke() override
+    {
+        return "consumer-lambda";
+    }
+};
+
 int main()
 {
     if (std::string(mustache_version()) != MUSTACHE_EXPECTED_VERSION) {
@@ -111,6 +123,10 @@ int main()
     renderLimits.maxOutputBytes = 10;
     const std::string compiledOutput =
         mustache::render(compiled, scalar, partials, renderLimits);
+    const mustache::Data consumerLambda = mustache::Data::lambda(
+        std::make_unique<ConsumerLambda>());
+    const std::string lambdaOutput = mustache::render(
+        mustache::compile("{{.}}"), consumerLambda);
 
     mustache::LambdaRenderContext inactiveContext;
     bool inactiveContextRejected = false;
@@ -127,6 +143,7 @@ int main()
             *decoded->children.front()->data == "owned" &&
             position == serial->size() &&
             compiledOutput == "[compiled]" &&
+            lambdaOutput == "consumer-lambda" &&
             !inactiveContext.active() && inactiveContextRejected
         ? 0
         : 1;

@@ -1,6 +1,7 @@
 set(MUSTACHE_SOURCES
     compiled_template.cpp
     data.cpp
+    json_parser.cpp
     lambda.cpp
     mustache.cpp
     node.cpp
@@ -9,9 +10,6 @@ set(MUSTACHE_SOURCES
     tokenizer.cpp
     utils.cpp
 )
-if(NOT MSVC)
-    list(APPEND MUSTACHE_SOURCES json_parser.cpp)
-endif()
 set_property(SOURCE json_parser.cpp APPEND PROPERTY COMPILE_OPTIONS
     "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility=hidden>"
     "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility-inlines-hidden>"
@@ -23,6 +21,7 @@ set(MUSTACHE_PUBLIC_HEADERS
     exception.hpp
     lambda.hpp
     mustache.hpp
+    mustache_export.hpp
     node.hpp
     renderer.hpp
     stack.hpp
@@ -47,41 +46,19 @@ function(mustache_configure_library target)
     mustache_apply_build_options(${target})
 endfunction()
 
-if(MSVC)
-    # CMake's legacy export-all mode scans this DLL target's object files. Keep
-    # the header-only parser in a private archive so its template machinery is
-    # linked into the DLL without becoming part of the Windows export table.
-    add_library(mustache_json_adapter STATIC json_parser.cpp)
-    target_compile_features(mustache_json_adapter PRIVATE
-        cxx_std_${MUSTACHE_CXX_STANDARD})
-    set_target_properties(mustache_json_adapter PROPERTIES CXX_EXTENSIONS OFF)
-    target_include_directories(mustache_json_adapter PRIVATE
-        "${CMAKE_CURRENT_BINARY_DIR}"
-        "${CMAKE_CURRENT_SOURCE_DIR}"
-    )
-    target_link_libraries(mustache_json_adapter PRIVATE
-        ${MUSTACHE_JSON_TARGET})
-    mustache_apply_build_options(mustache_json_adapter)
-endif()
-
 add_library(mustache SHARED ${MUSTACHE_SOURCES} ${MUSTACHE_PUBLIC_HEADERS})
 add_library(mustache::mustache ALIAS mustache)
 mustache_configure_library(mustache)
-if(MSVC)
-    target_link_libraries(mustache PRIVATE mustache_json_adapter)
-endif()
+target_compile_definitions(mustache PRIVATE MUSTACHE_BUILDING_LIBRARY)
 set_target_properties(mustache PROPERTIES
     VERSION "${MUSTACHE_ABI_VERSION}.0.0"
     SOVERSION "${MUSTACHE_ABI_VERSION}"
-    WINDOWS_EXPORT_ALL_SYMBOLS ON
 )
 
 add_library(mustache_static STATIC ${MUSTACHE_SOURCES} ${MUSTACHE_PUBLIC_HEADERS})
 add_library(mustache::mustache_static ALIAS mustache_static)
-if(MSVC)
-    target_sources(mustache_static PRIVATE json_parser.cpp)
-endif()
 mustache_configure_library(mustache_static)
+target_compile_definitions(mustache_static PUBLIC MUSTACHE_STATIC_DEFINE)
 if(MUSTACHE_ENABLE_FUZZING)
     # The fuzz executable links this archive, so its implementation needs
     # SanitizerCoverage instrumentation as well as the libFuzzer harness.

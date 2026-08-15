@@ -2,6 +2,8 @@
 #ifndef MUSTACHE_LAMBDA_HPP
 #define MUSTACHE_LAMBDA_HPP
 
+#include "mustache_export.hpp"
+
 #include <memory>
 #include <string>
 #include <string_view>
@@ -44,19 +46,20 @@ class LambdaRenderContext {
     ~LambdaRenderContext() = default;
 
     //! Returns whether this callback frame remains active.
-    bool active() const;
+    MUSTACHE_API bool active() const;
 
     //! Renders a node through the active callback frame.
-    void render(const Node& node, std::string& output) const;
+    MUSTACHE_API void render(
+        const Node& node, std::string& output) const;
 
     //! Renders a node and returns owned output.
-    std::string render(const Node& node) const;
+    MUSTACHE_API std::string render(const Node& node) const;
 };
 
 /*! \class Lambda
     \brief A callable for use within mustache::Data.
 */
-class Lambda {
+class MUSTACHE_API Lambda {
   public:
     //! Destructor
     virtual ~Lambda() {};

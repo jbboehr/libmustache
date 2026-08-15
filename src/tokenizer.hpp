@@ -2,6 +2,8 @@
 #ifndef MUSTACHE_TOKENIZER_HPP
 #define MUSTACHE_TOKENIZER_HPP
 
+#include "mustache_export.hpp"
+
 #include <cstddef>
 #include <iostream>
 #include <memory>
@@ -49,56 +51,57 @@ class Tokenizer {
       std::size_t maxTagBytes;
       std::size_t maxDelimiterBytes;
 
-      Limits();
+      MUSTACHE_API Limits();
     };
 
     //! Constructor
     Tokenizer() : _startSequence("{{"), _stopSequence("}}"), _escapeByDefault(true) {};
     
     //! Sets the start sequence
-    void setStartSequence(const std::string& start);
+    MUSTACHE_API void setStartSequence(const std::string& start);
 
     //! Sets the start sequence from an explicitly sized view
-    void setStartSequence(std::string_view start);
+    MUSTACHE_API void setStartSequence(std::string_view start);
     
     //! Sets the start sequence
-    void setStartSequence(const char * start, int len = 0);
+    MUSTACHE_API void setStartSequence(const char * start, int len = 0);
     
     //! Sets the stop sequence
-    void setStopSequence(const std::string& stop);
+    MUSTACHE_API void setStopSequence(const std::string& stop);
 
     //! Sets the stop sequence from an explicitly sized view
-    void setStopSequence(std::string_view stop);
+    MUSTACHE_API void setStopSequence(std::string_view stop);
     
     //! Sets the stop sequence
-    void setStopSequence(const char * stop, int len = 0);
+    MUSTACHE_API void setStopSequence(const char * stop, int len = 0);
     
     //! Sets whether to escape HTML by default
-    void setEscapeByDefault(bool flag);
+    MUSTACHE_API void setEscapeByDefault(bool flag);
     
     //! Gets the current start sequence
-    const std::string & getStartSequence();
+    MUSTACHE_API const std::string & getStartSequence();
     
     //! Gets the current stop sequence
-    const std::string & getStopSequence();
+    MUSTACHE_API const std::string & getStopSequence();
     
     //! Gets whether to escape HTML by default
-    bool getEscapeByDefault();
+    MUSTACHE_API bool getEscapeByDefault();
     
     //! Tokenizes the given string template
-    void tokenize(std::string * tmpl, Node * root, bool escapeOutput = false);
+    MUSTACHE_API void tokenize(
+        std::string * tmpl, Node * root, bool escapeOutput = false);
 
     //! Tokenizes the given string template with resource limits
-    void tokenize(std::string * tmpl, Node * root, const Limits& limits,
-        bool escapeOutput = false);
+    MUSTACHE_API void tokenize(std::string * tmpl, Node * root,
+        const Limits& limits, bool escapeOutput = false);
 
     //! Tokenizes an explicitly sized template view
-    void tokenize(std::string_view tmpl, Node * root,
+    MUSTACHE_API void tokenize(std::string_view tmpl, Node * root,
         bool escapeOutput = false);
 
     //! Tokenizes an explicitly sized template view with resource limits
-    void tokenize(std::string_view tmpl, Node * root, const Limits& limits,
-        bool escapeOutput = false);
+    MUSTACHE_API void tokenize(std::string_view tmpl, Node * root,
+        const Limits& limits, bool escapeOutput = false);
 };
 
 

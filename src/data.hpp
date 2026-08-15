@@ -2,6 +2,7 @@
 #define MUSTACHE_DATA_HPP
 
 #include "mustache_config.h"
+#include "mustache_export.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -51,7 +52,7 @@ class Data {
       std::size_t maxStringBytes;
       std::size_t maxContainerEntries;
 
-      ParseLimits();
+      MUSTACHE_API ParseLimits();
     };
 
     //! Enum of the supported data types. Existing values retain their numbers.
@@ -68,60 +69,60 @@ class Data {
     };
 
     //! Construct a null value.
-    Data();
+    MUSTACHE_API Data();
 
     /*! Construct an empty value of an existing compatibility type.
 
         The size is used only to reserve string or array capacity. New code
         should prefer the named factories below.
     */
-    Data(Type type, int size);
+    MUSTACHE_API Data(Type type, int size);
 
-    Data(const Data& other);
-    Data& operator=(const Data& other);
-    Data(Data&& other) noexcept;
-    Data& operator=(Data&& other) noexcept;
-    ~Data();
+    MUSTACHE_API Data(const Data& other);
+    MUSTACHE_API Data& operator=(const Data& other);
+    MUSTACHE_API Data(Data&& other) noexcept;
+    MUSTACHE_API Data& operator=(Data&& other) noexcept;
+    MUSTACHE_API ~Data();
 
-    static Data null();
-    static Data boolean(bool value);
-    static Data integer(std::int64_t value);
-    static Data floating(double value);
-    static Data string(std::string value);
-    static Data list(List values = List());
-    static Data array(Array values = Array());
-    static Data object(Map values = Map());
-    static Data lambda(std::unique_ptr<Lambda> value);
-    static Data sharedLambda(std::shared_ptr<Lambda> value);
+    static MUSTACHE_API Data null();
+    static MUSTACHE_API Data boolean(bool value);
+    static MUSTACHE_API Data integer(std::int64_t value);
+    static MUSTACHE_API Data floating(double value);
+    static MUSTACHE_API Data string(std::string value);
+    static MUSTACHE_API Data list(List values = List());
+    static MUSTACHE_API Data array(Array values = Array());
+    static MUSTACHE_API Data object(Map values = Map());
+    static MUSTACHE_API Data lambda(std::unique_ptr<Lambda> value);
+    static MUSTACHE_API Data sharedLambda(std::shared_ptr<Lambda> value);
 
     //! Compatibility initializer. Replacement is transactional.
-    void init(Type type, int size);
+    MUSTACHE_API void init(Type type, int size);
 
-    Type type() const noexcept;
-    int isEmpty() const noexcept;
+    MUSTACHE_API Type type() const noexcept;
+    MUSTACHE_API int isEmpty() const noexcept;
 
-    String& stringValue();
-    const String& stringValue() const;
-    bool booleanValue() const;
-    std::int64_t integerValue() const;
-    double floatingValue() const;
-    const List& listItems() const;
-    const Array& arrayItems() const;
-    const Map& objectItems() const;
-    Lambda * lambdaValue() const noexcept;
+    MUSTACHE_API String& stringValue();
+    MUSTACHE_API const String& stringValue() const;
+    MUSTACHE_API bool booleanValue() const;
+    MUSTACHE_API std::int64_t integerValue() const;
+    MUSTACHE_API double floatingValue() const;
+    MUSTACHE_API const List& listItems() const;
+    MUSTACHE_API const Array& arrayItems() const;
+    MUSTACHE_API const Map& objectItems() const;
+    MUSTACHE_API Lambda * lambdaValue() const noexcept;
 
     /*! Return the scalar spelling used for interpolation.
 
         Null and false return an empty string. Containers and lambdas reject
         conversion.
     */
-    std::string toString() const;
+    MUSTACHE_API std::string toString() const;
 
     //! Add or replace an object member.
-    Data& set(std::string key, Data value);
+    MUSTACHE_API Data& set(std::string key, Data value);
 
     //! Append to a list or array value.
-    Data& push_back(Data value);
+    MUSTACHE_API Data& push_back(Data value);
 
     /*! Find an object member without transferring ownership.
 
@@ -129,29 +130,30 @@ class Data {
         structural changes to the owning Data tree. The tree must not be
         structurally modified while a renderer is using it.
     */
-    const Data * find(const std::string& key) const noexcept;
+    MUSTACHE_API const Data * find(
+        const std::string& key) const noexcept;
 
     //! Parse into a value. The pointer-returning forms remain for compatibility.
-    static Data fromJSON(const char * string);
-    static Data fromJSON(
+    static MUSTACHE_API Data fromJSON(const char * string);
+    static MUSTACHE_API Data fromJSON(
         const char * string, const ParseLimits& limits);
-    static Data fromJSON(std::string_view string);
-    static Data fromJSON(
+    static MUSTACHE_API Data fromJSON(std::string_view string);
+    static MUSTACHE_API Data fromJSON(
         std::string_view string, const ParseLimits& limits);
-    static Data * createFromJSON(const char * string);
-    static Data * createFromJSON(
+    static MUSTACHE_API Data * createFromJSON(const char * string);
+    static MUSTACHE_API Data * createFromJSON(
         const char * string, const ParseLimits& limits);
-    static Data fromYAML(const char * string);
-    static Data fromYAML(
+    static MUSTACHE_API Data fromYAML(const char * string);
+    static MUSTACHE_API Data fromYAML(
         const char * string, const ParseLimits& limits);
-    static Data fromYAML(std::string_view string);
-    static Data fromYAML(
+    static MUSTACHE_API Data fromYAML(std::string_view string);
+    static MUSTACHE_API Data fromYAML(
         std::string_view string, const ParseLimits& limits);
-    static Data * createFromYAML(const char * string);
-    static Data * createFromYAML(
+    static MUSTACHE_API Data * createFromYAML(const char * string);
+    static MUSTACHE_API Data * createFromYAML(
         const char * string, const ParseLimits& limits);
 
-    void swap(Data& other) noexcept;
+    MUSTACHE_API void swap(Data& other) noexcept;
 
   private:
     class JSONDataBuilder;

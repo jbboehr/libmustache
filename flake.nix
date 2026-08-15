@@ -87,6 +87,10 @@
 
         checks = {
           inherit (packages) libmustache libmustache-cmake;
+          libmustache-static-only = makePackage {
+            cmakeSupport = false;
+            staticOnlySupport = true;
+          };
           libmustache-sanitized = makePackage {
             cmakeSupport = true;
             debugSupport = true;

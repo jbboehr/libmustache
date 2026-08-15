@@ -102,16 +102,26 @@ targets and remain opt-in for ordinary downstream builds. GitHub Actions,
 AppVeyor, and checked Nix builds enable the policy across GCC, Clang,
 AppleClang, and MSVC so new diagnostics fail CI.
 
+### Make the Windows DLL boundary explicit
+
+The checked-in `MUSTACHE_API` macro now exports only public library operations
+from the Windows DLL. Stateful public classes annotate their out-of-line
+methods rather than exporting their STL-bearing layouts wholesale, preserving
+strict MSVC warning checks. CMake propagates the static-consumer definition
+through `mustache::mustache_static`, while shared consumers import the explicit
+surface by default. Autotools selects and propagates the matching definition
+for static-only builds, including through the generated pkg-config metadata.
+
+The Windows test suite audits the resulting DLL with `dumpbin` or
+`llvm-readobj`: representative C, value, tokenizer, renderer,
+compiled-template, lambda, and utility symbols must be present, while template
+instantiations, private state types, parser helpers, and renderer internals
+must be absent. This replaces
+`WINDOWS_EXPORT_ALL_SYMBOLS` and makes future boundary expansion intentional.
+
 ## Remaining actionable work
 
-### Replace broad Windows symbol auto-export
-
-CMake's `WINDOWS_EXPORT_ALL_SYMBOLS` compatibility mode still publishes
-library implementation symbols unnecessarily. Replace it with explicit public
-API annotations in a dedicated ABI-boundary slice, using
-`GenerateExportHeader` or an equivalent checked-in macro. The private JSON
-adapter is already isolated from the DLL export scan, so its header-only parser
-machinery is not exposed while this broader migration remains.
+No build-system hardening findings from this follow-up remain open.
 
 ## Verified non-issues
 

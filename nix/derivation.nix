@@ -15,6 +15,7 @@
   libmustacheSrc ? ../.,
   checkSupport ? true,
   cmakeSupport ? false,
+  staticOnlySupport ? false,
   debugSupport ? false,
   sanitizerSupport ? false,
   fuzzSupport ? false,
@@ -23,6 +24,7 @@ stdenv.mkDerivation (finalAttrs: {
   pname =
     "libmustache"
     + lib.optionalString cmakeSupport "-cmake"
+    + lib.optionalString staticOnlySupport "-static-only"
     + lib.optionalString sanitizerSupport "-sanitized"
     + lib.optionalString fuzzSupport "-fuzz";
   version = "0.6.0";
@@ -80,6 +82,7 @@ stdenv.mkDerivation (finalAttrs: {
     ]
     ++ lib.optional checkSupport "--with-mustache-spec=${mustache_spec}/share/mustache-spec/specs"
     ++ lib.optional checkSupport "--enable-warnings-as-errors"
+    ++ lib.optionals staticOnlySupport ["--disable-shared" "--enable-static"]
     ++ lib.optional sanitizerSupport "--enable-sanitizers";
 
   cmakeFlags =
@@ -116,8 +119,13 @@ stdenv.mkDerivation (finalAttrs: {
 
       export PKG_CONFIG_PATH="$dev/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
       pkg-config --exact-version="${finalAttrs.version}" mustache
-      read -r -a pkg_config_flags <<< "$(pkg-config --cflags --libs mustache)"
+      read -r -a pkg_config_flags <<< "$(pkg-config ${lib.optionalString staticOnlySupport "--static"} --cflags --libs mustache)"
       pkg_config_consumer_flags=()
+      ${lib.optionalString staticOnlySupport ''
+        pkg_config_consumer_flags+=(
+          -DMUSTACHE_EXPECT_STATIC_DEFINE
+        )
+      ''}
       ${lib.optionalString sanitizerSupport ''
         pkg_config_consumer_flags+=(
           -fno-omit-frame-pointer

@@ -25,4 +25,8 @@ find_package(mustache 0.6 CONFIG REQUIRED
 add_executable(mustache_consumer main.cpp)
 target_compile_definitions(mustache_consumer PRIVATE
     MUSTACHE_EXPECTED_VERSION="${mustache_VERSION}")
+if(MUSTACHE_CONSUMER_LINKAGE STREQUAL "static")
+    target_compile_definitions(mustache_consumer PRIVATE
+        MUSTACHE_EXPECT_STATIC_DEFINE)
+endif()
 target_link_libraries(mustache_consumer PRIVATE ${MUSTACHE_CONSUMER_TARGET})

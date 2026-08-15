@@ -134,15 +134,10 @@ namespace customization support. Newer releases additionally compile in a
 libmustache-private ABI namespace. The Ubuntu 22.04 CI jobs audit both the
 shared library's dynamic symbols and the static archive's symbol visibility,
 so neither ordinary nlohmann/json types nor the SAX builder can become a
-public or interposable implementation boundary. On MSVC, the adapter is first
-compiled into a private static archive; this keeps CMake's legacy automatic
-DLL export scan from publishing the header-only parser's template machinery.
-
-The project still uses `WINDOWS_EXPORT_ALL_SYMBOLS` for the rest of its legacy
-Windows ABI. A later ABI-boundary slice should replace that broad mechanism
-with explicit public API annotations, using CMake's `GenerateExportHeader` or
-an equivalent checked-in export macro. That is a pre-existing library-wide
-issue, not a reason to expose the new parser implementation.
+public or interposable implementation boundary. On MSVC, the adapter is
+protected by the library's explicit `MUSTACHE_API` annotations. The DLL export
+audit rejects parser builders, private data state, and template instantiations,
+so the header-only implementation remains private without a separate archive.
 
 The minimum version is 3.10.5 because that is the Ubuntu 22.04 package and it
 contains the SAX callbacks used by the adapter. CI must continue to exercise

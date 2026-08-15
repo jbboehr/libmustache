@@ -61,7 +61,12 @@ clean-local:
 	rm -rf logs
 
 AM_CXXFLAGS = @MUSTACHE_CXXFLAGS@
-AM_CPPFLAGS = @MUSTACHE_CPPFLAGS@ -I$(top_builddir)/src -I$(top_srcdir)/src $(YAML_CFLAGS)
+AM_CPPFLAGS = \
+	@MUSTACHE_CPPFLAGS@ \
+	@MUSTACHE_CONSUMER_EXPORT_CPPFLAGS@ \
+	-I$(top_builddir)/src \
+	-I$(top_srcdir)/src \
+	$(YAML_CFLAGS)
 test_cli_CPPFLAGS = $(AM_CPPFLAGS) -I$(top_srcdir)/bin
 AM_LDFLAGS = @MUSTACHE_LDFLAGS@
 LDADD = $(top_builddir)/src/libmustache.la $(YAML_LIBS)

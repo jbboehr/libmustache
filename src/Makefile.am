@@ -10,6 +10,7 @@ mustacheinclude_HEADERS = \
 	data.hpp \
 	exception.hpp \
 	mustache.hpp \
+	mustache_export.hpp \
 	node.hpp \
 	renderer.hpp \
 	stack.hpp \
@@ -24,6 +25,7 @@ libmustache_json_adapter_la_CXXFLAGS = \
 	@MUSTACHE_JSON_CXXFLAGS@
 libmustache_json_adapter_la_CPPFLAGS = \
 	@MUSTACHE_CPPFLAGS@ \
+	-DMUSTACHE_STATIC_DEFINE \
 	$(NLOHMANN_JSON_CFLAGS)
 
 lib_LTLIBRARIES = libmustache.la
@@ -37,6 +39,7 @@ libmustache_la_SOURCES = \
 	exception.hpp \
 	mustache.cpp \
 	mustache.hpp \
+	mustache_export.hpp \
 	node.cpp \
 	node.hpp \
 	renderer.cpp \
@@ -56,5 +59,8 @@ libmustache_la_LDFLAGS = \
 	-version-info 6:0:0
 
 AM_CXXFLAGS = @MUSTACHE_CXXFLAGS@
-AM_CPPFLAGS = @MUSTACHE_CPPFLAGS@ $(YAML_CFLAGS)
+AM_CPPFLAGS = \
+	@MUSTACHE_CPPFLAGS@ \
+	@MUSTACHE_LIBRARY_EXPORT_CPPFLAGS@ \
+	$(YAML_CFLAGS)
 AM_LDFLAGS = @MUSTACHE_LDFLAGS@
