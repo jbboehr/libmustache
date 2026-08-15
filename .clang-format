@@ -1,0 +1,77 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+Standard: c++17
+
+# Match libmustache's established two-space layout.
+IndentWidth: 2
+ContinuationIndentWidth: 4
+TabWidth: 2
+UseTab: Never
+# Public/private labels and class members historically use one and two levels
+# of indentation, respectively.
+IndentAccessModifiers: true
+IndentCaseLabels: true
+NamespaceIndentation: None
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterExternBlock: false
+  AfterFunction: true
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyNamespace: false
+  SplitEmptyRecord: false
+
+ColumnLimit: 120
+BreakStringLiterals: false
+ReflowComments: false
+
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLambdasOnASingleLine: Empty
+AllowShortLoopsOnASingleLine: false
+
+AlignAfterOpenBracket: DontAlign
+AlignOperands: DontAlign
+AlignTrailingComments: false
+BinPackArguments: true
+BinPackParameters: true
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: AfterColon
+BreakInheritanceList: AfterColon
+PackConstructorInitializers: Never
+
+# Use conventional modern C++ control-statement spacing without adding spaces
+# inside ordinary calls or declarations.
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+SpacesInConditionalStatement: false
+SpaceBeforeRangeBasedForLoopColon: true
+
+# Keep existing C-style pointer placement while using the modern C++ reference
+# spelling already prevalent in the public API.
+DerivePointerAlignment: false
+PointerAlignment: Middle
+ReferenceAlignment: Left
+
+IncludeBlocks: Preserve
+SortIncludes: false
+SortUsingDeclarations: false
+FixNamespaceComments: true
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+...
