@@ -522,7 +522,8 @@ void Renderer::_renderNode(const Node * node, std::size_t depth)
       break;
 
     case Node::TypeOutput:
-      if( node->data.has_value() ) {
+      if( node->data.has_value() &&
+          !(node->flags & Node::FlagLambdaOnly) ) {
         _append(*node->data);
       }
       break;

@@ -13,8 +13,20 @@ foreach(specification_file IN LISTS specification_files)
     get_filename_component(filename "${specification_file}" NAME)
     file(READ "${specification_file}" contents)
     string(REPLACE "\r\n" "\n" contents "${contents}")
-    string(REPLACE "\n" "\r\n" contents "${contents}")
-    file(WRITE "${CRLF_SPEC_DIR}/${filename}" "${contents}")
+    string(REPLACE "\r" "\n" contents "${contents}")
+
+    # file(WRITE) uses the platform's text-mode newline handling on Windows,
+    # so pre-inserting carriage returns there produces CRCRLF.  Have CMake
+    # perform the newline conversion exactly once instead.  Escape literal @
+    # characters through a defined placeholder so file(CONFIGURE)'s @ONLY
+    # substitution cannot alter delimiter examples such as @...@.
+    string(REPLACE "@" "@MUSTACHE_CRLF_LITERAL_AT@" contents "${contents}")
+    set(MUSTACHE_CRLF_LITERAL_AT "@")
+    file(CONFIGURE
+        OUTPUT "${CRLF_SPEC_DIR}/${filename}"
+        CONTENT "${contents}"
+        @ONLY
+        NEWLINE_STYLE CRLF)
 endforeach()
 
 execute_process(

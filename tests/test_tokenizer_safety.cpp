@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "exception.hpp"
+#include "mustache.hpp"
 #include "node.hpp"
 #include "tokenizer.hpp"
 
@@ -285,6 +286,104 @@ void testSectionClosureValidation()
       "valid nested sections with changed delimiters were rejected");
 }
 
+std::string renderSource(
+    std::string_view source, const mustache::Data& data)
+{
+  return mustache::render(mustache::compile(source), data);
+}
+
+void testStandaloneTagStripping()
+{
+  const mustache::Data empty = mustache::Data::object();
+
+  expect(renderSource(
+      "Begin.\n  {{! Comment Block! }}\nEnd.\n", empty) ==
+          "Begin.\nEnd.\n",
+      "an indented standalone comment line was not removed");
+  expect(renderSource(
+      "Begin.\n\t{{!\ninside\n}}\nEnd.", empty) ==
+          "Begin.\nEnd.",
+      "a multiline standalone comment was not removed");
+  expect(renderSource(
+      "|\r\n{{! Standalone Comment }}\r\n|", empty) ==
+          "|\r\n|",
+      "CRLF standalone comment stripping changed line endings");
+  expect(renderSource(
+      " \t{{! no previous line }}\nnext", empty) == "next",
+      "a standalone comment required a preceding newline");
+  expect(renderSource(
+      "first\n \t{{! no following newline }}", empty) == "first\n",
+      "a standalone comment required a following newline");
+  expect(renderSource("inline {{! comment }}\n", empty) == "inline \n",
+      "an inline comment incorrectly stripped its surrounding line");
+  expect(renderSource("\v{{! comment }}\n", empty) == "\v\n",
+      "non-indentation whitespace incorrectly made a tag standalone");
+
+  mustache::Data truthy = mustache::Data::object();
+  truthy.set("show", mustache::Data::boolean(true));
+  expect(renderSource(
+      "A\n  {{#show}}\nvalue\n\t{{/show}}\nB\n", truthy) ==
+          "A\nvalue\nB\n",
+      "standalone section lines were not removed");
+
+  mustache::Data falsey = mustache::Data::object();
+  falsey.set("show", mustache::Data::boolean(false));
+  expect(renderSource(
+      "A\n  {{^show}}\nvalue\n\t{{/show}}\nB\n", falsey) ==
+          "A\nvalue\nB\n",
+      "standalone inverted-section lines were not removed");
+
+  expect(renderSource(
+      "A\r\n\t{{=<% %>=}}\r\n<%#show%>\r\nvalue\r\n"
+      "<%/show%>\r\nB", truthy) == "A\r\nvalue\r\nB",
+      "standalone stripping failed with changed delimiters");
+
+  const char nulTemplate[] = "\0{{! comment }}\n";
+  std::string nulSource(nulTemplate, sizeof(nulTemplate) - 1);
+  std::string nulExpected("\0\n", 2);
+  expect(renderSource(nulSource, empty) == nulExpected,
+      "an embedded NUL incorrectly made a comment standalone");
+
+  mustache::Tokenizer::Limits limits;
+  limits.maxNodes = 3;
+  mustache::Tokenizer tokenizer;
+  mustache::Node root;
+  tokenizer.tokenize(" \t{{! comment }}\n", &root, limits);
+  expect(root.children.size() == 3 &&
+          root.children[0]->type == mustache::Node::TypeOutput &&
+          root.children[0]->flags == mustache::Node::FlagLambdaOnly &&
+          root.children[1]->type == mustache::Node::TypeComment &&
+          root.children[2]->type == mustache::Node::TypeOutput &&
+          root.children[2]->flags == mustache::Node::FlagLambdaOnly,
+      "standalone source boundaries were not retained for lambdas");
+  limits.maxNodes = 2;
+  expectLimitFailure(" \t{{! comment }}\n", limits, "node count limit",
+      "lambda-only standalone source nodes bypassed the parser node limit");
+}
+
+void testRepeatedInlineTagsUseBoundedForwardWork()
+{
+  const std::string delimiterTags =
+      "{{=<% %>=}}<%={{ }}=%>";
+  const std::size_t pairCount = 10000;
+  std::string source("x");
+  source.reserve(source.size() + delimiterTags.size() * pairCount);
+  for( std::size_t i = 0; i < pairCount; ++i ) {
+    source.append(delimiterTags);
+  }
+
+  mustache::Tokenizer::Limits limits;
+  limits.maxNodes = 1;
+  mustache::Tokenizer tokenizer;
+  mustache::Node root;
+  tokenizer.tokenize(source, &root, limits);
+  expect(root.children.size() == 1 &&
+          root.children[0]->type == mustache::Node::TypeOutput &&
+          root.children[0]->data.has_value() &&
+          *root.children[0]->data == "x",
+      "repeated inline delimiter tags changed the parsed output");
+}
+
 } // namespace
 
 int main()
@@ -294,5 +393,7 @@ int main()
   testSetDataReplacesOwnedState();
   testParserLimits();
   testSectionClosureValidation();
+  testStandaloneTagStripping();
+  testRepeatedInlineTagsUseBoundedForwardWork();
   return failures == 0 ? 0 : 1;
 }

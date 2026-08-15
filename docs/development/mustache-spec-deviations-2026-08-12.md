@@ -1,6 +1,7 @@
 # Mustache specification conformance ledger
 
-**Date:** 2026-08-12  
+**Date:** 2026-08-12
+**Last revised:** 2026-08-15
 **Specification revision:** `5d3b58ea35ae309c40d7a8111bfedc4c5bcd43a6`
 
 This ledger records the exact conformance baseline before the memory-safety
@@ -18,16 +19,16 @@ or a change in the pinned suite inventory fails the test executable.
 
 | Suite | Exact passes | Explicit skips | Known failures | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Comments | 5 | 0 | 7 | 12 |
-| Delimiters | 6 | 0 | 8 | 14 |
+| Comments | 12 | 0 | 0 | 12 |
+| Delimiters | 14 | 0 | 0 | 14 |
 | Interpolation | 39 | 0 | 0 | 39 |
-| Inverted sections | 16 | 0 | 6 | 22 |
+| Inverted sections | 22 | 0 | 0 | 22 |
 | Partials | 7 | 0 | 4 | 11 |
-| Sections | 22 | 1 | 7 | 30 |
+| Sections | 29 | 1 | 0 | 30 |
 | Dynamic names | 0 | 21 | 0 | 21 |
 | Inheritance | 0 | 22 | 0 | 22 |
-| Lambdas | 9 | 0 | 1 | 10 |
-| **Total** | **104** | **44** | **33** | **181** |
+| Lambdas | 10 | 0 | 0 | 10 |
+| **Total** | **133** | **44** | **4** | **181** |
 
 CI succeeds only when there are zero unexpected failures and zero unexpected
 passes. Known failures remain visible in the summary and are not counted as
@@ -35,20 +36,13 @@ passes.
 
 ## Known conformance failures
 
-All 33 currently executed failures are exact-output whitespace failures. They
-fall into these related implementation gaps:
-
-- standalone section and inverted-section lines are not removed;
-- standalone comment lines are not removed;
-- standalone delimiter-change lines are not removed; and
-- standalone partial lines are not removed and partial indentation is not
-  propagated to every rendered line.
-
-These gaps also explain failures whose names are not themselves "Standalone",
-including deeply nested and doubled sections, delimiter changes surrounding
-sections, and the alternate-delimiter interpolation lambda. The complete list
-of suite and test names is kept in the executable ledger rather than duplicated
-here.
+The remaining four executed failures are the partial standalone and
+indentation cases. Standalone section, inverted-section, closing, comment, and
+delimiter-change tags are stripped with exact LF, CRLF, beginning-of-input,
+and end-of-input behavior. Standalone partial lines are not yet removed, and
+their indentation is not yet propagated to every rendered partial line. The
+complete list of suite and test names is kept in the executable ledger rather
+than duplicated here.
 
 ## Explicitly unsupported cases
 

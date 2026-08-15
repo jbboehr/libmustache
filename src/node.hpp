@@ -91,9 +91,13 @@ class Node {
     };
     
     //! Enum of token flags
-    enum Flag { 
+    enum Flag {
       FlagNone = 0,
-      FlagEscape = 1
+      FlagEscape = 1,
+
+      // Internal output retained only when reconstructing section text for
+      // lambda callbacks. Normal rendering suppresses these nodes.
+      FlagLambdaOnly = 2
     };
     
     //! The type from Node::Type

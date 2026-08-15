@@ -331,7 +331,7 @@ void testStrictDecoderValidation()
 
   invalid = fixture;
   invalid[4] = 0x02;
-  expectInvalid(invalid, "unknown node flags must be rejected");
+  expectInvalid(invalid, "invalid node flags must be rejected");
 
   invalid = fixture;
   writeUint24(invalid, 19, 6);
@@ -595,7 +595,13 @@ void testSerializerValidation()
   invalidFlags.type = mustache::Node::TypeRoot;
   invalidFlags.flags = 2;
   expectSerializeInvalid(invalidFlags,
-      "unknown flags must not be serialized");
+      "invalid flag placement must not be serialized");
+
+  mustache::Node misplacedLambdaFlag(
+      mustache::Node::TypeComment, "comment",
+      mustache::Node::FlagLambdaOnly);
+  expectSerializeInvalid(misplacedLambdaFlag,
+      "lambda-only flags on non-output nodes must not be serialized");
 
   mustache::Node missingData;
   missingData.type = mustache::Node::TypeVariable;

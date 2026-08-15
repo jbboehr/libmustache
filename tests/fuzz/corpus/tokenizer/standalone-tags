@@ -1,0 +1,10 @@
+before
+  {{! comment }}
+{{#show}}
+value
+{{/show}}
+{{=<% %>=}}
+<%^missing%>
+fallback
+<%/missing%>
+after

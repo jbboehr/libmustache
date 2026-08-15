@@ -168,6 +168,48 @@ void testLengthAwareLambdaText()
       "scoped lambda output lost its embedded NUL when reparsed");
 }
 
+void testStandaloneLambdaText()
+{
+  const std::string source = "{{#call}}\nbody\n{{/call}}\n";
+  const std::string expectedText = "\nbody\n";
+  std::string observed;
+
+  mustache::Mustache mustache;
+  mustache::Node root;
+  mustache.tokenize(source, &root);
+
+  mustache::Data legacyData(mustache::Data::TypeMap, 0);
+  legacyData.set("call", mustache::Data::lambda(
+      std::make_unique<LegacyLambda>(&observed)));
+  std::string output;
+  mustache.render(&root, &legacyData, NULL, &output);
+  expect(observed == expectedText,
+      "legacy lambda lost standalone section boundaries");
+  expect(output == expectedText,
+      "legacy standalone lambda output changed when reparsed");
+
+  const std::vector<uint8_t> serial = root.serializeValue();
+  std::unique_ptr<mustache::Node> decoded =
+      mustache::Node::unserializeOwned(std::string_view(
+          reinterpret_cast<const char *>(serial.data()), serial.size()));
+  observed.clear();
+  output.clear();
+  mustache.render(decoded.get(), &legacyData, NULL, &output);
+  expect(observed == expectedText && output == expectedText,
+      "serialized AST lost standalone lambda section boundaries");
+
+  mustache::Data scopedData(mustache::Data::TypeMap, 0);
+  scopedData.set("call", mustache::Data::lambda(
+      std::make_unique<ScopedLambda>(&observed)));
+  observed.clear();
+  output.clear();
+  mustache.render(&root, &scopedData, NULL, &output);
+  expect(observed == expectedText,
+      "scoped lambda lost standalone section boundaries");
+  expect(output == expectedText,
+      "scoped standalone lambda output changed when reparsed");
+}
+
 void testExplicitSerializedByteLengths()
 {
   mustache::Node root;
@@ -219,6 +261,7 @@ int main()
   testTemplateViewPreservesEmbeddedNul();
   testExplicitDelimiterLengths();
   testLengthAwareLambdaText();
+  testStandaloneLambdaText();
   testExplicitSerializedByteLengths();
   return failures == 0 ? 0 : 1;
 }

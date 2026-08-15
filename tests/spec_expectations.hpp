@@ -35,14 +35,6 @@ struct SpecSuiteRecord {
   std::size_t files;
 };
 
-static const char standaloneSectionReason[] =
-    "standalone section tag whitespace is not implemented";
-static const char standaloneInvertedReason[] =
-    "standalone inverted-section tag whitespace is not implemented";
-static const char standaloneCommentReason[] =
-    "standalone comment tag whitespace is not implemented";
-static const char standaloneDelimiterReason[] =
-    "standalone delimiter tag whitespace is not implemented";
 static const char partialIndentationReason[] =
     "standalone partial stripping and indentation are not implemented";
 
@@ -58,69 +50,6 @@ static SpecExpectationRecord specExpectations[] = {
         partialIndentationReason, 1, 0},
     {"partials.yml", "Standalone Indentation", SpecExpectedFailure,
         partialIndentationReason, 1, 0},
-
-    {"sections.yml", "Deeply Nested Contexts", SpecExpectedFailure,
-        standaloneSectionReason, 1, 0},
-    {"sections.yml", "Doubled", SpecExpectedFailure,
-        standaloneSectionReason, 1, 0},
-    {"sections.yml", "Standalone Lines", SpecExpectedFailure,
-        standaloneSectionReason, 1, 0},
-    {"sections.yml", "Indented Standalone Lines", SpecExpectedFailure,
-        standaloneSectionReason, 1, 0},
-    {"sections.yml", "Standalone Line Endings", SpecExpectedFailure,
-        standaloneSectionReason, 1, 0},
-    {"sections.yml", "Standalone Without Previous Line", SpecExpectedFailure,
-        standaloneSectionReason, 1, 0},
-    {"sections.yml", "Standalone Without Newline", SpecExpectedFailure,
-        standaloneSectionReason, 1, 0},
-
-    {"inverted.yml", "Doubled", SpecExpectedFailure,
-        standaloneInvertedReason, 1, 0},
-    {"inverted.yml", "Standalone Lines", SpecExpectedFailure,
-        standaloneInvertedReason, 1, 0},
-    {"inverted.yml", "Standalone Indented Lines", SpecExpectedFailure,
-        standaloneInvertedReason, 1, 0},
-    {"inverted.yml", "Standalone Line Endings", SpecExpectedFailure,
-        standaloneInvertedReason, 1, 0},
-    {"inverted.yml", "Standalone Without Previous Line", SpecExpectedFailure,
-        standaloneInvertedReason, 1, 0},
-    {"inverted.yml", "Standalone Without Newline", SpecExpectedFailure,
-        standaloneInvertedReason, 1, 0},
-
-    {"comments.yml", "Standalone", SpecExpectedFailure,
-        standaloneCommentReason, 1, 0},
-    {"comments.yml", "Indented Standalone", SpecExpectedFailure,
-        standaloneCommentReason, 1, 0},
-    {"comments.yml", "Standalone Line Endings", SpecExpectedFailure,
-        standaloneCommentReason, 1, 0},
-    {"comments.yml", "Standalone Without Previous Line", SpecExpectedFailure,
-        standaloneCommentReason, 1, 0},
-    {"comments.yml", "Standalone Without Newline", SpecExpectedFailure,
-        standaloneCommentReason, 1, 0},
-    {"comments.yml", "Multiline Standalone", SpecExpectedFailure,
-        standaloneCommentReason, 1, 0},
-    {"comments.yml", "Indented Multiline Standalone", SpecExpectedFailure,
-        standaloneCommentReason, 1, 0},
-
-    {"~lambdas.yml", "Interpolation - Alternate Delimiters",
-        SpecExpectedFailure, standaloneDelimiterReason, 1, 0},
-
-    {"delimiters.yml", "Sections", SpecExpectedFailure,
-        standaloneSectionReason, 1, 0},
-    {"delimiters.yml", "Inverted Sections", SpecExpectedFailure,
-        standaloneInvertedReason, 1, 0},
-    {"delimiters.yml", "Partial Inheritence", SpecExpectedFailure,
-        standaloneDelimiterReason, 1, 0},
-    {"delimiters.yml", "Standalone Tag", SpecExpectedFailure,
-        standaloneDelimiterReason, 1, 0},
-    {"delimiters.yml", "Indented Standalone Tag", SpecExpectedFailure,
-        standaloneDelimiterReason, 1, 0},
-    {"delimiters.yml", "Standalone Line Endings", SpecExpectedFailure,
-        standaloneDelimiterReason, 1, 0},
-    {"delimiters.yml", "Standalone Without Previous Line",
-        SpecExpectedFailure, standaloneDelimiterReason, 1, 0},
-    {"delimiters.yml", "Standalone Without Newline", SpecExpectedFailure,
-        standaloneDelimiterReason, 1, 0},
 
     {"sections.yml", "Implicit Iterator - Array", SpecExpectedSkip,
         "nested array iteration is not implemented", 1, 0},

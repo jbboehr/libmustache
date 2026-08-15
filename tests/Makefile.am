@@ -44,6 +44,7 @@ EXTRA_DIST = \
 	fuzz/corpus/tokenizer/delimiter-change \
 	fuzz/corpus/tokenizer/many-data-parts \
 	fuzz/corpus/tokenizer/mismatched-section \
+	fuzz/corpus/tokenizer/standalone-tags \
 	fuzz/corpus/tokenizer/triple-mustache \
 	fuzz/corpus/tokenizer/unclosed-tag \
 	fuzz/corpus/tokenizer/valid-section

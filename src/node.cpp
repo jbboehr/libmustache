@@ -70,7 +70,12 @@ void validateNodeShape(
   if( !isSerializableType(type) ) {
     throw Exception("Invalid serial node type");
   }
-  if( (flags & ~static_cast<size_t>(Node::FlagEscape)) != 0 ) {
+  const size_t validFlags = static_cast<size_t>(Node::FlagEscape) |
+      static_cast<size_t>(Node::FlagLambdaOnly);
+  if( (flags & ~validFlags) != 0 ||
+      ((flags & static_cast<size_t>(Node::FlagLambdaOnly)) != 0 &&
+          (type != Node::TypeOutput ||
+              flags != static_cast<size_t>(Node::FlagLambdaOnly))) ) {
     throw Exception("Invalid serial node flags");
   }
   if( type == Node::TypeRoot ) {

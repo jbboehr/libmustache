@@ -22,6 +22,39 @@ bool matchesAt(
       input.compare(position, sequence.size(), sequence) == 0;
 }
 
+bool isStandaloneIndent(char value)
+{
+  return value == ' ' || value == '\t';
+}
+
+bool standaloneLineEnd(
+    std::string_view input, size_t tagEnd, size_t * lineEnd)
+{
+  size_t position = tagEnd;
+  while( position < input.size() && isStandaloneIndent(input[position]) ) {
+    ++position;
+  }
+  if( position < input.size() ) {
+    if( input[position] == '\n' ) {
+      ++position;
+    } else if( input[position] == '\r' &&
+        position + 1 < input.size() && input[position + 1] == '\n' ) {
+      position += 2;
+    } else {
+      return false;
+    }
+  }
+
+  *lineEnd = position;
+  return true;
+}
+
+bool isStandaloneType(Node::Type type)
+{
+  return type == Node::TypeSection || type == Node::TypeNegate ||
+      type == Node::TypeStop || type == Node::TypeComment;
+}
+
 struct ParseFrame {
   ParseFrame(Node * node, int lineNo, int charNo) :
       node(node), lineNo(lineNo), charNo(charNo) {}
@@ -42,6 +75,18 @@ Node * appendNode(Node * parent, std::unique_ptr<Node> node,
   parent->children.push_back(std::move(node));
   ++*nodeCount;
   return parent->children.back().get();
+}
+
+void appendLambdaOnlyOutput(Node * parent, std::string_view output,
+    std::size_t * nodeCount, const Tokenizer::Limits& limits,
+    int lineNo, int charNo)
+{
+  if( output.empty() ) {
+    return;
+  }
+  appendNode(parent, std::make_unique<Node>(
+      Node::TypeOutput, std::string(output), Node::FlagLambdaOnly),
+      nodeCount, limits, lineNo, charNo);
 }
 
 } // namespace
@@ -156,6 +201,7 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root,
   std::string start(_startSequence);
   std::string buffer;
   buffer.reserve(100); // Reserver 100 chars
+  std::string outputBeforeTag;
   
   const size_t tmplL = tmpl.length();
   
@@ -170,12 +216,17 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root,
   size_t skipUntil = std::string_view::npos;
   int lineNo = 1;
   int charNo = 0;
+  size_t lineStart = 0;
+  bool linePrefixIsIndent = true;
   
   int inTag = 0;
   int inTripleTag = 0;
   int skip = 0;
   int startCharNo = 0;
   int startLineNo = 0;
+  size_t tagStart = 0;
+  size_t tagIndentationBytes = 0;
+  bool tagPrefixIsIndent = false;
   Node::Type currentType = Node::TypeNone;
   int currentFlags = Node::FlagNone;
   
@@ -192,6 +243,18 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root,
   
   // Scan loop
   for( pos = 0; pos < tmplL; pos++ ) {
+
+    // Maintain the state immediately before tmpl[pos]. This makes standalone
+    // prefix classification linear even for many eligible tags on one line.
+    if( pos > 0 ) {
+      const char previous = tmpl[pos - 1];
+      if( previous == '\n' ) {
+        lineStart = pos;
+        linePrefixIsIndent = true;
+      } else if( !isStandaloneIndent(previous) ) {
+        linePrefixIsIndent = false;
+      }
+    }
     
     // Track line numbers
     if( tmpl[pos] == '\n' ) {
@@ -213,16 +276,15 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root,
     // Main
     if( !inTag ) {
       if( tmpl[pos] == startC && matchesAt(tmpl, pos, start) ) {
-        // Close previous buffer
-        if( buffer.length() > 0 ) {
-          appendNode(nodeStack.back().node, std::make_unique<Node>(
-              Node::TypeOutput, buffer), &nodeCount, limits,
-              lineNo, charNo);
-          buffer.clear();
-        }
+        // Delay publishing the preceding output until the tag is classified.
+        // A standalone tag removes indentation from that output.
+        outputBeforeTag.swap(buffer);
         // Open new buffer
         inTag = true;
         skipUntil = pos + startL - 1;
+        tagStart = pos;
+        tagPrefixIsIndent = linePrefixIsIndent;
+        tagIndentationBytes = pos - lineStart;
         startLineNo = lineNo;
         startCharNo = charNo; // Could be inaccurate
         // Triple mustache
@@ -302,6 +364,35 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root,
             skip = 1;
             break;
         }
+
+        size_t standaloneEnd = std::string_view::npos;
+        const bool standaloneCandidate = !inTripleTag &&
+            (skip || isStandaloneType(currentType));
+        if( standaloneCandidate && tagPrefixIsIndent &&
+            standaloneLineEnd(tmpl, pos + tmpStopL, &standaloneEnd) ) {
+          if( tagIndentationBytes > outputBeforeTag.size() ) {
+            throw TokenizerException(
+                "Invalid standalone parser state",
+                startLineNo, startCharNo);
+          }
+          outputBeforeTag.resize(
+              outputBeforeTag.size() - tagIndentationBytes);
+        }
+
+        if( !outputBeforeTag.empty() ) {
+          appendNode(nodeStack.back().node, std::make_unique<Node>(
+              Node::TypeOutput, outputBeforeTag), &nodeCount, limits,
+              startLineNo, startCharNo);
+        }
+        outputBeforeTag.clear();
+
+        if( standaloneEnd != std::string_view::npos ) {
+          appendLambdaOnlyOutput(nodeStack.back().node,
+              tmpl.substr(tagStart - tagIndentationBytes,
+                  tagIndentationBytes),
+              &nodeCount, limits, startLineNo, startCharNo);
+        }
+
         if( !skip ) {
           if( currentType != Node::TypeVariable || currentFlags != 0 ) {
             buffer.erase(0, 1);
@@ -366,11 +457,20 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root,
             nodeStack.pop_back();
           }
         }
+
+        if( standaloneEnd != std::string_view::npos ) {
+          appendLambdaOnlyOutput(nodeStack.back().node,
+              tmpl.substr(pos + tmpStopL,
+                  standaloneEnd - (pos + tmpStopL)),
+              &nodeCount, limits, lineNo, charNo);
+        }
         // Clear buffer
         buffer.clear();
         // Open new buffer
         inTag = false;
-        skipUntil = pos + tmpStopL - 1;
+        skipUntil = standaloneEnd == std::string_view::npos
+            ? pos + tmpStopL - 1
+            : standaloneEnd - 1;
         // Triple mustache
         if( !skip && inTripleTag && stop.compare("}}") == 0 ) {
           if( !matchesAt(tmpl, pos + 2, "}") ) {
