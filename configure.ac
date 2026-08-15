@@ -117,7 +117,37 @@ AS_IF([test "x$GXX" = "xyes"], [
         MUSTACHE_CXXFLAGS="$MUSTACHE_CXXFLAGS -fstack-protector-strong"
         AS_CASE([$host_os], [linux*], [
             AS_CASE([" $CPPFLAGS $CXXFLAGS "], [*_FORTIFY_SOURCE*], [], [
-                MUSTACHE_CPPFLAGS="$MUSTACHE_CPPFLAGS -D_FORTIFY_SOURCE=3"
+                AC_CACHE_CHECK([whether $CXX supports _FORTIFY_SOURCE=3],
+                    [mustache_cv_cxx_fortify_source_3], [
+                    mustache_save_CPPFLAGS=$CPPFLAGS
+                    mustache_save_CXXFLAGS=$CXXFLAGS
+                    CPPFLAGS="$CPPFLAGS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3"
+                    CXXFLAGS="$CXXFLAGS -Werror"
+                    AC_COMPILE_IFELSE([
+                        AC_LANG_PROGRAM([[
+                            #if !defined(__OPTIMIZE__) || __OPTIMIZE__ <= 0
+                            #error _FORTIFY_SOURCE requires optimization
+                            #endif
+                            #if !defined(_FORTIFY_SOURCE) || _FORTIFY_SOURCE != 3
+                            #error _FORTIFY_SOURCE=3 was not selected
+                            #endif
+                            #include <cstring>
+                        ]], [[
+                            char source[] = "abc";
+                            char destination[sizeof(source)];
+                            std::memcpy(destination, source, sizeof(source));
+                            return destination[0] == 'a' ? 0 : 1;
+                        ]])
+                    ], [mustache_cv_cxx_fortify_source_3=yes],
+                       [mustache_cv_cxx_fortify_source_3=no])
+                    CPPFLAGS=$mustache_save_CPPFLAGS
+                    CXXFLAGS=$mustache_save_CXXFLAGS
+                ])
+                AS_IF([test "x$mustache_cv_cxx_fortify_source_3" = "xyes"], [
+                    MUSTACHE_CPPFLAGS="$MUSTACHE_CPPFLAGS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3"
+                ], [
+                    AC_MSG_WARN([_FORTIFY_SOURCE=3 is unavailable; continuing with the compiler default])
+                ])
             ])
             AS_CASE([" $CPPFLAGS $CXXFLAGS "], [*_GLIBCXX_ASSERTIONS*], [], [
                 MUSTACHE_CPPFLAGS="$MUSTACHE_CPPFLAGS -D_GLIBCXX_ASSERTIONS=1"
@@ -125,6 +155,17 @@ AS_IF([test "x$GXX" = "xyes"], [
             MUSTACHE_LDFLAGS="$MUSTACHE_LDFLAGS -Wl,-z,relro -Wl,-z,now"
         ])
     ])
+])
+
+AC_ARG_ENABLE([warnings-as-errors],
+    [AS_HELP_STRING([--enable-warnings-as-errors],
+        [treat project compiler warnings as errors])],
+    [], [enable_warnings_as_errors=no])
+AS_IF([test "x$enable_warnings_as_errors" = "xyes"], [
+    AS_IF([test "x$GXX" != "xyes"], [
+        AC_MSG_ERROR([--enable-warnings-as-errors requires a GCC-compatible C++ compiler])
+    ])
+    MUSTACHE_CXXFLAGS="$MUSTACHE_CXXFLAGS -Werror"
 ])
 
 AC_ARG_ENABLE([sanitizers],

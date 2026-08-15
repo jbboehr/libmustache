@@ -84,7 +84,9 @@ jobs:
         run: |
           mkdir build-autotools
           cd build-autotools
-          ../configure --prefix="$RUNNER_TEMP/libmustache"
+          ../configure \
+            --prefix="$RUNNER_TEMP/libmustache" \
+            --enable-warnings-as-errors
 
       - name: Build and test
         working-directory: build-autotools
@@ -165,7 +167,8 @@ jobs:
         run: |
           cmake -S . -B build-cmake -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/libmustache"
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/libmustache" \
+            -DMUSTACHE_WARNINGS_AS_ERRORS=ON
           cmake --build build-cmake --parallel
           ctest --test-dir build-cmake --output-on-failure
           cmake --install build-cmake
@@ -222,7 +225,8 @@ jobs:
         run: |
           cmake -S . -B build-cmake -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/libmustache"
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/libmustache" \
+            -DMUSTACHE_WARNINGS_AS_ERRORS=ON
           cmake --build build-cmake --parallel
           ctest --test-dir build-cmake --output-on-failure
           cmake --install build-cmake
@@ -296,6 +300,7 @@ jobs:
           cmake -S . -B build-sanitized -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
             -DMUSTACHE_ENABLE_SANITIZERS=ON \
+            -DMUSTACHE_WARNINGS_AS_ERRORS=ON \
             -DMUSTACHE_ENABLE_FUZZING=${{ matrix.compiler.name == 'Clang' && 'ON' || 'OFF' }}
           cmake --build build-sanitized --parallel
           ctest --test-dir build-sanitized --output-on-failure
@@ -303,7 +308,9 @@ jobs:
           autoreconf --force --install --verbose
           mkdir build-sanitized-autotools
           cd build-sanitized-autotools
-          ../configure --enable-sanitizers
+          ../configure \
+            --enable-sanitizers \
+            --enable-warnings-as-errors
           make --jobs="$(nproc)"
           make check
 

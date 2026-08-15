@@ -79,6 +79,7 @@ stdenv.mkDerivation (finalAttrs: {
       "--includedir=${placeholder "dev"}/include"
     ]
     ++ lib.optional checkSupport "--with-mustache-spec=${mustache_spec}/share/mustache-spec/specs"
+    ++ lib.optional checkSupport "--enable-warnings-as-errors"
     ++ lib.optional sanitizerSupport "--enable-sanitizers";
 
   cmakeFlags =
@@ -86,6 +87,7 @@ stdenv.mkDerivation (finalAttrs: {
       (lib.cmakeBool "MUSTACHE_ENABLE_TESTS" checkSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_HARDENING" true)
       (lib.cmakeBool "MUSTACHE_ENABLE_ASSERTIONS" true)
+      (lib.cmakeBool "MUSTACHE_WARNINGS_AS_ERRORS" checkSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_SANITIZERS" sanitizerSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_FUZZING" fuzzSupport)
       "-DCMAKE_BUILD_TYPE=${

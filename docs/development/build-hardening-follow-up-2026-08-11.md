@@ -23,6 +23,9 @@ risks: [Repository review](repository-review-2026-08-11.md).
 - Autotools warning, hardening, sanitizer, coverage, and profiling options use
   project `AM_*` flags. User `CXXFLAGS`, `CPPFLAGS`, and `LDFLAGS` remain
   authoritative, and an existing `_FORTIFY_SOURCE` definition is respected.
+  Compiler-provided defaults are replaced without redefinition warnings by a
+  checked, ordered `-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3` pair in both
+  Autotools and CMake optimized hardening builds.
 - The Autotools `render-*` helpers use `$(top_srcdir)` and work from a VPATH
   build.
 - CMake-generated pkg-config metadata derives its prefix from `pcfiledir`, so a
@@ -84,28 +87,24 @@ installed executable smoke tests retain process-level coverage.
 The custom argument parser also removes the Windows-only `getopt` build and
 vcpkg dependency.
 
+### Keep project builds warning-clean
+
+The remaining GCC, Clang, and MSVC diagnostics were resolved as correctness
+work rather than disabled. Node reconstruction now makes its intentional
+fallthrough and non-rendering enum values explicit. Utility loops use container
+size types instead of narrowing to `int`, test diagnostics use the matching
+`size_t` format, specification files retain their full checked length, and
+unused or shadowed names were removed.
+
+CMake's `MUSTACHE_WARNINGS_AS_ERRORS` option and Autotools'
+`--enable-warnings-as-errors` switch apply `-Werror` or `/WX` only to project
+targets and remain opt-in for ordinary downstream builds. GitHub Actions,
+AppVeyor, and checked Nix builds enable the policy across GCC, Clang,
+AppleClang, and MSVC so new diagnostics fail CI.
+
 ## Remaining actionable work
 
-### 1. Resolve compiler warnings as correctness work
-
-The new warning flags expose pre-existing issues. Do not blanket-disable them.
-Review and fix each class before enabling warnings-as-errors:
-
-- incomplete enum switches in `Node`;
-- signed/unsigned comparisons and narrowing conversions in data parsing,
-  tokenization, deserialization, utilities, the CLI, and tests;
-- the MSVC `test_utils` format mismatch (`%lu` for a `size_t`; use `%zu` or
-  an explicitly matched type);
-- the intentional-looking but unannotated fallthrough in
-  `Node::to_template_string`;
-- shadowed names plus unused variables and parameters in the CLI, library, and
-  tests.
-
-The deserialization warnings must be handled together with full buffer-boundary
-validation. Merely changing integer types would leave the security issue
-described in the repository review unresolved.
-
-### 2. Replace broad Windows symbol auto-export
+### Replace broad Windows symbol auto-export
 
 CMake's `WINDOWS_EXPORT_ALL_SYMBOLS` compatibility mode still publishes
 library implementation symbols unnecessarily. Replace it with explicit public

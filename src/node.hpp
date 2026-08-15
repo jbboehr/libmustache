@@ -130,7 +130,7 @@ class Node {
         const std::string& start, const std::string& stop) const;
     
     //! Set data
-    void setData(const std::string& data);
+    void setData(const std::string& value);
     
     //! Serialize
     std::vector<uint8_t> * serialize() const;

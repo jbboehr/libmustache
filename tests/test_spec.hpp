@@ -7,6 +7,7 @@
 #include <yaml.h>
 
 #include <cstdlib>
+#include <cstddef>
 #include <list>
 #include <string>
 #include <iostream>
@@ -115,7 +116,7 @@ class MustacheSpecTest {
     }
 };
 
-void parse_file(char * fileData, int length);
+void parse_file(const char * fileData, std::size_t length);
 
 void mustache_spec_parse_document(yaml_document_t * document);
 void mustache_spec_parse_tests(yaml_document_t * document, yaml_node_t * node);

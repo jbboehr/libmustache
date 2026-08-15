@@ -51,7 +51,7 @@ std::string MultipleCallsLambda::invoke() {
 	return st.str();
 }
 
-std::string MultipleCallsLambda::invoke(std::string * text, mustache::Renderer * renderer) {
+std::string MultipleCallsLambda::invoke(std::string *, mustache::Renderer *) {
 	return invoke();
 }
 
@@ -61,7 +61,7 @@ std::string SectionLambda::invoke() {
 	throw mustache::Exception("This is a section lambda");
 }
 
-std::string SectionLambda::invoke(std::string * text, mustache::Renderer * renderer) {
+std::string SectionLambda::invoke(std::string * text, mustache::Renderer *) {
 	if( text->compare("{{x}}") == 0 ) {
 		return "yes";
 	} else {
@@ -76,7 +76,7 @@ std::string SectionExpansionLambda::invoke() {
 	throw mustache::Exception("This is a section lambda");
 }
 
-std::string SectionExpansionLambda::invoke(std::string * text, mustache::Renderer * renderer) {
+std::string SectionExpansionLambda::invoke(std::string * text, mustache::Renderer *) {
 	std::ostringstream st;
 	st << *text << "{{planet}}" << *text;
 	return st.str();
@@ -89,7 +89,7 @@ std::string SectionAlternateDelimitersLambda::invoke() {
 	throw mustache::Exception("This is a section lambda");
 }
 
-std::string SectionAlternateDelimitersLambda::invoke(std::string * text, mustache::Renderer * renderer) {
+std::string SectionAlternateDelimitersLambda::invoke(std::string * text, mustache::Renderer *) {
 	std::ostringstream st;
 	st << *text << "{{planet}} => |planet|" << *text;
 	return st.str();
@@ -102,7 +102,7 @@ std::string SectionMultipleCallsLambda::invoke() {
 	throw mustache::Exception("This is a section lambda");
 }
 
-std::string SectionMultipleCallsLambda::invoke(std::string * text, mustache::Renderer * renderer) {
+std::string SectionMultipleCallsLambda::invoke(std::string * text, mustache::Renderer *) {
 	std::ostringstream st;
 	st << "__";
 	st << *text;

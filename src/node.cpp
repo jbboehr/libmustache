@@ -426,15 +426,15 @@ std::string Node::children_to_template_string(
   return template_string;
 }
 
-void Node::setData(const std::string& data)
+void Node::setData(const std::string& value)
 {
-  std::optional<std::string> nextData(data);
+  std::optional<std::string> nextData(value);
   std::vector<std::string> nextDataParts;
 
   if( this->type & Node::TypeHasDot ) {
-    size_t found = data.find(".");
+    size_t found = value.find(".");
     if( found != std::string::npos ) {
-      explode(".", data, &nextDataParts);
+      explode(".", value, &nextDataParts);
     }
   }
 
@@ -495,21 +495,18 @@ std::string Node::to_template_string(
         template_string.append("&");
       }
 
-      switch( type ) {
-        case Node::TypeNegate:
-          template_string.append("^");
-          break;
-        case Node::TypeSection:
-          template_string.append("#");
-          break;
-        case Node::TypeStop:
-          template_string.append("/");
-          break;
+      if( type == Node::TypeNegate ) {
+        template_string.append("^");
+      } else if( type == Node::TypeSection ) {
+        template_string.append("#");
+      } else if( type == Node::TypeStop ) {
+        template_string.append("/");
       }
 
       template_string.append(*data);
 
       template_string.append(stop);
+      [[fallthrough]];
     case Node::TypeRoot: // a root node only has children, so start here
       if( children.size() > 0 ) {
         Node::Children::const_iterator it;
@@ -520,6 +517,15 @@ std::string Node::to_template_string(
           template_string.append((*it)->to_template_string(start, stop));
         }
       }
+      break;
+    case Node::TypeNone:
+    case Node::TypeTag:
+    case Node::TypeContainer:
+    case Node::TypeInlinePartial:
+    case Node::TypeHasChildren:
+    case Node::TypeHasData:
+    case Node::TypeHasNoString:
+    case Node::TypeHasDot:
       break;
   }
 

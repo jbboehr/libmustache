@@ -19,7 +19,7 @@ public:
     	return this->tmpl;
     }
 
-    std::string invoke(std::string * text, mustache::Renderer * renderer) {
+    std::string invoke(std::string *, mustache::Renderer *) {
     	return this->tmpl;
     }
 };

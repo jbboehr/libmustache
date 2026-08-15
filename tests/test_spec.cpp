@@ -2,6 +2,8 @@
 #include "test_spec.hpp"
 #include "./fixtures/lambdas.hpp"
 
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <utility>
 
@@ -88,7 +90,8 @@ int main( int argc, char * argv[] )
     fileName += '/';
     fileName += file;
     
-    std::ifstream pFile(fileName.c_str());
+    std::ifstream pFile(
+        fileName.c_str(), std::ios::in | std::ios::binary);
     if( !pFile.is_open() ) {
       std::cerr << "Unable to open file: " << fileName;
       continue;
@@ -96,18 +99,30 @@ int main( int argc, char * argv[] )
     
     // get length of file:
     pFile.seekg (0, pFile.end);
-    int length = pFile.tellg();
+    const std::streamoff streamLength = pFile.tellg();
+    if( streamLength < 0 ||
+        streamLength > std::numeric_limits<std::streamsize>::max() ||
+        static_cast<std::uintmax_t>(streamLength) >
+            std::numeric_limits<std::size_t>::max() ) {
+      std::cerr << "Invalid file size: " << fileName << "\n";
+      continue;
+    }
     pFile.seekg (0, pFile.beg);
-    
+
     // read file data
-    char * fileData = new char[length];
-    pFile.read(fileData, length);
+    std::string fileData(static_cast<std::size_t>(streamLength), '\0');
+    if( !fileData.empty() ) {
+      pFile.read(fileData.data(), static_cast<std::streamsize>(streamLength));
+    }
+    if( !pFile ) {
+      std::cerr << "Unable to read file: " << fileName << "\n";
+      continue;
+    }
     pFile.close();
-    
+
     // parse the file
     std::cout << fileName << "\n";
-    parse_file(fileData, length);
-    delete[] fileData;
+    parse_file(fileData.data(), fileData.size());
   }
 
   // Summarize
@@ -147,7 +162,7 @@ int main( int argc, char * argv[] )
           nUnexpectedPasses > 0 ? 1 : 0);
 }
 
-void parse_file(char * fileData, int length)
+void parse_file(const char * fileData, std::size_t length)
 {
   // start yaml parser
   yaml_parser_t parser;
@@ -305,8 +320,15 @@ void mustache_spec_parse_data(yaml_document_t * document, yaml_node_t * node, mu
     }
   } else if( node->type == YAML_SEQUENCE_NODE ) {
     yaml_node_item_t * item;
-    int nItems = node->data.sequence.items.top - node->data.sequence.items.start;
-    data->init(mustache::Data::TypeArray, nItems);
+    const std::ptrdiff_t itemCount =
+        node->data.sequence.items.top - node->data.sequence.items.start;
+    if( itemCount < 0 ||
+        itemCount > static_cast<std::ptrdiff_t>(
+            std::numeric_limits<int>::max()) ) {
+      throw std::runtime_error("Invalid specification array size");
+    }
+    data->init(
+        mustache::Data::TypeArray, static_cast<int>(itemCount));
     for( item = node->data.sequence.items.start; item < node->data.sequence.items.top; item ++) {
       mustache::Data child;
       yaml_node_t * valueNode = yaml_document_get_node(document, *item);
@@ -335,7 +357,6 @@ void mustache_spec_parse_partials(yaml_document_t * document, yaml_node_t * node
   }
   
   mustache::Mustache mustache;
-  std::string ckey;
   yaml_node_pair_t * pair;
 
   for( pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; pair++ ) {

@@ -30,6 +30,7 @@ build_script:
     -DVCPKG_INSTALLED_DIR=%APPVEYOR_BUILD_FOLDER%\vcpkg_installed
     -DVCPKG_TARGET_TRIPLET=%VCPKG_DEFAULT_TRIPLET%
     -DVCPKG_MANIFEST_MODE=ON
+    -DMUSTACHE_WARNINGS_AS_ERRORS=ON
   - cmake --build build --config Release --parallel
   - cmake --install build --config Release
   - copy /Y vcpkg_installed\%VCPKG_DEFAULT_TRIPLET%\bin\*.dll artifacts\bin\

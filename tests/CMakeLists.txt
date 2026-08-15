@@ -57,6 +57,14 @@ if(MUSTACHE_BUILD_CLI)
 endif()
 
 add_test(NAME spec COMMAND test_spec "${MUSTACHE_SPEC_DIR}")
+if(WIN32)
+    add_test(NAME spec_crlf
+        COMMAND "${CMAKE_COMMAND}"
+            "-DTEST_SPEC_EXECUTABLE=$<TARGET_FILE:test_spec>"
+            "-DMUSTACHE_SPEC_DIR=${MUSTACHE_SPEC_DIR}"
+            "-DCRLF_SPEC_DIR=${CMAKE_CURRENT_BINARY_DIR}/spec-crlf"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_spec_crlf.cmake")
+endif()
 add_test(NAME utils COMMAND test_utils)
 add_test(NAME misc COMMAND test_misc)
 add_test(NAME data_behavior COMMAND test_data_behavior)

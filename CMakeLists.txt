@@ -31,8 +31,35 @@ option(MUSTACHE_BUILD_CLI "Build the mustache command-line program" ${MUSTACHE_I
 option(MUSTACHE_ENABLE_TESTS "Build and register the test suite" ${MUSTACHE_IS_TOP_LEVEL})
 option(MUSTACHE_ENABLE_HARDENING "Enable supported compiler and linker hardening" ON)
 option(MUSTACHE_ENABLE_ASSERTIONS "Enable standard-library runtime assertions" ON)
+option(MUSTACHE_WARNINGS_AS_ERRORS "Treat project compiler warnings as errors" OFF)
 option(MUSTACHE_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(MUSTACHE_ENABLE_FUZZING "Build the Clang libFuzzer targets and smoke tests" OFF)
+
+if(NOT MSVC AND MUSTACHE_ENABLE_HARDENING)
+    include(CheckCXXSourceCompiles)
+    include(CMakePushCheckState)
+    cmake_push_check_state(RESET)
+    set(CMAKE_REQUIRED_FLAGS
+        "-O2 -Werror -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3")
+    check_cxx_source_compiles([=[
+        #if !defined(__OPTIMIZE__) || __OPTIMIZE__ <= 0
+        #error _FORTIFY_SOURCE requires optimization
+        #endif
+        #if !defined(_FORTIFY_SOURCE) || _FORTIFY_SOURCE != 3
+        #error _FORTIFY_SOURCE=3 was not selected
+        #endif
+        #include <cstring>
+
+        int main()
+        {
+            char source[] = "abc";
+            char destination[sizeof(source)];
+            std::memcpy(destination, source, sizeof(source));
+            return destination[0] == 'a' ? 0 : 1;
+        }
+    ]=] MUSTACHE_FORTIFY_SOURCE_3_SUPPORTED)
+    cmake_pop_check_state()
+endif()
 
 if(MUSTACHE_ENABLE_FUZZING)
     if(NOT MUSTACHE_ENABLE_TESTS)
@@ -95,15 +122,24 @@ configure_file(
 function(mustache_apply_build_options target)
     if(MSVC)
         target_compile_options(${target} PRIVATE /W4)
+        if(MUSTACHE_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE /WX)
+        endif()
     else()
         target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+        if(MUSTACHE_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE -Werror)
+        endif()
         if(MUSTACHE_ENABLE_ASSERTIONS)
             target_compile_definitions(${target} PRIVATE _GLIBCXX_ASSERTIONS=1)
         endif()
         if(MUSTACHE_ENABLE_HARDENING)
             target_compile_options(${target} PRIVATE -fstack-protector-strong)
-            target_compile_definitions(${target} PRIVATE
-                $<$<NOT:$<CONFIG:Debug>>:_FORTIFY_SOURCE=3>)
+            if(MUSTACHE_FORTIFY_SOURCE_3_SUPPORTED)
+                target_compile_options(${target} PRIVATE
+                    $<$<NOT:$<CONFIG:Debug>>:-U_FORTIFY_SOURCE>
+                    $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=3>)
+            endif()
             if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
                 target_link_options(${target} PRIVATE -Wl,-z,relro -Wl,-z,now)
             endif()

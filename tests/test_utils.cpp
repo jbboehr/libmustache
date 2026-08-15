@@ -6,13 +6,13 @@
 
 #include "utils.hpp"
 
-int main( int argc, char * argv[] )
+int main()
 {
   std::string case1 = "a.b.c";
   std::vector<std::string> result1;
   mustache::explode(".", case1, &result1);
   if( result1.size() != 3 ) {
-    fprintf(stdout, "Failed, expected three parts, got %lu\n", result1.size());
+    fprintf(stdout, "Failed, expected three parts, got %zu\n", result1.size());
     return 1;
   }
   if( result1[0].compare("a") != 0 ) {
@@ -30,4 +30,3 @@ int main( int argc, char * argv[] )
   
   return 0;
 }
-

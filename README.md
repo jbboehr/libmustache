@@ -43,6 +43,9 @@ cmake -S . -B build \
   -DMUSTACHE_ENABLE_TESTS=OFF
 ```
 
+Maintainer and CI builds can add `-DMUSTACHE_WARNINGS_AS_ERRORS=ON` to promote
+project warnings to errors without changing the default for downstream builds.
+
 Installed CMake packages expose separate components. The shared component is
 the default and does not require dependency development packages at consume
 time:
@@ -74,8 +77,8 @@ sudo make install
 ```
 
 Use `--without-mustache-spec` when configuring a source tree without the
-specification submodule. `./configure --help` lists the hardening, sanitizer,
-coverage, and profiling options.
+specification submodule. `./configure --help` lists the warning-as-error,
+hardening, sanitizer, coverage, and profiling options.
 
 ## Nix
 

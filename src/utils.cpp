@@ -8,12 +8,10 @@ namespace mustache {
 void stripWhitespace(std::string& str, const std::string& chars)
 {
   std::string tmp;
-  std::string::iterator it = str.begin();
-  char * chr;
-  for( ; it != str.end() ; it++ ) {
-    std::size_t found = chars.find(*it);
+  for( const char chr : str ) {
+    std::size_t found = chars.find(chr);
     if( found == std::string::npos ) {
-      tmp += *it;
+      tmp += chr;
     }
   }
   str.swap(tmp);
@@ -49,12 +47,9 @@ void trim(std::string& str, const std::string& trimChars)
 void htmlspecialchars(std::string * str)
 {
   std::string tmp;
-  int pos = 0;
-  int len = str->length();
-  char * chr = (char *) str->c_str();
-  tmp.reserve(len * 2);
-  for( pos = 0; pos < len; pos++, chr++ ) {
-    switch( *chr ) {
+  tmp.reserve(str->size());
+  for( const char chr : *str ) {
+    switch( chr ) {
       case '&':
         tmp.append("&amp;");
         break;
@@ -71,7 +66,7 @@ void htmlspecialchars(std::string * str)
         tmp.append("&gt;");
         break;
       default:
-        tmp.append(1, *chr);
+        tmp.append(1, chr);
         break;
     }
   }
@@ -85,11 +80,8 @@ void htmlspecialchars_append(std::string * str, std::string * buf)
 
 void htmlspecialchars_append(const std::string& str, std::string * buf)
 {
-  int pos = 0;
-  int len = str.length();
-  const char * chr = str.c_str();
-  for( pos = 0; pos < len; pos++, chr++ ) {
-    switch( *chr ) {
+  for( const char chr : str ) {
+    switch( chr ) {
       case '&':
         buf->append("&amp;");
         break;
@@ -106,7 +98,7 @@ void htmlspecialchars_append(const std::string& str, std::string * buf)
         buf->append("&gt;");
         break;
       default:
-        buf->append(1, *chr);
+        buf->append(1, chr);
         break;
     }
   }
@@ -114,17 +106,17 @@ void htmlspecialchars_append(const std::string& str, std::string * buf)
 
 void explode(const std::string &delimiter, const std::string &str, std::vector<std::string> * arr)
 {
-  int strleng = str.length();
-  int delleng = delimiter.length();
+  const std::string::size_type strleng = str.length();
+  const std::string::size_type delleng = delimiter.length();
   if( delleng == 0 ) {
     // no change
     return;
   }
 
-  int i = 0;
-  int k = 0;
+  std::string::size_type i = 0;
+  std::string::size_type k = 0;
   while( i < strleng ) {
-      int j = 0;
+      std::string::size_type j = 0;
       while( i + j < strleng && j < delleng && str[i+j] == delimiter[j] ) {
         j++;
       }
