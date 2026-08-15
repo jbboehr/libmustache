@@ -152,9 +152,12 @@ The decoder must:
 - construct into temporary RAII-managed state and publish only on success; and
 - return precise, stable errors rather than aborting the process.
 
-The current serializer must also reject values that the legacy field widths
-cannot represent instead of silently truncating them, and it should return an
-owned value instead of a heap-allocated container pointer.
+The current serializer rejects values that the legacy field widths cannot
+represent instead of silently truncating them. `Node::serializeValue()` now
+returns the encoded bytes by value, while `Node::unserializeOwned()` returns a
+`std::unique_ptr<Node>` only after a complete strict decode. The original
+owning-pointer methods remain compatibility adapters over those canonical
+paths.
 
 Keep the existing `serialize()` and `unserialize()` entry points for source
 compatibility, but make their resource policy explicit through overloads that
@@ -445,10 +448,10 @@ unchanged or record an intentionally approved behavior change.
 
 ## Phase 6: Modernize rendering and lambdas
 
-**Status: renderer resource policy, exception-safe transient state, and a
-copyable callback-scoped lambda capability are implemented on the 0.6
-development branch. Migrating downstream bindings off the retainable legacy
-renderer-pointer hook remains.**
+**Status: renderer resource policy, exception-safe transient state, bounded
+compatibility AST reconstruction, and a copyable callback-scoped lambda
+capability are implemented on the 0.6 development branch. Migrating downstream
+bindings off the retainable legacy renderer-pointer hook remains.**
 
 The renderer should:
 
@@ -492,13 +495,21 @@ and stable exhaustion messages are documented and covered by tests.
 php-mustache may select stricter request-appropriate defaults, but it must not
 depend on undocumented renderer behavior.
 
-The compatibility-only `Node::children_to_template_string()`,
-`Node::to_template_string()`, and installed `Stack` API remain available while
-downstream code migrates. The bounded renderer must not call the unbounded
-`Node` reconstruction helpers. Before the ABI 6 release, either add an
-explicitly bounded replacement and deprecation window or remove these surfaces
-under the source-compatibility schedule in Phase 8; do not maintain duplicate
-renderer and `Node` reconstruction implementations indefinitely.
+The compatibility-only `Node::children_to_template_string()` and
+`Node::to_template_string()` methods now share a checked reconstruction path.
+`Node::TemplateStringLimits` defaults to 64 MiB of output, 64 nodes along a
+root-to-leaf path, and 100,001 visited nodes including the receiver; zero never
+means unlimited. The receiver counts when reconstructing only its children,
+and skipped closing nodes still consume work. A separate 256-level ceiling
+protects the implementation stack even when callers configure a larger public
+limit. Returned strings are transactional, so failures never publish partial
+output. Existing overloads apply the defaults.
+
+These helpers and the installed `Stack` API remain available while downstream
+code migrates, but are transitional compatibility surfaces. The bounded
+renderer uses its own accounting-aware reconstruction and never calls them.
+Remove the duplicate compatibility surface only under the Phase 8 source
+schedule rather than breaking current consumers silently.
 
 The php-mustache lambda helper requires special handling. PHP can retain the
 helper beyond the callback window in which its legacy renderer pointer is

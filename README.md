@@ -99,8 +99,10 @@ necessarily includes C++11 support.
 
 Template source, delimiters, lambda section text, and serialized AST input
 have length-aware C++17 entry points. Prefer `std::string_view` for text and
-the pointer-plus-length `Node::unserialize` overload for raw bytes. Existing
-`std::string` and `std::vector<uint8_t>` calls remain supported as adapters.
+`Node::unserializeOwned()` for complete serialized AST byte strings. Prefer
+`Node::serializeValue()` when legacy AST persistence is required. The original
+owning-pointer `serialize()` and `unserialize()` calls remain supported as
+compatibility adapters.
 
 Template parsing also accepts `Tokenizer::Limits`. The compatibility defaults
 permit 64 MiB of input, 62 nested sections, 100,000 AST nodes excluding the
@@ -291,6 +293,16 @@ name components are stored as values; `children`, `child`, and `partials` use
 `std::unique_ptr<Node>` to make ownership explicit. Construct manually supplied
 nodes with `std::make_unique<Node>()` and move them into those containers. The
 tokenizer and decoder publish complete trees transactionally.
+
+The compatibility `Node::to_template_string()` and
+`children_to_template_string()` helpers enforce `Node::TemplateStringLimits`.
+Their defaults permit 64 MiB of reconstructed output, 64 nodes along a
+root-to-leaf path, and 100,001 visited nodes including the receiver. Explicit
+limits can be stricter, but a separate 256-level implementation ceiling always
+protects the C++ call stack. The receiver counts even when only its children
+are reconstructed, and skipped closing nodes still consume the node-work
+budget. These helpers and the installed `Stack` template remain transitional
+compatibility APIs; new rendering code should use `CompiledTemplate`.
 
 ## Windows
 

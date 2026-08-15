@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -72,6 +73,13 @@ void expectBytes(
   std::fprintf(stderr, "%s (expected %zu bytes, got %zu)\n", message,
       expected.size(), actual.size());
   ++failures;
+}
+
+std::string_view byteView(const std::vector<uint8_t>& bytes)
+{
+  const char * data = bytes.empty()
+      ? "" : reinterpret_cast<const char *>(bytes.data());
+  return std::string_view(data, bytes.size());
 }
 
 void appendUint16(std::vector<uint8_t>& output, std::size_t value)
@@ -270,6 +278,17 @@ void testPHPFixture()
   std::unique_ptr<std::vector<uint8_t> > serialized(root->serialize());
   expectBytes(*serialized, fixture,
       "legacy fixture must serialize back to its exact public byte sequence");
+
+  const std::vector<uint8_t> serializedValue = root->serializeValue();
+  expectBytes(serializedValue, fixture,
+      "value serializer changed the public byte sequence");
+  std::unique_ptr<mustache::Node> owned =
+      mustache::Node::unserializeOwned(byteView(fixture));
+  expect(owned->type == mustache::Node::TypeRoot &&
+          owned->children.size() == 1,
+      "RAII decoder did not return the complete fixture tree");
+  expectBytes(owned->serializeValue(), fixture,
+      "RAII codec did not round-trip the public byte sequence");
 
   mustache::Data data(mustache::Data::TypeMap, 0);
   data.set("test", mustache::Data::string("baz"));
@@ -535,6 +554,10 @@ void testSerializationLimits()
   std::unique_ptr<std::vector<uint8_t> > serialized(root->serialize(limits));
   expectBytes(*serialized, fixture,
       "exact serializer resource limits must accept the fixture");
+  std::unique_ptr<mustache::Node> owned =
+      mustache::Node::unserializeOwned(byteView(fixture), limits);
+  expectBytes(owned->serializeValue(limits), fixture,
+      "exact resource limits must accept the RAII codec APIs");
 
   limits.maxOutputBytes = fixture.size() - 1;
   expectSerializeInvalidWithLimits(*root, limits,

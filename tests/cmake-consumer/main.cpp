@@ -106,11 +106,18 @@ int main()
     root.children.push_back(std::make_unique<mustache::Node>(
         mustache::Node::TypeOutput, "owned"));
     mustache::Node movedRoot(std::move(root));
-    std::unique_ptr<std::vector<uint8_t> > serial(movedRoot.serialize(limits));
-    std::size_t position = 0;
-    std::unique_ptr<mustache::Node> decoded(
-        mustache::Node::unserialize(
-            serial->data(), serial->size(), 0, &position, limits));
+    const std::vector<uint8_t> serial = movedRoot.serializeValue(limits);
+    const char* serialData = serial.empty()
+        ? "" : reinterpret_cast<const char*>(serial.data());
+    std::unique_ptr<mustache::Node> decoded =
+        mustache::Node::unserializeOwned(
+            std::string_view(serialData, serial.size()), limits);
+    mustache::Node::TemplateStringLimits templateLimits;
+    templateLimits.maxOutputBytes = 5;
+    templateLimits.maxNestingDepth = 2;
+    templateLimits.maxNodes = 2;
+    const std::string nodeTemplate = movedRoot.to_template_string(
+        "{{", "}}", templateLimits);
 
     mustache::Data::ParseLimits dataLimits;
     const char jsonData[] = {'"', 'c', 'o', 'm', 'p', 'i', 'l', 'e', 'd', '"'};
@@ -141,7 +148,7 @@ int main()
             decoded->children.size() == 1 &&
             decoded->children.front()->data.has_value() &&
             *decoded->children.front()->data == "owned" &&
-            position == serial->size() &&
+            nodeTemplate == "owned" &&
             compiledOutput == "[compiled]" &&
             lambdaOutput == "consumer-lambda" &&
             !inactiveContext.active() && inactiveContextRejected

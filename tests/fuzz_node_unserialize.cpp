@@ -68,16 +68,22 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t * data, std::size_t size)
     serial.assign(data, data + size);
   }
 
-  std::size_t position = 0;
+  const char * serialData = serial.empty()
+      ? "" : reinterpret_cast<const char *>(serial.data());
+  std::unique_ptr<mustache::Node> node;
   try {
-    std::unique_ptr<mustache::Node> node(
-        mustache::Node::unserialize(serial, 0, &position));
-    std::unique_ptr<std::vector<uint8_t> > encoded(node->serialize());
-    if( position != serial.size() || *encoded != serial ) {
-      std::abort();
-    }
+    node = mustache::Node::unserializeOwned(
+        std::string_view(serialData, serial.size()));
   } catch( const mustache::Exception& ) {
+    return 0;
   }
+
+  const std::vector<uint8_t> encoded = node->serializeValue();
+  if( encoded != serial ) {
+    std::abort();
+  }
+  static_cast<void>(node->to_template_string("{{", "}}"));
+  static_cast<void>(node->children_to_template_string("{{", "}}"));
 
   return 0;
 }

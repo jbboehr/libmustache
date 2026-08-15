@@ -16,6 +16,7 @@ namespace {
 const size_t serialHeaderSize = 14;
 const size_t serialMaxDataSize = 0x00ffffff;
 const size_t serialMaxChildren = 0x0000ffff;
+const size_t templateStringImplementationMaxDepth = 256;
 
 struct SerialState {
   explicit SerialState(const Node::SerializationLimits& limits) :
@@ -24,6 +25,14 @@ struct SerialState {
   const Node::SerializationLimits& limits;
   size_t nodes;
   size_t dataParts;
+};
+
+struct TemplateStringState {
+  explicit TemplateStringState(const Node::TemplateStringLimits& limits) :
+      limits(limits), nodes(0) {}
+
+  const Node::TemplateStringLimits& limits;
+  size_t nodes;
 };
 
 bool isSerializableTypeValue(size_t type)
@@ -346,6 +355,134 @@ std::unique_ptr<Node> unserializeNode(SerialReader& reader, size_t limit,
   return node;
 }
 
+std::unique_ptr<Node> unserializeOwnedRange(const uint8_t * serial,
+    size_t length, size_t offset,
+    const Node::SerializationLimits& limits)
+{
+  if( serial == NULL && length != 0 ) {
+    throw Exception("Missing serial data");
+  }
+  if( offset > length ) {
+    throw Exception("Invalid serial offset");
+  }
+  if( length - offset > limits.maxInputBytes ) {
+    throw Exception("Serialized AST size limit exceeded");
+  }
+
+  SerialReader reader(serial, length, offset);
+  SerialState state(limits);
+  std::unique_ptr<Node> node(
+      unserializeNode(reader, length, state, 0));
+  if( reader.position() != length ) {
+    throw Exception("Trailing serial data");
+  }
+  return node;
+}
+
+void checkTemplateStringBudget(TemplateStringState& state, size_t depth)
+{
+  if( depth >= state.limits.maxNestingDepth ||
+      depth >= templateStringImplementationMaxDepth ) {
+    throw Exception("Template node nesting limit exceeded");
+  }
+  if( state.nodes >= state.limits.maxNodes ) {
+    throw Exception("Template node count limit exceeded");
+  }
+  ++state.nodes;
+}
+
+void appendTemplateString(std::string& output, std::string_view value,
+    const TemplateStringState& state)
+{
+  if( output.size() > state.limits.maxOutputBytes ||
+      value.size() > state.limits.maxOutputBytes - output.size() ) {
+    throw Exception("Template reconstruction size limit exceeded");
+  }
+  output.append(value.data(), value.size());
+}
+
+void appendNodeTemplate(const Node& node, const std::string& start,
+    const std::string& stop, std::string& output,
+    TemplateStringState& state, size_t depth);
+
+void appendNodeChildren(const Node& node, const std::string& start,
+    const std::string& stop, std::string& output,
+    TemplateStringState& state, size_t depth, bool skipStops)
+{
+  for( Node::Children::const_iterator it = node.children.begin();
+      it != node.children.end(); ++it ) {
+    if( *it == NULL ) {
+      throw Exception("Invalid null child node");
+    }
+    if( skipStops && (*it)->type == Node::TypeStop ) {
+      checkTemplateStringBudget(state, depth);
+      continue;
+    }
+    appendNodeTemplate(**it, start, stop, output, state, depth);
+  }
+}
+
+void appendNodeTemplate(const Node& node, const std::string& start,
+    const std::string& stop, std::string& output,
+    TemplateStringState& state, size_t depth)
+{
+  checkTemplateStringBudget(state, depth);
+
+  if( !(node.type & Node::TypeHasNoString) && !node.data.has_value() ) {
+    throw Exception("Invalid node without data");
+  }
+
+  switch( node.type ) {
+    case Node::TypeComment:
+      appendTemplateString(output, start, state);
+      appendTemplateString(output, "!", state);
+      appendTemplateString(output, *node.data, state);
+      appendTemplateString(output, stop, state);
+      break;
+    case Node::TypeOutput:
+      appendTemplateString(output, *node.data, state);
+      break;
+    case Node::TypePartial:
+      appendTemplateString(output, start, state);
+      appendTemplateString(output, ">", state);
+      appendTemplateString(output, *node.data, state);
+      appendTemplateString(output, stop, state);
+      break;
+    case Node::TypeNegate:
+    case Node::TypeSection:
+    case Node::TypeStop:
+    case Node::TypeVariable:
+      appendTemplateString(output, start, state);
+      if( node.type == Node::TypeVariable &&
+          !(node.flags & Node::FlagEscape) ) {
+        appendTemplateString(output, "&", state);
+      }
+      if( node.type == Node::TypeNegate ) {
+        appendTemplateString(output, "^", state);
+      } else if( node.type == Node::TypeSection ) {
+        appendTemplateString(output, "#", state);
+      } else if( node.type == Node::TypeStop ) {
+        appendTemplateString(output, "/", state);
+      }
+      appendTemplateString(output, *node.data, state);
+      appendTemplateString(output, stop, state);
+      [[fallthrough]];
+    case Node::TypeRoot:
+      appendNodeChildren(
+          node, start, stop, output, state, depth + 1, false);
+      break;
+    case Node::TypeNone:
+    case Node::TypeTag:
+    case Node::TypeContainer:
+    case Node::TypeInlinePartial:
+    case Node::TypeHasChildren:
+    case Node::TypeHasData:
+    case Node::TypeHasNoString:
+    case Node::TypeHasDot:
+      break;
+  }
+}
+
 } // namespace
 
 Node::SerializationLimits::SerializationLimits() :
@@ -355,6 +492,14 @@ Node::SerializationLimits::SerializationLimits() :
     maxNodes(100000),
     maxDataPartsPerNode(256),
     maxDataParts(100000)
+{
+}
+
+Node::TemplateStringLimits::TemplateStringLimits() :
+    maxOutputBytes(64 * 1024 * 1024),
+    maxNestingDepth(64),
+    // Tokenizer::Limits::maxNodes excludes the root receiver.
+    maxNodes(100001)
 {
 }
 
@@ -407,23 +552,18 @@ Node::~Node() = default;
 std::string Node::children_to_template_string(
     const std::string& start, const std::string& stop) const
 {
-  std::string template_string;
+  return children_to_template_string(
+      start, stop, TemplateStringLimits());
+}
 
-  if( children.size() > 0 ) {
-    Node::Children::const_iterator it;
-    for( it = children.begin() ; it != children.end(); it++ ) {
-      if( *it == NULL ) {
-        throw Exception("Invalid null child node");
-      }
-      if( (*it)->type == Node::TypeStop ) {
-        continue;
-      }
-
-      template_string.append((*it)->to_template_string(start, stop));
-    }
-  }
-
-  return template_string;
+std::string Node::children_to_template_string(const std::string& start,
+    const std::string& stop, const TemplateStringLimits& limits) const
+{
+  std::string output;
+  TemplateStringState state(limits);
+  checkTemplateStringBudget(state, 0);
+  appendNodeChildren(*this, start, stop, output, state, 1, true);
+  return output;
 }
 
 void Node::setData(const std::string& value)
@@ -444,92 +584,57 @@ void Node::setData(const std::string& value)
 
 std::vector<uint8_t> * Node::serialize() const
 {
-  const SerializationLimits limits;
-  return serialize(limits);
+  return new std::vector<uint8_t>(serializeValue());
 }
 
 std::vector<uint8_t> * Node::serialize(
     const SerializationLimits& limits) const
 {
-  std::unique_ptr<std::vector<uint8_t> > output(
-      new std::vector<uint8_t>());
-  output->reserve(18);
+  return new std::vector<uint8_t>(serializeValue(limits));
+}
+
+std::vector<uint8_t> Node::serializeValue() const
+{
+  return serializeValue(SerializationLimits());
+}
+
+std::vector<uint8_t> Node::serializeValue(
+    const SerializationLimits& limits) const
+{
+  std::vector<uint8_t> output;
+  output.reserve(18);
 
   SerialState state(limits);
-  serializeNode(*this, *output, state, 0);
-  return output.release();
+  serializeNode(*this, output, state, 0);
+  return output;
 }
 
 std::string Node::to_template_string(
     const std::string& start, const std::string& stop) const
 {
-  std::string template_string;
+  return to_template_string(start, stop, TemplateStringLimits());
+}
 
-  if( !(type & Node::TypeHasNoString) && !data.has_value() ) {
-    throw Exception("Invalid node without data");
-  }
+std::string Node::to_template_string(const std::string& start,
+    const std::string& stop, const TemplateStringLimits& limits) const
+{
+  std::string output;
+  TemplateStringState state(limits);
+  appendNodeTemplate(*this, start, stop, output, state, 0);
+  return output;
+}
 
-  switch( type ) {
-    case Node::TypeComment:
-      template_string.append(start);
-      template_string.append("!");
-      template_string.append(*data);
-      template_string.append(stop);
-      break;
-    case Node::TypeOutput:
-      template_string.assign(*data);
-      break;
-    case Node::TypePartial:
-      template_string.append(start);
-      template_string.append(">");
-      template_string.append(*data);
-      template_string.append(stop);
-      break;
-    case Node::TypeNegate:
-    case Node::TypeSection:
-    case Node::TypeStop:
-    case Node::TypeVariable:
-      template_string.append(start);
+std::unique_ptr<Node> Node::unserializeOwned(std::string_view serial)
+{
+  return unserializeOwned(serial, SerializationLimits());
+}
 
-      if( type == Node::TypeVariable && !(flags & Node::FlagEscape) ) {
-        template_string.append("&");
-      }
-
-      if( type == Node::TypeNegate ) {
-        template_string.append("^");
-      } else if( type == Node::TypeSection ) {
-        template_string.append("#");
-      } else if( type == Node::TypeStop ) {
-        template_string.append("/");
-      }
-
-      template_string.append(*data);
-
-      template_string.append(stop);
-      [[fallthrough]];
-    case Node::TypeRoot: // a root node only has children, so start here
-      if( children.size() > 0 ) {
-        Node::Children::const_iterator it;
-        for( it = children.begin() ; it != children.end(); it++ ) {
-          if( *it == NULL ) {
-            throw Exception("Invalid null child node");
-          }
-          template_string.append((*it)->to_template_string(start, stop));
-        }
-      }
-      break;
-    case Node::TypeNone:
-    case Node::TypeTag:
-    case Node::TypeContainer:
-    case Node::TypeInlinePartial:
-    case Node::TypeHasChildren:
-    case Node::TypeHasData:
-    case Node::TypeHasNoString:
-    case Node::TypeHasDot:
-      break;
-  }
-
-  return template_string;
+std::unique_ptr<Node> Node::unserializeOwned(
+    std::string_view serial, const SerializationLimits& limits)
+{
+  return unserializeOwnedRange(
+      reinterpret_cast<const uint8_t *>(serial.data()),
+      serial.size(), 0, limits);
 }
 
 Node * Node::unserialize(std::vector<uint8_t>& serial, size_t offset, size_t * vpos)
@@ -557,25 +662,9 @@ Node * Node::unserialize(const uint8_t * serial, size_t length,
   if( vpos == NULL ) {
     throw Exception("Missing serial output position");
   }
-  if( serial == NULL && length != 0 ) {
-    throw Exception("Missing serial data");
-  }
-  if( offset > length ) {
-    throw Exception("Invalid serial offset");
-  }
-  if( length - offset > limits.maxInputBytes ) {
-    throw Exception("Serialized AST size limit exceeded");
-  }
-
-  SerialReader reader(serial, length, offset);
-  SerialState state(limits);
   std::unique_ptr<Node> node(
-      unserializeNode(reader, length, state, 0));
-  if( reader.position() != length ) {
-    throw Exception("Trailing serial data");
-  }
-
-  *vpos = reader.position();
+      unserializeOwnedRange(serial, length, offset, limits));
+  *vpos = length;
   return node.release();
 }
 

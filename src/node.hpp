@@ -44,6 +44,21 @@ class Node {
 
       MUSTACHE_API SerializationLimits();
     };
+
+    /*! \struct TemplateStringLimits
+        \brief Resource limits for reconstructing template source.
+
+        The receiver is the first visited node and occupies the first nesting
+        level, including for children_to_template_string(). Every field is an
+        enforced maximum; zero never means unlimited.
+    */
+    struct TemplateStringLimits {
+      std::size_t maxOutputBytes;
+      std::size_t maxNestingDepth;
+      std::size_t maxNodes;
+
+      MUSTACHE_API TemplateStringLimits();
+    };
     
     //! Enum of token types
     enum Type {
@@ -128,47 +143,74 @@ class Node {
     //! Destructor
     MUSTACHE_API ~Node();
 
+    /*! Reconstruct child template source using compatibility defaults. */
     MUSTACHE_API std::string children_to_template_string(
         const std::string& start, const std::string& stop) const;
+
+    //! Reconstruct child template source with explicit resource limits.
+    MUSTACHE_API std::string children_to_template_string(
+        const std::string& start, const std::string& stop,
+        const TemplateStringLimits& limits) const;
     
     //! Set data
     MUSTACHE_API void setData(const std::string& value);
     
-    //! Serialize
+    /*! Legacy owning-pointer serializer. Prefer serializeValue(). */
     MUSTACHE_API std::vector<uint8_t> * serialize() const;
 
-    //! Serialize with explicit resource limits
+    /*! Legacy owning-pointer serializer. Prefer serializeValue(). */
     MUSTACHE_API std::vector<uint8_t> * serialize(
         const SerializationLimits& limits) const;
 
+    //! Serialize into an owned value.
+    MUSTACHE_API std::vector<uint8_t> serializeValue() const;
+
+    //! Serialize into an owned value with explicit resource limits.
+    MUSTACHE_API std::vector<uint8_t> serializeValue(
+        const SerializationLimits& limits) const;
+
+    /*! Reconstruct this node using compatibility defaults. */
     MUSTACHE_API std::string to_template_string(
         const std::string& start, const std::string& stop) const;
+
+    //! Reconstruct this node with explicit resource limits.
+    MUSTACHE_API std::string to_template_string(
+        const std::string& start, const std::string& stop,
+        const TemplateStringLimits& limits) const;
+
+    //! Decode a complete serialized AST into an RAII owner.
+    static MUSTACHE_API std::unique_ptr<Node> unserializeOwned(
+        std::string_view serial);
+
+    //! Decode a complete serialized AST with explicit resource limits.
+    static MUSTACHE_API std::unique_ptr<Node> unserializeOwned(
+        std::string_view serial, const SerializationLimits& limits);
     
-    //! Unserialize
+    /*! Legacy owning-pointer decoder. Prefer unserializeOwned(). */
     static MUSTACHE_API Node * unserialize(
         std::vector<uint8_t> & serial, size_t offset, size_t * vpos);
 
-    //! Unserialize with explicit resource limits
+    /*! Legacy owning-pointer decoder. Prefer unserializeOwned(). */
     static MUSTACHE_API Node * unserialize(
         std::vector<uint8_t> & serial, size_t offset, size_t * vpos,
         const SerializationLimits& limits);
 
-    //! Unserialize an explicitly sized byte range
+    /*! Legacy owning-pointer decoder. Prefer unserializeOwned(). */
     static MUSTACHE_API Node * unserialize(const uint8_t * serial,
         size_t length,
         size_t offset, size_t * vpos);
 
-    //! Unserialize an explicitly sized byte range with resource limits
+    /*! Legacy owning-pointer decoder. Prefer unserializeOwned(). */
     static MUSTACHE_API Node * unserialize(const uint8_t * serial,
         size_t length,
         size_t offset, size_t * vpos, const SerializationLimits& limits);
 
-    //! Unserialize bytes held in a string view
+    /*! Legacy owning-pointer decoder. Prefer unserializeOwned(). */
     static MUSTACHE_API Node * unserialize(
         std::string_view serial, size_t offset,
         size_t * vpos);
 
-    //! Unserialize bytes held in a string view with resource limits
+    /*! Legacy owning-pointer decoder. Prefer unserializeOwned(). */
     static MUSTACHE_API Node * unserialize(
         std::string_view serial, size_t offset,
         size_t * vpos, const SerializationLimits& limits);

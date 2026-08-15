@@ -45,16 +45,25 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t * data, std::size_t size)
   serializationLimits.maxDataParts =
       limits.maxInputBytes + limits.maxNodes;
 
-  std::unique_ptr<std::vector<uint8_t> > serial(
-      root.serialize(serializationLimits));
-  std::size_t position = 0;
-  std::unique_ptr<mustache::Node> decoded(
-      mustache::Node::unserialize(
-          *serial, 0, &position, serializationLimits));
-  if( position != serial->size() ||
-      decoded->type != mustache::Node::TypeRoot ) {
+  const std::vector<uint8_t> serial =
+      root.serializeValue(serializationLimits);
+  const char * serialData = serial.empty()
+      ? "" : reinterpret_cast<const char *>(serial.data());
+  std::unique_ptr<mustache::Node> decoded =
+      mustache::Node::unserializeOwned(
+          std::string_view(serialData, serial.size()), serializationLimits);
+  if( decoded->type != mustache::Node::TypeRoot ) {
     std::abort();
   }
+
+  mustache::Node::TemplateStringLimits templateLimits;
+  templateLimits.maxOutputBytes = 64 * 1024;
+  templateLimits.maxNestingDepth = limits.maxNestingDepth + 2;
+  templateLimits.maxNodes = limits.maxNodes + 1;
+  static_cast<void>(
+      root.to_template_string("{{", "}}", templateLimits));
+  static_cast<void>(
+      root.children_to_template_string("{{", "}}", templateLimits));
 
   return 0;
 }
