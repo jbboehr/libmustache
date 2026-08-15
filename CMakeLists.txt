@@ -34,6 +34,14 @@ option(MUSTACHE_ENABLE_ASSERTIONS "Enable standard-library runtime assertions" O
 option(MUSTACHE_WARNINGS_AS_ERRORS "Treat project compiler warnings as errors" OFF)
 option(MUSTACHE_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(MUSTACHE_ENABLE_FUZZING "Build the Clang libFuzzer targets and smoke tests" OFF)
+option(MUSTACHE_ENABLE_CLANG_TIDY "Run clang-tidy on production targets" OFF)
+
+if(MUSTACHE_ENABLE_CLANG_TIDY)
+    find_program(MUSTACHE_CLANG_TIDY_EXECUTABLE NAMES clang-tidy REQUIRED)
+    set(MUSTACHE_CLANG_TIDY_COMMAND
+        "${MUSTACHE_CLANG_TIDY_EXECUTABLE}"
+        "--config-file=${CMAKE_CURRENT_SOURCE_DIR}/.clang-tidy")
+endif()
 
 if(NOT MSVC AND MUSTACHE_ENABLE_HARDENING)
     include(CheckCXXSourceCompiles)
@@ -153,6 +161,13 @@ function(mustache_apply_build_options target)
                 -fsanitize=address,undefined
                 -fno-sanitize-recover=all)
         endif()
+    endif()
+endfunction()
+
+function(mustache_enable_clang_tidy target)
+    if(MUSTACHE_ENABLE_CLANG_TIDY)
+        set_property(TARGET ${target} PROPERTY CXX_CLANG_TIDY
+            "${MUSTACHE_CLANG_TIDY_COMMAND}")
     endif()
 endfunction()
 

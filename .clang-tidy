@@ -1,0 +1,13 @@
+Checks: >
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  -bugprone-easily-swappable-parameters,
+  -performance-enum-size,
+  -portability-template-virtual-member-function
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(^|/)(src|bin)/'
+SystemHeaders: false
+FormatStyle: file

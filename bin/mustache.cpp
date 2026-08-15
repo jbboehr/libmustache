@@ -22,11 +22,15 @@ int main(int argc, char * argv[])
     try {
       std::cerr << "mustachec: " << exception.what() << '\n';
     } catch (...) {
+      // Failure reporting is best-effort at the process boundary.
+      return 1;
     }
   } catch (...) {
     try {
       std::cerr << "mustachec: unknown failure\n";
     } catch (...) {
+      // Failure reporting is best-effort at the process boundary.
+      return 1;
     }
   }
   return 1;

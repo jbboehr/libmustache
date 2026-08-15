@@ -3,7 +3,7 @@
 
 namespace mustache {
 
-void stripWhitespace(std::string& str, const std::string& chars)
+void stripWhitespace(std::string& str, std::string_view chars)
 {
   std::string tmp;
   for (const char chr : str) {
@@ -25,19 +25,19 @@ void trimDecimal(std::string& str)
   }
 }
 
-void trimRight(std::string& str, const std::string& trimChars)
+void trimRight(std::string& str, std::string_view trimChars)
 {
   std::string::size_type pos = str.find_last_not_of(trimChars);
   str.erase(pos + 1);
 }
 
-void trimLeft(std::string& str, const std::string& trimChars)
+void trimLeft(std::string& str, std::string_view trimChars)
 {
   std::string::size_type pos = str.find_first_not_of(trimChars);
   str.erase(0, pos);
 }
 
-void trim(std::string& str, const std::string& trimChars)
+void trim(std::string& str, std::string_view trimChars)
 {
   trimRight(str, trimChars);
   trimLeft(str, trimChars);
@@ -131,7 +131,7 @@ void explode(const std::string& delimiter, const std::string& str, std::vector<s
   arr->push_back(str.substr(k, i - k));
 }
 
-void stringTok(const std::string& str, const std::string& delimiters, std::vector<std::string> * tokens)
+void stringTok(const std::string& str, std::string_view delimiters, std::vector<std::string> * tokens)
 {
   // Skip delimiters at beginning.
   std::string::size_type lastPos = str.find_first_not_of(delimiters, 0);

@@ -75,7 +75,9 @@ std::string Lambda::invoke(std::string *, Renderer *)
   throw Exception("Legacy section lambda callback is not implemented");
 }
 
-std::string Lambda::invoke(std::string_view text, LambdaRenderContext context)
+// Passing the context by value gives each callback its own retainable capability handle.
+std::string Lambda::invoke(
+    std::string_view text, LambdaRenderContext context) // NOLINT(performance-unnecessary-value-param)
 {
   std::string ownedText(text);
   return invoke(&ownedText, context.legacyRenderer());

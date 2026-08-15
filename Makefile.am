@@ -9,6 +9,7 @@ EXTRA_DIST = \
 	README.md \
 	LICENSE.md \
 	CMakeLists.txt \
+	.clang-tidy \
 	.appveyor.yml \
 	.envrc \
 	.github/workflows/ci.yml \

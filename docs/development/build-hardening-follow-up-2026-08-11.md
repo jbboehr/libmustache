@@ -102,6 +102,43 @@ targets and remain opt-in for ordinary downstream builds. GitHub Actions,
 AppVeyor, and checked Nix builds enable the policy across GCC, Clang,
 AppleClang, and MSVC so new diagnostics fail CI.
 
+### Run production sources through focused static analysis
+
+CMake's opt-in `MUSTACHE_ENABLE_CLANG_TIDY` option runs clang-tidy against the
+static library implementation and command-line executable. The shared library
+uses the same implementation sources and is intentionally omitted to avoid
+duplicate diagnostics; tests and downstream fixtures are outside this
+production-source policy.
+
+The pinned Nix `libmustache-clang-tidy` check builds with LLVM and treats every
+enabled finding as an error. Because GitHub Actions derives its jobs from the
+flake checks, the same analysis runs in CI. The Nix development shell also
+provides `clang-tidy`. Reproduce the CI lane with:
+
+```console
+nix build .#checks.x86_64-linux.libmustache-clang-tidy
+```
+
+The policy enables the Clang analyzer plus the `bugprone`, `performance`, and
+`portability` families. It excludes `bugprone-easily-swappable-parameters`, a
+subjective API-naming heuristic; `performance-enum-size`, an ABI-sensitive
+layout optimization rather than a safety check; and
+`portability-template-virtual-member-function`, which diagnoses the private
+nlohmann/json SAX interface rather than project code. The intentional
+pass-by-value lambda render context has one local suppression because retaining
+that value is part of the capability's lifetime contract.
+
+The initial analysis made `noexcept` data queries use non-throwing variant
+access, validated optional node data before dereferencing it, widened resource
+limit arithmetic before multiplication, replaced dynamically initialized
+utility constants with borrowed string views, clarified tokenizer control flow,
+and made best-effort command-line error reporting paths explicit.
+
+Automake release archives include the clang-tidy policy and every CMake
+subdirectory manifest, while excluding Autotools' generated configuration
+header. A release archive can therefore be configured, analyzed, built, and
+tested directly with CMake.
+
 ### Make the Windows DLL boundary explicit
 
 The checked-in `MUSTACHE_API` macro now exports only public library operations

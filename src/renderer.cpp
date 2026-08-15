@@ -60,27 +60,35 @@ bool isPartialIndentation(std::string_view value)
   });
 }
 
-bool validatePartialIndentationAt(const Node::Children& children, std::size_t index)
+const std::string& requireNodeData(const Node& node)
+{
+  if (!node.data.has_value()) {
+    throw Exception("Invalid node without data");
+  }
+  return node.data.value();
+}
+
+const std::string * validatePartialIndentationAt(const Node::Children& children, std::size_t index)
 {
   const Node * child = children[index].get();
   if (child == NULL || (child->flags & Node::FlagPartialIndent) == 0) {
-    return false;
+    return NULL;
   }
   if (child->type != Node::TypeOutput || child->flags != (Node::FlagLambdaOnly | Node::FlagPartialIndent) ||
       !child->data.has_value() || !isPartialIndentation(*child->data) || index + 1 >= children.size() ||
       children[index + 1] == NULL || children[index + 1]->type != Node::TypePartial) {
     throw Exception("Invalid standalone partial indentation metadata");
   }
-  return true;
+  return &child->data.value();
 }
 
 } // namespace
 
 RenderLimits::RenderLimits() :
-    maxOutputBytes(64 * 1024 * 1024),
+    maxOutputBytes(std::size_t{64} * 1024 * 1024),
     maxNestingDepth(renderNestingCeiling),
     maxNodeVisits(1000000),
-    maxLambdaTemplateBytes(64 * 1024 * 1024)
+    maxLambdaTemplateBytes(std::size_t{64} * 1024 * 1024)
 {}
 
 Renderer::Renderer() :
@@ -256,9 +264,10 @@ void Renderer::_renderChildren(const Node * node, std::size_t depth)
 {
   for (std::size_t index = 0; index < node->children.size(); ++index) {
     const std::unique_ptr<Node>& child = node->children[index];
-    if (validatePartialIndentationAt(node->children, index)) {
+    const std::string * partialIndentation = validatePartialIndentationAt(node->children, index);
+    if (partialIndentation != NULL) {
       _renderNode(child.get(), depth + 1, NULL, true);
-      _renderNode(node->children[index + 1].get(), depth + 1, &*child->data);
+      _renderNode(node->children[index + 1].get(), depth + 1, partialIndentation);
       ++index;
       continue;
     }
@@ -474,16 +483,16 @@ void Renderer::_appendLambdaNodeTemplate(
     case Node::TypeComment:
       _appendLambdaTemplate(output, start);
       _appendLambdaTemplate(output, "!");
-      _appendLambdaTemplate(output, *node->data);
+      _appendLambdaTemplate(output, requireNodeData(*node));
       _appendLambdaTemplate(output, stop);
       break;
     case Node::TypeOutput:
-      _appendLambdaTemplate(output, *node->data);
+      _appendLambdaTemplate(output, requireNodeData(*node));
       break;
     case Node::TypePartial:
       _appendLambdaTemplate(output, start);
       _appendLambdaTemplate(output, ">");
-      _appendLambdaTemplate(output, *node->data);
+      _appendLambdaTemplate(output, requireNodeData(*node));
       _appendLambdaTemplate(output, stop);
       break;
     case Node::TypeNegate:
@@ -501,7 +510,7 @@ void Renderer::_appendLambdaNodeTemplate(
       } else if (node->type == Node::TypeStop) {
         _appendLambdaTemplate(output, "/");
       }
-      _appendLambdaTemplate(output, *node->data);
+      _appendLambdaTemplate(output, requireNodeData(*node));
       _appendLambdaTemplate(output, stop);
       appendChildren = true;
       break;
@@ -737,6 +746,7 @@ void Renderer::_renderNode(
 
     case Node::TypePartial: {
       _beginTemplateTag();
+      const std::string& name = requireNodeData(*node);
       std::vector<std::string_view> indentation;
       if (partialIndentation != NULL) {
         if (!_indentationStack.empty()) {
@@ -755,21 +765,21 @@ void Renderer::_renderNode(
       };
       bool partialFound = false;
       if (_partialResolver) {
-        const Node * partial = _partialResolver(*node->data);
+        const Node * partial = _partialResolver(name);
         if (partial != NULL) {
           partialFound = true;
           renderPartial(partial);
         }
       }
       if (!partialFound && _partials != NULL) {
-        const Node::Partials::const_iterator partial = _partials->find(*node->data);
+        const Node::Partials::const_iterator partial = _partials->find(name);
         if (partial != _partials->end() && partial->second != NULL) {
           partialFound = true;
           renderPartial(partial->second.get());
         }
       }
       if (!partialFound && !_node->partials.empty()) {
-        const Node::Partials::const_iterator partial = _node->partials.find(*node->data);
+        const Node::Partials::const_iterator partial = _node->partials.find(name);
         if (partial != _node->partials.end() && partial->second != NULL) {
           renderPartial(partial->second.get());
         }
@@ -785,14 +795,15 @@ void Renderer::_renderNode(
 const Data * Renderer::_lookup(const Node * node)
 {
   const Data * data = _stack.back();
+  const std::string& name = requireNodeData(*node);
 
-  if (node->data->compare(".") == 0) {
+  if (name == ".") {
     return data;
   }
 
   if (data->type() == Data::TypeMap) {
     // Check top level
-    const Data * found = data->find(*node->data);
+    const Data * found = data->find(name);
     if (found != NULL) {
       return found;
     }
@@ -808,7 +819,7 @@ const Data * Renderer::_lookup(const Node * node)
   if (!node->dataParts.empty()) {
     initial = &(node->dataParts.at(0));
   } else {
-    initial = &*node->data;
+    initial = &name;
   }
 
   // Resolve up the data stack

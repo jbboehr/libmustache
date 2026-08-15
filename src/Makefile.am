@@ -1,5 +1,5 @@
 
-# EXTRA_DIST = mustache.def
+EXTRA_DIST = CMakeLists.txt stack.cpp
 CLEANFILES = mustache_config.h
 
 # include_HEADERS = mustache.hpp mustache_config.h
@@ -15,8 +15,9 @@ mustacheinclude_HEADERS = \
 	renderer.hpp \
 	stack.hpp \
 	tokenizer.hpp \
-	utils.hpp \
-	mustache_config.h
+	utils.hpp
+
+nodist_mustacheinclude_HEADERS = mustache_config.h
 
 noinst_LTLIBRARIES = libmustache_json_adapter.la
 libmustache_json_adapter_la_SOURCES = json_parser.cpp
@@ -48,8 +49,7 @@ libmustache_la_SOURCES = \
 	tokenizer.cpp \
 	tokenizer.hpp \
 	utils.cpp \
-	utils.hpp \
-	mustache_config.h
+	utils.hpp
 
 libmustache_la_LIBADD = libmustache_json_adapter.la $(YAML_LIBS)
 

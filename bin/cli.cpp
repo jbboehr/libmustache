@@ -354,6 +354,8 @@ void reportFailure(std::ostream& error, const char * message) noexcept
   try {
     error << "mustachec: " << message << '\n';
   } catch (...) {
+    // Failure reporting is best-effort at this noexcept process boundary.
+    return;
   }
 }
 
@@ -366,6 +368,8 @@ void reportTokenizerFailure(std::ostream& error, const mustache::TokenizerExcept
     }
     error << '\n';
   } catch (...) {
+    // Failure reporting is best-effort at this noexcept process boundary.
+    return;
   }
 }
 

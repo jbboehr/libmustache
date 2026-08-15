@@ -1,6 +1,8 @@
 
 bin_PROGRAMS = mustachec
 
+EXTRA_DIST = CMakeLists.txt
+
 mustachec_SOURCES = mustache.cpp cli.cpp cli.hpp
 
 AM_CXXFLAGS = @MUSTACHE_CXXFLAGS@

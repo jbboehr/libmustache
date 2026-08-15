@@ -448,6 +448,14 @@ void appendNodeChildren(const Node& node, const std::string& start, const std::s
   }
 }
 
+const std::string& requireNodeData(const Node& node)
+{
+  if (!node.data.has_value()) {
+    throw Exception("Invalid node without data");
+  }
+  return node.data.value();
+}
+
 void appendNodeTemplate(const Node& node, const std::string& start, const std::string& stop, std::string& output,
     TemplateStringState& state, size_t depth)
 {
@@ -461,16 +469,16 @@ void appendNodeTemplate(const Node& node, const std::string& start, const std::s
     case Node::TypeComment:
       appendTemplateString(output, start, state);
       appendTemplateString(output, "!", state);
-      appendTemplateString(output, *node.data, state);
+      appendTemplateString(output, requireNodeData(node), state);
       appendTemplateString(output, stop, state);
       break;
     case Node::TypeOutput:
-      appendTemplateString(output, *node.data, state);
+      appendTemplateString(output, requireNodeData(node), state);
       break;
     case Node::TypePartial:
       appendTemplateString(output, start, state);
       appendTemplateString(output, ">", state);
-      appendTemplateString(output, *node.data, state);
+      appendTemplateString(output, requireNodeData(node), state);
       appendTemplateString(output, stop, state);
       break;
     case Node::TypeNegate:
@@ -488,7 +496,7 @@ void appendNodeTemplate(const Node& node, const std::string& start, const std::s
       } else if (node.type == Node::TypeStop) {
         appendTemplateString(output, "/", state);
       }
-      appendTemplateString(output, *node.data, state);
+      appendTemplateString(output, requireNodeData(node), state);
       appendTemplateString(output, stop, state);
       [[fallthrough]];
     case Node::TypeRoot:
@@ -509,8 +517,8 @@ void appendNodeTemplate(const Node& node, const std::string& start, const std::s
 } // namespace
 
 Node::SerializationLimits::SerializationLimits() :
-    maxInputBytes(64 * 1024 * 1024),
-    maxOutputBytes(64 * 1024 * 1024),
+    maxInputBytes(std::size_t{64} * 1024 * 1024),
+    maxOutputBytes(std::size_t{64} * 1024 * 1024),
     maxNestingDepth(64),
     maxNodes(100000),
     maxDataPartsPerNode(256),
@@ -518,7 +526,7 @@ Node::SerializationLimits::SerializationLimits() :
 {}
 
 Node::TemplateStringLimits::TemplateStringLimits() :
-    maxOutputBytes(64 * 1024 * 1024),
+    maxOutputBytes(std::size_t{64} * 1024 * 1024),
     maxNestingDepth(64),
     // Tokenizer::Limits::maxNodes excludes the root receiver.
     maxNodes(100001)
@@ -591,7 +599,7 @@ void Node::setData(const std::string& value)
   std::vector<std::string> nextDataParts;
 
   if (this->type & Node::TypeHasDot) {
-    size_t found = value.find(".");
+    size_t found = value.find('.');
     if (found != std::string::npos) {
       explode(".", value, &nextDataParts);
     }

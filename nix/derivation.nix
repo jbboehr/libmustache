@@ -8,6 +8,7 @@
   automake,
   autoreconfHook,
   cmake ? null,
+  clang-tools ? null,
   nlohmann_json,
   libyaml,
   mustache_spec,
@@ -19,6 +20,7 @@
   debugSupport ? false,
   sanitizerSupport ? false,
   fuzzSupport ? false,
+  clangTidySupport ? false,
 }:
 stdenv.mkDerivation (finalAttrs: {
   pname =
@@ -26,7 +28,8 @@ stdenv.mkDerivation (finalAttrs: {
     + lib.optionalString cmakeSupport "-cmake"
     + lib.optionalString staticOnlySupport "-static-only"
     + lib.optionalString sanitizerSupport "-sanitized"
-    + lib.optionalString fuzzSupport "-fuzz";
+    + lib.optionalString fuzzSupport "-fuzz"
+    + lib.optionalString clangTidySupport "-clang-tidy";
   version = "0.6.0";
 
   src =
@@ -63,6 +66,7 @@ stdenv.mkDerivation (finalAttrs: {
   nativeBuildInputs =
     lib.optional checkSupport mustache_spec
     ++ lib.optionals cmakeSupport [cmake]
+    ++ lib.optional clangTidySupport clang-tools
     ++ lib.optionals (!cmakeSupport) [autoreconfHook libtool m4 autoconf automake]
     ++ [pkg-config];
 
@@ -93,6 +97,7 @@ stdenv.mkDerivation (finalAttrs: {
       (lib.cmakeBool "MUSTACHE_WARNINGS_AS_ERRORS" checkSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_SANITIZERS" sanitizerSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_FUZZING" fuzzSupport)
+      (lib.cmakeBool "MUSTACHE_ENABLE_CLANG_TIDY" clangTidySupport)
       "-DCMAKE_BUILD_TYPE=${
         if debugSupport || sanitizerSupport
         then "Debug"

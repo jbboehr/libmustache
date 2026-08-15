@@ -102,10 +102,10 @@ const char * typeDescription(Data::Type type)
 } // namespace
 
 Data::ParseLimits::ParseLimits() :
-    maxInputBytes(64 * 1024 * 1024),
+    maxInputBytes(std::size_t{64} * 1024 * 1024),
     maxNestingDepth(32),
     maxNodes(100000),
-    maxStringBytes(64 * 1024 * 1024),
+    maxStringBytes(std::size_t{64} * 1024 * 1024),
     maxContainerEntries(100000)
 {}
 
@@ -236,9 +236,9 @@ Data::Type Data::type() const noexcept
       return TypeInteger;
     case 8:
       return TypeDouble;
+    default:
+      return TypeNone;
   }
-
-  return TypeNone;
 }
 
 int Data::isEmpty() const noexcept
@@ -246,18 +246,30 @@ int Data::isEmpty() const noexcept
   switch (type()) {
     case TypeNone:
       return 1;
-    case TypeString:
-      return std::get<String>(storage_->value).empty() ? 1 : 0;
-    case TypeList:
-      return std::get<List>(storage_->value).empty() ? 1 : 0;
-    case TypeMap:
-      return std::get<Map>(storage_->value).empty() ? 1 : 0;
-    case TypeArray:
-      return std::get<Array>(storage_->value).empty() ? 1 : 0;
-    case TypeLambda:
-      return std::get<std::shared_ptr<Lambda>>(storage_->value) == nullptr ? 1 : 0;
-    case TypeBoolean:
-      return std::get<bool>(storage_->value) ? 0 : 1;
+    case TypeString: {
+      const String * value = std::get_if<String>(&storage_->value);
+      return value == nullptr || value->empty() ? 1 : 0;
+    }
+    case TypeList: {
+      const List * value = std::get_if<List>(&storage_->value);
+      return value == nullptr || value->empty() ? 1 : 0;
+    }
+    case TypeMap: {
+      const Map * value = std::get_if<Map>(&storage_->value);
+      return value == nullptr || value->empty() ? 1 : 0;
+    }
+    case TypeArray: {
+      const Array * value = std::get_if<Array>(&storage_->value);
+      return value == nullptr || value->empty() ? 1 : 0;
+    }
+    case TypeLambda: {
+      const std::shared_ptr<Lambda> * value = std::get_if<std::shared_ptr<Lambda>>(&storage_->value);
+      return value == nullptr || *value == nullptr ? 1 : 0;
+    }
+    case TypeBoolean: {
+      const bool * value = std::get_if<bool>(&storage_->value);
+      return value == nullptr || !*value ? 1 : 0;
+    }
     case TypeInteger:
     case TypeDouble:
       return 0;
@@ -326,7 +338,8 @@ Lambda * Data::lambdaValue() const noexcept
   if (type() != TypeLambda) {
     return nullptr;
   }
-  return std::get<std::shared_ptr<Lambda>>(storage_->value).get();
+  const std::shared_ptr<Lambda> * value = std::get_if<std::shared_ptr<Lambda>>(&storage_->value);
+  return value == nullptr ? nullptr : value->get();
 }
 
 std::string Data::toString() const
@@ -382,9 +395,12 @@ const Data * Data::find(const std::string& key) const noexcept
   if (type() != TypeMap) {
     return nullptr;
   }
-  const Map& values = std::get<Map>(storage_->value);
-  const Map::const_iterator found = values.find(key);
-  return found == values.end() ? nullptr : &found->second;
+  const Map * values = std::get_if<Map>(&storage_->value);
+  if (values == nullptr) {
+    return nullptr;
+  }
+  const Map::const_iterator found = values->find(key);
+  return found == values->end() ? nullptr : &found->second;
 }
 
 void Data::swap(Data& other) noexcept

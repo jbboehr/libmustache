@@ -5,22 +5,23 @@
 #include "mustache_export.hpp"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mustache {
 
 //! Whitespace character list
-const std::string whiteSpaces(" \f\n\r\t\v");
+inline constexpr std::string_view whiteSpaces(" \f\n\r\t\v");
 
 //! Special HTML character list
-const std::string specialChars("&\"'<>");
+inline constexpr std::string_view specialChars("&\"'<>");
 
 //! String whitespace from a string
 /*!
   /param str The string to strip
   /param trimChars The charaters to strip
 */
-MUSTACHE_API void stripWhitespace(std::string& str, const std::string& chars = whiteSpaces);
+MUSTACHE_API void stripWhitespace(std::string& str, std::string_view chars = whiteSpaces);
 
 //! Trim trailing zeros from a decimal-like string
 /*!
@@ -34,7 +35,7 @@ MUSTACHE_API void trimDecimal(std::string& str);
   /param str The string to trim
   /param trimChars The charaters to trim off
 */
-MUSTACHE_API void trimRight(std::string& str, const std::string& trimChars = whiteSpaces);
+MUSTACHE_API void trimRight(std::string& str, std::string_view trimChars = whiteSpaces);
 
 //! Trim a string (left)
 /*!
@@ -42,7 +43,7 @@ MUSTACHE_API void trimRight(std::string& str, const std::string& trimChars = whi
   /param str The string to trim
   /param trimChars The charaters to trim off
 */
-MUSTACHE_API void trimLeft(std::string& str, const std::string& trimChars = whiteSpaces);
+MUSTACHE_API void trimLeft(std::string& str, std::string_view trimChars = whiteSpaces);
 
 //! Trim a string
 /*!
@@ -50,7 +51,7 @@ MUSTACHE_API void trimLeft(std::string& str, const std::string& trimChars = whit
   /param str The string to trim
   /param trimChars The charaters to trim off
 */
-MUSTACHE_API void trim(std::string& str, const std::string& trimChars = whiteSpaces);
+MUSTACHE_API void trim(std::string& str, std::string_view trimChars = whiteSpaces);
 
 //! Escape special HTML charcters.
 /*!
@@ -86,7 +87,7 @@ MUSTACHE_API void explode(const std::string& delimiter, const std::string& str, 
   /param delimiters The delimiters to tokenize by
   /param tokens The tokens are stored here
 */
-MUSTACHE_API void stringTok(const std::string& str, const std::string& delimiters, std::vector<std::string> * tokens);
+MUSTACHE_API void stringTok(const std::string& str, std::string_view delimiters, std::vector<std::string> * tokens);
 
 } // namespace mustache
 

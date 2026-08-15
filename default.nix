@@ -4,6 +4,7 @@ in
   {
     pkgs ? import <nixpkgs> {},
     stdenv ? pkgs.stdenv,
+    clang-tools ? pkgs.llvmPackages.clang-tools,
     gitignoreFilterWith ?
       (import (
         fetchTarball {
@@ -24,9 +25,10 @@ in
     debugSupport ? false,
     sanitizerSupport ? false,
     fuzzSupport ? false,
+    clangTidySupport ? false,
   }:
     pkgs.callPackage ./nix/derivation.nix {
-      inherit stdenv mustache_spec libmustacheSrc;
-      inherit checkSupport cmakeSupport staticOnlySupport debugSupport sanitizerSupport fuzzSupport;
+      inherit stdenv clang-tools mustache_spec libmustacheSrc;
+      inherit checkSupport cmakeSupport staticOnlySupport debugSupport sanitizerSupport fuzzSupport clangTidySupport;
       inherit gitignoreFilterWith;
     }

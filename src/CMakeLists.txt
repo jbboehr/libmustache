@@ -58,6 +58,7 @@ set_target_properties(mustache PROPERTIES
 add_library(mustache_static STATIC ${MUSTACHE_SOURCES} ${MUSTACHE_PUBLIC_HEADERS})
 add_library(mustache::mustache_static ALIAS mustache_static)
 mustache_configure_library(mustache_static)
+mustache_enable_clang_tidy(mustache_static)
 target_compile_definitions(mustache_static PUBLIC MUSTACHE_STATIC_DEFINE)
 if(MUSTACHE_ENABLE_FUZZING)
     # The fuzz executable links this archive, so its implementation needs

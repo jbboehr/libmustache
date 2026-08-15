@@ -19,6 +19,7 @@ test_renderer_safety_SOURCES = test_renderer_safety.cpp
 test_cli_SOURCES = test_cli.cpp ../bin/cli.cpp ../bin/cli.hpp
 
 EXTRA_DIST = \
+	CMakeLists.txt \
 	run_spec_crlf.cmake \
 	fuzz_node_unserialize.cpp \
 	fuzz_tokenizer.cpp \

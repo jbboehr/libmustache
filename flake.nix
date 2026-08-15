@@ -107,6 +107,12 @@
             sanitizerSupport = true;
             fuzzSupport = true;
           };
+          libmustache-clang-tidy = makePackage {
+            stdenv = pkgs.llvmPackages.stdenv;
+            clang-tools = pkgs.llvmPackages.clang-tools;
+            cmakeSupport = true;
+            clangTidySupport = true;
+          };
           pre-commit = pre-commit-check;
         };
 
@@ -122,7 +128,7 @@
 
         devShells.default = pkgs.mkShell {
           inputsFrom = [packages.libmustache packages.libmustache-cmake];
-          packages = pre-commit-check.enabledPackages;
+          packages = pre-commit-check.enabledPackages ++ [pkgs.llvmPackages.clang-tools];
           shellHook = pre-commit-check.shellHook;
         };
 

@@ -87,12 +87,12 @@ void appendSourceOnlyOutput(Node * parent, std::string_view output, int flags, b
 } // namespace
 
 Tokenizer::Limits::Limits() :
-    maxInputBytes(64 * 1024 * 1024),
+    maxInputBytes(std::size_t{64} * 1024 * 1024),
     // Default serialization permits 64 nodes along a root-to-leaf path.
     // A parsed path includes the root and its innermost closing node.
     maxNestingDepth(62),
     maxNodes(100000),
-    maxTagBytes(1024 * 1024),
+    maxTagBytes(std::size_t{1024} * 1024),
     maxDelimiterBytes(1024)
 {}
 
@@ -205,7 +205,7 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root, const Limits& limit
 
   char stopC = stop.at(0);
   size_t stopL = stop.length();
-  size_t tmpStopL = stopL;
+  size_t tmpStopL;
 
   size_t pos = 0;
   size_t skipUntil = std::string_view::npos;
@@ -321,7 +321,7 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root, const Limits& limit
           case '>':
             currentType = Node::TypePartial;
             break;
-          case '=':
+          case '=': {
             if (buffer.at(buffer.length() - 1) != '=') {
               std::ostringstream oss;
               oss << "Missing closing delimiter (=)"
@@ -350,6 +350,9 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root, const Limits& limit
             stopC = stop.at(0);
             stopL = stop.length();
             skip = 1;
+            break;
+          }
+          default:
             break;
         }
 
