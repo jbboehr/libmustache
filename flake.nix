@@ -69,6 +69,10 @@
           hooks = {
             actionlint.enable = true;
             alejandra.enable = true;
+            clang-format = {
+              enable = true;
+              types_or = pkgs.lib.mkForce ["c" "c++"];
+            };
             shellcheck.enable = true;
             version-consistency = {
               enable = true;
@@ -118,6 +122,7 @@
 
         devShells.default = pkgs.mkShell {
           inputsFrom = [packages.libmustache packages.libmustache-cmake];
+          packages = pre-commit-check.enabledPackages;
           shellHook = pre-commit-check.shellHook;
         };
 
