@@ -16,8 +16,7 @@ namespace mustache {
 
     This class is used to implement stacks
 */
-template <class T, int S = MUSTACHE_STACK_DEFAULT_MAXSIZE>
-class Stack {
+template <class T, int S = MUSTACHE_STACK_DEFAULT_MAXSIZE> class Stack {
   public:
     static const int MAXSIZE = S;
 
@@ -30,17 +29,20 @@ class Stack {
 
   public:
     //! Constructor
-    Stack() : _size(0) {};
+    Stack() :
+        _size(0) {};
 
     //! Clear the data stack
-    void clear() {
+    void clear()
+    {
       _size = 0;
     }
 
     //! Add an element onto the top of the stack
-    void push_back(T data) {
+    void push_back(T data)
+    {
 #ifndef MUSTACHE_STACK_UNCHECKED
-      if( _size < 0 || _size >= Stack::MAXSIZE ) {
+      if (_size < 0 || _size >= Stack::MAXSIZE) {
         throw Exception("Reached max stack size");
       }
 #endif
@@ -49,9 +51,10 @@ class Stack {
     }
 
     //! Pop an element off the top of the stack
-    T pop_back() {
+    T pop_back()
+    {
 #ifndef MUSTACHE_STACK_UNCHECKED
-      if( _size <= 0 ) {
+      if (_size <= 0) {
         throw Exception("Reached bottom of stack");
       }
 #endif
@@ -62,18 +65,20 @@ class Stack {
     };
 
     //! Get the top of the stack
-    T back() {
+    T back()
+    {
 #ifndef MUSTACHE_STACK_UNCHECKED
-      if( _size <= 0 ) {
+      if (_size <= 0) {
         throw Exception("Reached bottom of stack");
       }
 #endif
       return _stack[_size - 1];
     };
 
-    T backOffset(int of) {
+    T backOffset(int of)
+    {
 #ifndef MUSTACHE_STACK_UNCHECKED
-      if( _size <= of ) {
+      if (_size <= of) {
         throw Exception("Reached bottom of stack");
       }
 #endif
@@ -81,22 +86,24 @@ class Stack {
     }
 
     //! Get the size of the stack
-    int size() {
+    int size()
+    {
       return _size;
     };
 
     //! Gets a pointer to the beginning of the stack
-    T * begin() {
+    T * begin()
+    {
       return _stack;
     };
 
     //! Gets a pointer to the end of the stack
-    T * end() {
+    T * end()
+    {
       return (_stack + _size - 1);
     };
 };
 
-}
-
+} // namespace mustache
 
 #endif

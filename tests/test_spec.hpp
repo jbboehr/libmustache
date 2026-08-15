@@ -32,11 +32,15 @@ class MustacheSpecTest {
     bool skipped;
     bool knownFailure;
     int _passed;
-    
-    MustacheSpecTest() : skipped(false), knownFailure(false), _passed(-1) {};
-    bool passed() {
-      if( -1 == _passed ) {
-        if( output == expected ) {
+
+    MustacheSpecTest() :
+        skipped(false),
+        knownFailure(false),
+        _passed(-1) {};
+    bool passed()
+    {
+      if (-1 == _passed) {
+        if (output == expected) {
           _passed = 1;
         } else {
           _passed = 0;
@@ -44,12 +48,13 @@ class MustacheSpecTest {
       }
       return (_passed == 1);
     };
-    static std::string escapeForDiagnostic(const std::string& value) {
+    static std::string escapeForDiagnostic(const std::string& value)
+    {
       std::string escaped;
       char buffer[5];
-      for( std::size_t i = 0; i < value.size(); ++i ) {
+      for (std::size_t i = 0; i < value.size(); ++i) {
         const unsigned char chr = static_cast<unsigned char>(value[i]);
-        switch( chr ) {
+        switch (chr) {
           case '\\':
             escaped.append("\\\\");
             break;
@@ -66,7 +71,7 @@ class MustacheSpecTest {
             escaped.append("\\t");
             break;
           default:
-            if( chr < 0x20 || chr >= 0x7f ) {
+            if (chr < 0x20 || chr >= 0x7f) {
               snprintf(buffer, sizeof(buffer), "\\x%02x", chr);
               escaped.append(buffer);
             } else {
@@ -77,29 +82,28 @@ class MustacheSpecTest {
       }
       return escaped;
     }
-    void print() {
+    void print()
+    {
       std::cout << suite << " / " << name << " ... ";
-      if( skipped ) {
+      if (skipped) {
         std::cout << "SKIPPED (" << expectationReason << ")\n";
         return;
       }
 
       const bool outputMatches = passed();
-      if( knownFailure ) {
-        std::cout << (outputMatches ? "UNEXPECTED PASS" : "KNOWN FAILURE")
-                  << " (" << expectationReason << ")\n";
+      if (knownFailure) {
+        std::cout << (outputMatches ? "UNEXPECTED PASS" : "KNOWN FAILURE") << " (" << expectationReason << ")\n";
       } else {
         std::cout << (outputMatches ? "PASSED" : "FAILED") << "\n";
       }
 
-      if( !outputMatches && !knownFailure ) {
-        std::cout << "Expected: \"" << escapeForDiagnostic(expected)
-                  << "\"\n";
-        std::cout << "Output:   \"" << escapeForDiagnostic(output)
-                  << "\"\n";
+      if (!outputMatches && !knownFailure) {
+        std::cout << "Expected: \"" << escapeForDiagnostic(expected) << "\"\n";
+        std::cout << "Output:   \"" << escapeForDiagnostic(output) << "\"\n";
       }
     }
-    std::string toString() {
+    std::string toString()
+    {
       std::string ret;
       ret.append("name=");
       ret.append(name);

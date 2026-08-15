@@ -17,28 +17,29 @@
 namespace mustache {
 
 struct Data::Storage {
-  typedef std::variant<std::monostate, String, List, Map, Array,
-      std::shared_ptr<Lambda>, bool, std::int64_t, double> Value;
+    typedef std::variant<std::monostate, String, List, Map, Array, std::shared_ptr<Lambda>, bool, std::int64_t, double>
+        Value;
 
-  Value value;
-  std::string scalarSpelling;
+    Value value;
+    std::string scalarSpelling;
 
-  Storage() = default;
-  Storage(const Storage&) = default;
-  Storage(Storage&&) noexcept = default;
+    Storage() = default;
+    Storage(const Storage&) = default;
+    Storage(Storage&&) noexcept = default;
 
-  template <typename T, typename = std::enable_if_t<
-      !std::is_same_v<std::decay_t<T>, Storage> > >
-  explicit Storage(T&& value) : value(std::forward<T>(value)) {}
+    template <typename T, typename = std::enable_if_t<!std::is_same_v<std::decay_t<T>, Storage>>>
+    explicit Storage(T&& value) :
+        value(std::forward<T>(value))
+    {}
 };
 
 std::unique_ptr<Data::Storage> Data::makeStorage(Type type, int size)
 {
-  if( size < 0 ) {
+  if (size < 0) {
     throw Exception("Invalid data size");
   }
 
-  switch( type ) {
+  switch (type) {
     case Data::TypeNone:
       return std::make_unique<Storage>();
     case Data::TypeString: {
@@ -75,7 +76,7 @@ namespace {
 
 const char * typeDescription(Data::Type type)
 {
-  switch( type ) {
+  switch (type) {
     case Data::TypeNone:
       return "null";
     case Data::TypeString:
@@ -106,24 +107,27 @@ Data::ParseLimits::ParseLimits() :
     maxNodes(100000),
     maxStringBytes(64 * 1024 * 1024),
     maxContainerEntries(100000)
-{
-}
+{}
 
-Data::Data() : storage_(std::make_unique<Storage>()) {}
+Data::Data() :
+    storage_(std::make_unique<Storage>())
+{}
 
-Data::Data(Type type, int size) : storage_(makeStorage(type, size)) {}
+Data::Data(Type type, int size) :
+    storage_(makeStorage(type, size))
+{}
 
 Data::Data(std::unique_ptr<Storage> storage) noexcept :
-    storage_(std::move(storage)) {}
+    storage_(std::move(storage))
+{}
 
 Data::Data(const Data& other) :
-    storage_(other.storage_ == nullptr
-        ? std::make_unique<Storage>()
-        : std::make_unique<Storage>(*other.storage_)) {}
+    storage_(other.storage_ == nullptr ? std::make_unique<Storage>() : std::make_unique<Storage>(*other.storage_))
+{}
 
 Data& Data::operator=(const Data& other)
 {
-  if( this != &other ) {
+  if (this != &other) {
     Data copy(other);
     swap(copy);
   }
@@ -153,7 +157,7 @@ Data Data::integer(std::int64_t value)
 
 Data Data::floating(double value)
 {
-  if( !std::isfinite(value) ) {
+  if (!std::isfinite(value)) {
     throw Exception("Invalid floating-point data");
   }
   return Data(std::make_unique<Storage>(value));
@@ -193,7 +197,7 @@ Data Data::lambda(std::unique_ptr<Lambda> value)
 
 Data Data::sharedLambda(std::shared_ptr<Lambda> value)
 {
-  if( value == nullptr ) {
+  if (value == nullptr) {
     throw Exception("Empty lambda data");
   }
   return Data(std::make_unique<Storage>(std::move(value)));
@@ -207,14 +211,13 @@ void Data::init(Type type, int size)
 
 Data::Type Data::type() const noexcept
 {
-  static_assert(std::variant_size<Storage::Value>::value == 9,
-      "Update Data::type() when adding a storage alternative");
+  static_assert(std::variant_size<Storage::Value>::value == 9, "Update Data::type() when adding a storage alternative");
 
-  if( storage_ == nullptr ) {
+  if (storage_ == nullptr) {
     return TypeNone;
   }
 
-  switch( storage_->value.index() ) {
+  switch (storage_->value.index()) {
     case 0:
       return TypeNone;
     case 1:
@@ -240,7 +243,7 @@ Data::Type Data::type() const noexcept
 
 int Data::isEmpty() const noexcept
 {
-  switch( type() ) {
+  switch (type()) {
     case TypeNone:
       return 1;
     case TypeString:
@@ -252,8 +255,7 @@ int Data::isEmpty() const noexcept
     case TypeArray:
       return std::get<Array>(storage_->value).empty() ? 1 : 0;
     case TypeLambda:
-      return std::get<std::shared_ptr<Lambda> >(storage_->value) == nullptr
-          ? 1 : 0;
+      return std::get<std::shared_ptr<Lambda>>(storage_->value) == nullptr ? 1 : 0;
     case TypeBoolean:
       return std::get<bool>(storage_->value) ? 0 : 1;
     case TypeInteger:
@@ -265,16 +267,15 @@ int Data::isEmpty() const noexcept
 
 Data::Storage& Data::requireStorage(Type expected, const char * description)
 {
-  if( type() != expected ) {
+  if (type() != expected) {
     throw Exception(std::string("Data is not ") + description);
   }
   return *storage_;
 }
 
-const Data::Storage& Data::requireStorage(
-    Type expected, const char * description) const
+const Data::Storage& Data::requireStorage(Type expected, const char * description) const
 {
-  if( type() != expected ) {
+  if (type() != expected) {
     throw Exception(std::string("Data is not ") + description);
   }
   return *storage_;
@@ -297,14 +298,12 @@ bool Data::booleanValue() const
 
 std::int64_t Data::integerValue() const
 {
-  return std::get<std::int64_t>(
-      requireStorage(TypeInteger, "an integer").value);
+  return std::get<std::int64_t>(requireStorage(TypeInteger, "an integer").value);
 }
 
 double Data::floatingValue() const
 {
-  return std::get<double>(
-      requireStorage(TypeDouble, "a floating-point number").value);
+  return std::get<double>(requireStorage(TypeDouble, "a floating-point number").value);
 }
 
 const Data::List& Data::listItems() const
@@ -324,15 +323,15 @@ const Data::Map& Data::objectItems() const
 
 Lambda * Data::lambdaValue() const noexcept
 {
-  if( type() != TypeLambda ) {
+  if (type() != TypeLambda) {
     return nullptr;
   }
-  return std::get<std::shared_ptr<Lambda> >(storage_->value).get();
+  return std::get<std::shared_ptr<Lambda>>(storage_->value).get();
 }
 
 std::string Data::toString() const
 {
-  switch( type() ) {
+  switch (type()) {
     case TypeNone:
       return std::string();
     case TypeString:
@@ -342,21 +341,19 @@ std::string Data::toString() const
     case TypeInteger:
       return std::to_string(integerValue());
     case TypeDouble: {
-      if( !storage_->scalarSpelling.empty() ) {
+      if (!storage_->scalarSpelling.empty()) {
         return storage_->scalarSpelling;
       }
       std::ostringstream stream;
       stream.imbue(std::locale::classic());
-      stream << std::setprecision(std::numeric_limits<double>::max_digits10)
-             << floatingValue();
+      stream << std::setprecision(std::numeric_limits<double>::max_digits10) << floatingValue();
       return stream.str();
     }
     case TypeList:
     case TypeMap:
     case TypeArray:
     case TypeLambda:
-      throw Exception(std::string("Cannot render ") +
-          typeDescription(type()) + " data as a scalar");
+      throw Exception(std::string("Cannot render ") + typeDescription(type()) + " data as a scalar");
   }
   throw Exception("Unknown data type");
 }
@@ -370,9 +367,9 @@ Data& Data::set(std::string key, Data value)
 
 Data& Data::push_back(Data value)
 {
-  if( type() == TypeList ) {
+  if (type() == TypeList) {
     std::get<List>(storage_->value).push_back(std::move(value));
-  } else if( type() == TypeArray ) {
+  } else if (type() == TypeArray) {
     std::get<Array>(storage_->value).push_back(std::move(value));
   } else {
     throw Exception("Data is not a list or array");
@@ -382,7 +379,7 @@ Data& Data::push_back(Data value)
 
 const Data * Data::find(const std::string& key) const noexcept
 {
-  if( type() != TypeMap ) {
+  if (type() != TypeMap) {
     return nullptr;
   }
   const Map& values = std::get<Map>(storage_->value);
@@ -404,13 +401,16 @@ const std::size_t parseNestingCeiling = 256;
 class ParseBudget {
   public:
     ParseBudget(const Data::ParseLimits& limits, const char * format) :
-        limits_(limits), format_(format), nodes_(0), stringBytes_(0),
-        containerEntries_(0) {}
+        limits_(limits),
+        format_(format),
+        nodes_(0),
+        stringBytes_(0),
+        containerEntries_(0)
+    {}
 
     void addNode(std::size_t depth)
     {
-      if( depth >= limits_.maxNestingDepth ||
-          depth >= parseNestingCeiling ) {
+      if (depth >= limits_.maxNestingDepth || depth >= parseNestingCeiling) {
         fail(" nesting limit exceeded");
       }
       consume(nodes_, 1, limits_.maxNodes, " node count limit exceeded");
@@ -418,14 +418,12 @@ class ParseBudget {
 
     void addString(std::size_t bytes)
     {
-      consume(stringBytes_, bytes, limits_.maxStringBytes,
-          " string byte limit exceeded");
+      consume(stringBytes_, bytes, limits_.maxStringBytes, " string byte limit exceeded");
     }
 
     void addContainerEntries(std::size_t entries)
     {
-      consume(containerEntries_, entries, limits_.maxContainerEntries,
-          " container entry limit exceeded");
+      consume(containerEntries_, entries, limits_.maxContainerEntries, " container entry limit exceeded");
     }
 
   private:
@@ -440,23 +438,21 @@ class ParseBudget {
       throw Exception(std::string(format_) + description);
     }
 
-    void consume(std::size_t& used, std::size_t amount,
-        std::size_t maximum, const char * description)
+    void consume(std::size_t& used, std::size_t amount, std::size_t maximum, const char * description)
     {
-      if( used > maximum || amount > maximum - used ) {
+      if (used > maximum || amount > maximum - used) {
         fail(description);
       }
       used += amount;
     }
 };
 
-void checkInputSize(std::string_view input,
-    const Data::ParseLimits& limits, const char * format)
+void checkInputSize(std::string_view input, const Data::ParseLimits& limits, const char * format)
 {
-  if( input.size() > limits.maxInputBytes ) {
+  if (input.size() > limits.maxInputBytes) {
     throw Exception(std::string(format) + " input byte limit exceeded");
   }
-  if( input.find('\0') != std::string_view::npos ) {
+  if (input.find('\0') != std::string_view::npos) {
     throw Exception(std::string(format) + " input contains NUL byte");
   }
 }
@@ -470,7 +466,7 @@ Data Data::fromJSON(const char * string)
 
 Data Data::fromJSON(const char * string, const ParseLimits& limits)
 {
-  if( string == nullptr ) {
+  if (string == nullptr) {
     throw Exception("Missing JSON data");
   }
   return fromJSON(std::string_view(string), limits);
@@ -486,8 +482,7 @@ Data * Data::createFromJSON(const char * string)
   return new Data(fromJSON(string));
 }
 
-Data * Data::createFromJSON(
-    const char * string, const ParseLimits& limits)
+Data * Data::createFromJSON(const char * string, const ParseLimits& limits)
 {
   return new Data(fromJSON(string, limits));
 }
@@ -495,10 +490,8 @@ Data * Data::createFromJSON(
 Data Data::fromJSON(std::string_view string, const ParseLimits& limits)
 {
   checkInputSize(string, limits, "JSON");
-  if( string.size() >= 3 &&
-      static_cast<unsigned char>(string[0]) == 0xef &&
-      static_cast<unsigned char>(string[1]) == 0xbb &&
-      static_cast<unsigned char>(string[2]) == 0xbf ) {
+  if (string.size() >= 3 && static_cast<unsigned char>(string[0]) == 0xef &&
+      static_cast<unsigned char>(string[1]) == 0xbb && static_cast<unsigned char>(string[2]) == 0xbf) {
     throw Exception("Invalid JSON data");
   }
 
@@ -512,7 +505,7 @@ Data Data::fromYAML(const char * string)
 
 Data Data::fromYAML(const char * string, const ParseLimits& limits)
 {
-  if( string == nullptr ) {
+  if (string == nullptr) {
     throw Exception("Missing YAML data");
   }
   return fromYAML(std::string_view(string), limits);
@@ -528,8 +521,7 @@ Data * Data::createFromYAML(const char * string)
   return new Data(fromYAML(string));
 }
 
-Data * Data::createFromYAML(
-    const char * string, const ParseLimits& limits)
+Data * Data::createFromYAML(const char * string, const ParseLimits& limits)
 {
   return new Data(fromYAML(string, limits));
 }
@@ -538,30 +530,31 @@ namespace {
 
 class YAMLPreflight {
   public:
-    YAMLPreflight(
-        std::string_view input, const Data::ParseLimits& limits) :
-        input_(input), budget_(limits, "YAML"), sawRoot_(false),
-        completedDocuments_(0) {}
+    YAMLPreflight(std::string_view input, const Data::ParseLimits& limits) :
+        input_(input),
+        budget_(limits, "YAML"),
+        sawRoot_(false),
+        completedDocuments_(0)
+    {}
 
     void run()
     {
       yaml_parser_t parser;
-      if( yaml_parser_initialize(&parser) == 0 ) {
+      if (yaml_parser_initialize(&parser) == 0) {
         throw Exception("Failed to initialize yaml parser");
       }
 
       static const unsigned char emptyInput = 0;
-      const unsigned char * input = input_.empty()
-          ? &emptyInput
-          : reinterpret_cast<const unsigned char *>(input_.data());
+      const unsigned char * input =
+          input_.empty() ? &emptyInput : reinterpret_cast<const unsigned char *>(input_.data());
       yaml_parser_set_input_string(&parser, input, input_.size());
 
       try {
         bool finished = false;
-        while( !finished ) {
+        while (!finished) {
           yaml_event_t event;
-          if( yaml_parser_parse(&parser, &event) == 0 ) {
-            if( completedDocuments_ != 0 ) {
+          if (yaml_parser_parse(&parser, &event) == 0) {
+            if (completedDocuments_ != 0) {
               throw Exception("Invalid trailing YAML content");
             }
             throw Exception("Failed to parse yaml document");
@@ -569,19 +562,19 @@ class YAMLPreflight {
 
           try {
             finished = handle(event);
-          } catch( ... ) {
+          } catch (...) {
             yaml_event_delete(&event);
             throw;
           }
           yaml_event_delete(&event);
         }
-      } catch( ... ) {
+      } catch (...) {
         yaml_parser_delete(&parser);
         throw;
       }
       yaml_parser_delete(&parser);
 
-      if( !sawRoot_ ) {
+      if (!sawRoot_) {
         throw Exception("Empty yaml document");
       }
     }
@@ -593,8 +586,8 @@ class YAMLPreflight {
     };
 
     struct Container {
-      ContainerType type;
-      bool expectingKey;
+        ContainerType type;
+        bool expectingKey;
     };
 
     std::string_view input_;
@@ -605,19 +598,19 @@ class YAMLPreflight {
 
     bool handle(const yaml_event_t& event)
     {
-      switch( event.type ) {
+      switch (event.type) {
         case YAML_NO_EVENT:
         case YAML_STREAM_START_EVENT:
           return false;
         case YAML_STREAM_END_EVENT:
           return true;
         case YAML_DOCUMENT_START_EVENT:
-          if( completedDocuments_ != 0 ) {
+          if (completedDocuments_ != 0) {
             throw Exception("Multiple YAML documents are not supported");
           }
           return false;
         case YAML_DOCUMENT_END_EVENT:
-          if( !containers_.empty() ) {
+          if (!containers_.empty()) {
             throw Exception("Failed to parse yaml document");
           }
           ++completedDocuments_;
@@ -646,14 +639,13 @@ class YAMLPreflight {
 
     bool expectingMappingKey() const
     {
-      return !containers_.empty() &&
-          containers_.back().type == ContainerType::Mapping &&
+      return !containers_.empty() && containers_.back().type == ContainerType::Mapping &&
           containers_.back().expectingKey;
     }
 
     void consumeAlias()
     {
-      if( expectingMappingKey() ) {
+      if (expectingMappingKey()) {
         budget_.addContainerEntries(1);
         containers_.back().expectingKey = false;
         return;
@@ -664,7 +656,7 @@ class YAMLPreflight {
 
     void consumeScalar(std::size_t length)
     {
-      if( expectingMappingKey() ) {
+      if (expectingMappingKey()) {
         budget_.addContainerEntries(1);
         budget_.addString(length);
         containers_.back().expectingKey = false;
@@ -677,7 +669,7 @@ class YAMLPreflight {
 
     void startContainer(ContainerType type)
     {
-      if( expectingMappingKey() ) {
+      if (expectingMappingKey()) {
         throw Exception("Invalid yaml object key");
       }
       beginValue();
@@ -686,9 +678,8 @@ class YAMLPreflight {
 
     void endContainer(ContainerType expected)
     {
-      if( containers_.empty() || containers_.back().type != expected ||
-          (expected == ContainerType::Mapping &&
-              !containers_.back().expectingKey) ) {
+      if (containers_.empty() || containers_.back().type != expected ||
+          (expected == ContainerType::Mapping && !containers_.back().expectingKey)) {
         throw Exception("Failed to parse yaml document");
       }
       containers_.pop_back();
@@ -697,14 +688,14 @@ class YAMLPreflight {
 
     void beginValue()
     {
-      if( containers_.empty() ) {
-        if( sawRoot_ ) {
+      if (containers_.empty()) {
+        if (sawRoot_) {
           throw Exception("Failed to parse yaml document");
         }
         sawRoot_ = true;
-      } else if( containers_.back().type == ContainerType::Sequence ) {
+      } else if (containers_.back().type == ContainerType::Sequence) {
         budget_.addContainerEntries(1);
-      } else if( containers_.back().expectingKey ) {
+      } else if (containers_.back().expectingKey) {
         throw Exception("Invalid yaml object key");
       }
       budget_.addNode(containers_.size());
@@ -712,16 +703,14 @@ class YAMLPreflight {
 
     void finishValue()
     {
-      if( !containers_.empty() &&
-          containers_.back().type == ContainerType::Mapping &&
-          !containers_.back().expectingKey ) {
+      if (!containers_.empty() && containers_.back().type == ContainerType::Mapping &&
+          !containers_.back().expectingKey) {
         containers_.back().expectingKey = true;
       }
     }
 };
 
-void preflightYAML(
-    std::string_view input, const Data::ParseLimits& limits)
+void preflightYAML(std::string_view input, const Data::ParseLimits& limits)
 {
   // The event parser avoids libyaml's document-composer behavior on inputs
   // that exceed the public resource policy. The composed/expanded result is
@@ -731,10 +720,11 @@ void preflightYAML(
 
 class ActiveYAMLNode {
   public:
-    ActiveYAMLNode(std::unordered_set<yaml_node_t *>& active,
-        yaml_node_t * node) : active_(active), node_(node)
+    ActiveYAMLNode(std::unordered_set<yaml_node_t *>& active, yaml_node_t * node) :
+        active_(active),
+        node_(node)
     {
-      if( !active_.insert(node_).second ) {
+      if (!active_.insert(node_).second) {
         throw Exception("YAML alias cycle detected");
       }
     }
@@ -751,67 +741,56 @@ class ActiveYAMLNode {
 
 std::string yamlScalarString(const yaml_node_t * node)
 {
-  if( node->data.scalar.length == 0 ) {
+  if (node->data.scalar.length == 0) {
     return std::string();
   }
-  return std::string(
-      reinterpret_cast<const char *>(node->data.scalar.value),
-      node->data.scalar.length);
+  return std::string(reinterpret_cast<const char *>(node->data.scalar.value), node->data.scalar.length);
 }
 
-Data createFromYAMLNode(yaml_document_t * document, yaml_node_t * node,
-    ParseBudget& budget, std::unordered_set<yaml_node_t *>& active,
-    std::size_t depth)
+Data createFromYAMLNode(yaml_document_t * document, yaml_node_t * node, ParseBudget& budget,
+    std::unordered_set<yaml_node_t *>& active, std::size_t depth)
 {
-  if( node == nullptr ) {
+  if (node == nullptr) {
     throw Exception("Missing yaml node");
   }
   budget.addNode(depth);
   ActiveYAMLNode activeNode(active, node);
 
-  switch( node->type ) {
+  switch (node->type) {
     case YAML_SCALAR_NODE: {
       budget.addString(node->data.scalar.length);
       return Data::string(yamlScalarString(node));
     }
     case YAML_MAPPING_NODE: {
-      const std::size_t length = static_cast<std::size_t>(
-          node->data.mapping.pairs.top - node->data.mapping.pairs.start);
+      const std::size_t length =
+          static_cast<std::size_t>(node->data.mapping.pairs.top - node->data.mapping.pairs.start);
       budget.addContainerEntries(length);
-      if( length > static_cast<std::size_t>(
-              std::numeric_limits<int>::max()) ) {
+      if (length > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
         throw Exception("YAML object is too large");
       }
       Data result(Data::TypeMap, static_cast<int>(length));
-      for( yaml_node_pair_t * pair = node->data.mapping.pairs.start;
-          pair < node->data.mapping.pairs.top; ++pair ) {
-        yaml_node_t * keyNode =
-            yaml_document_get_node(document, pair->key);
-        yaml_node_t * valueNode =
-            yaml_document_get_node(document, pair->value);
-        if( keyNode == nullptr || keyNode->type != YAML_SCALAR_NODE ) {
+      for (yaml_node_pair_t * pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; ++pair) {
+        yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
+        yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
+        if (keyNode == nullptr || keyNode->type != YAML_SCALAR_NODE) {
           throw Exception("Invalid yaml object key");
         }
         budget.addString(keyNode->data.scalar.length);
-        result.set(yamlScalarString(keyNode), createFromYAMLNode(
-            document, valueNode, budget, active, depth + 1));
+        result.set(yamlScalarString(keyNode), createFromYAMLNode(document, valueNode, budget, active, depth + 1));
       }
       return result;
     }
     case YAML_SEQUENCE_NODE: {
-      const std::size_t length = static_cast<std::size_t>(
-          node->data.sequence.items.top - node->data.sequence.items.start);
+      const std::size_t length =
+          static_cast<std::size_t>(node->data.sequence.items.top - node->data.sequence.items.start);
       budget.addContainerEntries(length);
-      if( length > static_cast<std::size_t>(
-              std::numeric_limits<int>::max()) ) {
+      if (length > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
         throw Exception("YAML array is too large");
       }
       Data result(Data::TypeArray, static_cast<int>(length));
-      for( yaml_node_item_t * item = node->data.sequence.items.start;
-          item < node->data.sequence.items.top; ++item ) {
-        result.push_back(createFromYAMLNode(
-            document, yaml_document_get_node(document, *item), budget,
-            active, depth + 1));
+      for (yaml_node_item_t * item = node->data.sequence.items.start; item < node->data.sequence.items.top; ++item) {
+        result.push_back(
+            createFromYAMLNode(document, yaml_document_get_node(document, *item), budget, active, depth + 1));
       }
       return result;
     }
@@ -829,45 +808,41 @@ Data Data::fromYAML(std::string_view string, const ParseLimits& limits)
 
   yaml_parser_t parser;
   yaml_document_t document;
-  if( yaml_parser_initialize(&parser) == 0 ) {
+  if (yaml_parser_initialize(&parser) == 0) {
     throw Exception("Failed to initialize yaml parser");
   }
 
   static const unsigned char emptyInput = 0;
-  const unsigned char * input = string.empty()
-      ? &emptyInput
-      : reinterpret_cast<const unsigned char *>(string.data());
+  const unsigned char * input = string.empty() ? &emptyInput : reinterpret_cast<const unsigned char *>(string.data());
   yaml_parser_set_input_string(&parser, input, string.size());
-  if( yaml_parser_load(&parser, &document) == 0 ) {
+  if (yaml_parser_load(&parser, &document) == 0) {
     yaml_parser_delete(&parser);
     throw Exception("Failed to parse yaml document");
   }
 
   try {
     yaml_node_t * root = yaml_document_get_root_node(&document);
-    if( root == nullptr ) {
+    if (root == nullptr) {
       throw Exception("Empty yaml document");
     }
     ParseBudget budget(limits, "YAML");
     std::unordered_set<yaml_node_t *> active;
-    Data data = createFromYAMLNode(
-        &document, root, budget, active, 0);
+    Data data = createFromYAMLNode(&document, root, budget, active, 0);
 
     yaml_document_t trailingDocument;
-    if( yaml_parser_load(&parser, &trailingDocument) == 0 ) {
+    if (yaml_parser_load(&parser, &trailingDocument) == 0) {
       throw Exception("Invalid trailing YAML content");
     }
-    const bool hasTrailingDocument =
-        yaml_document_get_root_node(&trailingDocument) != nullptr;
+    const bool hasTrailingDocument = yaml_document_get_root_node(&trailingDocument) != nullptr;
     yaml_document_delete(&trailingDocument);
-    if( hasTrailingDocument ) {
+    if (hasTrailingDocument) {
       throw Exception("Multiple YAML documents are not supported");
     }
 
     yaml_document_delete(&document);
     yaml_parser_delete(&parser);
     return data;
-  } catch( ... ) {
+  } catch (...) {
     yaml_document_delete(&document);
     yaml_parser_delete(&parser);
     throw;

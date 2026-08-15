@@ -7,9 +7,10 @@
 #include "mustache.hpp"
 #include "utils.hpp"
 
-int testGH46() {
+int testGH46()
+{
   std::string tmpl = "a{{ <html> }}b";
-  
+
   // Tokenize
   mustache::Mustache mustache;
   mustache::Node root;
@@ -19,7 +20,7 @@ int testGH46() {
   std::string output;
   mustache.render(&root, &data, NULL, &output);
 
-  if( output.compare("ab") != 0 ) {
+  if (output.compare("ab") != 0) {
     fprintf(stdout, "Failed, expected output to be 'ab', got '%s'\n", output.c_str());
     return 1;
   }

@@ -13,38 +13,36 @@ namespace {
 
 unsigned int hexDigit(uint8_t value)
 {
-  if( value >= '0' && value <= '9' ) {
+  if (value >= '0' && value <= '9') {
     return static_cast<unsigned int>(value - '0');
   }
-  if( value >= 'a' && value <= 'f' ) {
+  if (value >= 'a' && value <= 'f') {
     return static_cast<unsigned int>(value - 'a' + 10);
   }
-  if( value >= 'A' && value <= 'F' ) {
+  if (value >= 'A' && value <= 'F') {
     return static_cast<unsigned int>(value - 'A' + 10);
   }
   return 16;
 }
 
-bool decodeHexSeed(
-    const uint8_t * data, std::size_t size, std::vector<uint8_t>& output)
+bool decodeHexSeed(const uint8_t * data, std::size_t size, std::vector<uint8_t>& output)
 {
-  if( size < 4 || data[0] != 'h' || data[1] != 'e' || data[2] != 'x' ||
-      data[3] != ':' ) {
+  if (size < 4 || data[0] != 'h' || data[1] != 'e' || data[2] != 'x' || data[3] != ':') {
     return false;
   }
 
   std::vector<uint8_t> decoded;
   unsigned int high = 16;
-  for( std::size_t i = 4; i < size; ++i ) {
-    if( std::isspace(static_cast<unsigned char>(data[i])) != 0 ) {
+  for (std::size_t i = 4; i < size; ++i) {
+    if (std::isspace(static_cast<unsigned char>(data[i])) != 0) {
       continue;
     }
 
     const unsigned int digit = hexDigit(data[i]);
-    if( digit > 15 ) {
+    if (digit > 15) {
       return false;
     }
-    if( high > 15 ) {
+    if (high > 15) {
       high = digit;
     } else {
       decoded.push_back(static_cast<uint8_t>((high << 4) | digit));
@@ -52,7 +50,7 @@ bool decodeHexSeed(
     }
   }
 
-  if( high <= 15 ) {
+  if (high <= 15) {
     return false;
   }
   output.swap(decoded);
@@ -64,22 +62,20 @@ bool decodeHexSeed(
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t * data, std::size_t size)
 {
   std::vector<uint8_t> serial;
-  if( !decodeHexSeed(data, size, serial) && size > 0 ) {
+  if (!decodeHexSeed(data, size, serial) && size > 0) {
     serial.assign(data, data + size);
   }
 
-  const char * serialData = serial.empty()
-      ? "" : reinterpret_cast<const char *>(serial.data());
+  const char * serialData = serial.empty() ? "" : reinterpret_cast<const char *>(serial.data());
   std::unique_ptr<mustache::Node> node;
   try {
-    node = mustache::Node::unserializeOwned(
-        std::string_view(serialData, serial.size()));
-  } catch( const mustache::Exception& ) {
+    node = mustache::Node::unserializeOwned(std::string_view(serialData, serial.size()));
+  } catch (const mustache::Exception&) {
     return 0;
   }
 
   const std::vector<uint8_t> encoded = node->serializeValue();
-  if( encoded != serial ) {
+  if (encoded != serial) {
     std::abort();
   }
   static_cast<void>(node->to_template_string("{{", "}}"));

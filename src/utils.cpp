@@ -3,24 +3,23 @@
 
 namespace mustache {
 
-
-
 void stripWhitespace(std::string& str, const std::string& chars)
 {
   std::string tmp;
-  for( const char chr : str ) {
+  for (const char chr : str) {
     std::size_t found = chars.find(chr);
-    if( found == std::string::npos ) {
+    if (found == std::string::npos) {
       tmp += chr;
     }
   }
   str.swap(tmp);
 }
 
-void trimDecimal(std::string& str) {
-  if( str.length() < 20 ) {
+void trimDecimal(std::string& str)
+{
+  if (str.length() < 20) {
     std::string::size_type found = str.find_first_not_of("0123456789.");
-    if( found == std::string::npos ) {
+    if (found == std::string::npos) {
       trimRight(str, "0");
     }
   }
@@ -29,7 +28,7 @@ void trimDecimal(std::string& str) {
 void trimRight(std::string& str, const std::string& trimChars)
 {
   std::string::size_type pos = str.find_last_not_of(trimChars);
-  str.erase(pos + 1);    
+  str.erase(pos + 1);
 }
 
 void trimLeft(std::string& str, const std::string& trimChars)
@@ -48,8 +47,8 @@ void htmlspecialchars(std::string * str)
 {
   std::string tmp;
   tmp.reserve(str->size());
-  for( const char chr : *str ) {
-    switch( chr ) {
+  for (const char chr : *str) {
+    switch (chr) {
       case '&':
         tmp.append("&amp;");
         break;
@@ -80,8 +79,8 @@ void htmlspecialchars_append(std::string * str, std::string * buf)
 
 void htmlspecialchars_append(const std::string& str, std::string * buf)
 {
-  for( const char chr : str ) {
-    switch( chr ) {
+  for (const char chr : str) {
+    switch (chr) {
       case '&':
         buf->append("&amp;");
         break;
@@ -104,43 +103,43 @@ void htmlspecialchars_append(const std::string& str, std::string * buf)
   }
 }
 
-void explode(const std::string &delimiter, const std::string &str, std::vector<std::string> * arr)
+void explode(const std::string& delimiter, const std::string& str, std::vector<std::string> * arr)
 {
   const std::string::size_type strleng = str.length();
   const std::string::size_type delleng = delimiter.length();
-  if( delleng == 0 ) {
+  if (delleng == 0) {
     // no change
     return;
   }
 
   std::string::size_type i = 0;
   std::string::size_type k = 0;
-  while( i < strleng ) {
-      std::string::size_type j = 0;
-      while( i + j < strleng && j < delleng && str[i+j] == delimiter[j] ) {
-        j++;
-      }
-      if( j == delleng ) {
-        // found delimiter
-        arr->push_back(str.substr(k, i-k));
-        i += delleng;
-        k = i;
-      } else {
-        i++;
-      }
+  while (i < strleng) {
+    std::string::size_type j = 0;
+    while (i + j < strleng && j < delleng && str[i + j] == delimiter[j]) {
+      j++;
+    }
+    if (j == delleng) {
+      // found delimiter
+      arr->push_back(str.substr(k, i - k));
+      i += delleng;
+      k = i;
+    } else {
+      i++;
+    }
   }
-  arr->push_back(str.substr(k, i-k));
+  arr->push_back(str.substr(k, i - k));
 }
 
-void stringTok(const std::string &str, const std::string &delimiters, std::vector<std::string> * tokens)
+void stringTok(const std::string& str, const std::string& delimiters, std::vector<std::string> * tokens)
 {
   // Skip delimiters at beginning.
   std::string::size_type lastPos = str.find_first_not_of(delimiters, 0);
-  
+
   // Find first "non-delimiter".
   std::string::size_type pos = str.find_first_of(delimiters, lastPos);
 
-  while( std::string::npos != pos || std::string::npos != lastPos ) {
+  while (std::string::npos != pos || std::string::npos != lastPos) {
     // Found a token, add it to the vector.
     tokens->push_back(str.substr(lastPos, pos - lastPos));
     // Skip delimiters.  Note the "not_of"
@@ -150,6 +149,4 @@ void stringTok(const std::string &str, const std::string &delimiters, std::vecto
   }
 }
 
-
-
-} // namespace Mustache
+} // namespace mustache

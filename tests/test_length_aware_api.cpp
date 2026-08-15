@@ -20,7 +20,7 @@ int failures = 0;
 
 void expect(bool condition, const char * message)
 {
-  if( !condition ) {
+  if (!condition) {
     std::fprintf(stderr, "%s\n", message);
     ++failures;
   }
@@ -33,8 +33,7 @@ mustache::Data makeStringData(std::string_view value)
 
 void testTemplateViewPreservesEmbeddedNul()
 {
-  const char source[] = {
-      'A', '\0', 'B', '{', '{', 'n', 'a', 'm', 'e', '}', '}', 'C'};
+  const char source[] = {'A', '\0', 'B', '{', '{', 'n', 'a', 'm', 'e', '}', '}', 'C'};
   const char expected[] = {'A', '\0', 'B', 'o', 'k', 'C'};
 
   mustache::Mustache mustache;
@@ -54,16 +53,13 @@ void testExplicitDelimiterLengths()
 {
   const char start[] = {'<', '%'};
   const char stop[] = {'%', '>'};
-  const char source[] = {
-      'A', '<', '%', 'n', 'a', 'm', 'e', '%', '>', 'B'};
+  const char source[] = {'A', '<', '%', 'n', 'a', 'm', 'e', '%', '>', 'B'};
 
   mustache::Mustache mustache;
   mustache.setStartSequence(start, sizeof(start));
   mustache.setStopSequence(stop, sizeof(stop));
-  expect(mustache.getStartSequence() == "<%",
-      "the legacy start-delimiter length was ignored");
-  expect(mustache.getStopSequence() == "%>",
-      "the legacy stop-delimiter length was ignored");
+  expect(mustache.getStartSequence() == "<%", "the legacy start-delimiter length was ignored");
+  expect(mustache.getStopSequence() == "%>", "the legacy stop-delimiter length was ignored");
 
   mustache::Node root;
   mustache.tokenize(std::string_view(source, sizeof(source)), &root);
@@ -71,13 +67,12 @@ void testExplicitDelimiterLengths()
   data.set("name", makeStringData("ok"));
   std::string output;
   mustache.render(&root, &data, NULL, &output);
-  expect(output == "AokB",
-      "explicitly sized delimiters did not tokenize correctly");
+  expect(output == "AokB", "explicitly sized delimiters did not tokenize correctly");
 
   bool rejected = false;
   try {
     mustache.setStartSequence(std::string_view());
-  } catch( const mustache::Exception& ) {
+  } catch (const mustache::Exception&) {
     rejected = true;
   }
   expect(rejected, "an empty start delimiter was accepted");
@@ -85,7 +80,7 @@ void testExplicitDelimiterLengths()
   rejected = false;
   try {
     mustache.setStopSequence(static_cast<const char *>(NULL), 1);
-  } catch( const mustache::Exception& ) {
+  } catch (const mustache::Exception&) {
     rejected = true;
   }
   expect(rejected, "a null stop delimiter was accepted");
@@ -93,15 +88,16 @@ void testExplicitDelimiterLengths()
 
 class LegacyLambda : public mustache::Lambda {
   public:
-    explicit LegacyLambda(std::string * observed) : observed(observed) {}
+    explicit LegacyLambda(std::string * observed) :
+        observed(observed)
+    {}
 
     std::string invoke() override
     {
       return std::string();
     }
 
-    std::string invoke(
-        std::string * text, mustache::Renderer *) override
+    std::string invoke(std::string * text, mustache::Renderer *) override
     {
       *observed = *text;
       return *text;
@@ -113,15 +109,16 @@ class LegacyLambda : public mustache::Lambda {
 
 class ScopedLambda : public mustache::Lambda {
   public:
-    explicit ScopedLambda(std::string * observed) : observed(observed) {}
+    explicit ScopedLambda(std::string * observed) :
+        observed(observed)
+    {}
 
     std::string invoke() override
     {
       return std::string();
     }
 
-    std::string invoke(std::string_view text,
-        mustache::LambdaRenderContext) override
+    std::string invoke(std::string_view text, mustache::LambdaRenderContext) override
     {
       observed->assign(text.data(), text.size());
       return std::string(text);
@@ -134,16 +131,13 @@ class ScopedLambda : public mustache::Lambda {
 void testLengthAwareLambdaText()
 {
   const char source[] = {
-      '{', '{', '#', 'c', 'a', 'l', 'l', '}', '}',
-      'A', '\0', 'B',
-      '{', '{', '/', 'c', 'a', 'l', 'l', '}', '}'};
+      '{', '{', '#', 'c', 'a', 'l', 'l', '}', '}', 'A', '\0', 'B', '{', '{', '/', 'c', 'a', 'l', 'l', '}', '}'};
   const char expected[] = {'A', '\0', 'B'};
   const std::string expectedText(expected, sizeof(expected));
   std::string observed;
 
   mustache::Data data(mustache::Data::TypeMap, 0);
-  data.set("call", mustache::Data::lambda(
-      std::make_unique<LegacyLambda>(&observed)));
+  data.set("call", mustache::Data::lambda(std::make_unique<LegacyLambda>(&observed)));
 
   mustache::Mustache mustache;
   mustache::Node root;
@@ -151,21 +145,16 @@ void testLengthAwareLambdaText()
   std::string output;
   mustache.render(&root, &data, NULL, &output);
 
-  expect(observed == expectedText,
-      "string_view lambda text lost its embedded NUL");
-  expect(output == expectedText,
-      "lambda output lost its embedded NUL when it was reparsed");
+  expect(observed == expectedText, "string_view lambda text lost its embedded NUL");
+  expect(output == expectedText, "lambda output lost its embedded NUL when it was reparsed");
 
   observed.clear();
   mustache::Data scopedData(mustache::Data::TypeMap, 0);
-  scopedData.set("call", mustache::Data::lambda(
-      std::make_unique<ScopedLambda>(&observed)));
+  scopedData.set("call", mustache::Data::lambda(std::make_unique<ScopedLambda>(&observed)));
   output.clear();
   mustache.render(&root, &scopedData, NULL, &output);
-  expect(observed == expectedText,
-      "scoped lambda text lost its embedded NUL");
-  expect(output == expectedText,
-      "scoped lambda output lost its embedded NUL when reparsed");
+  expect(observed == expectedText, "scoped lambda text lost its embedded NUL");
+  expect(output == expectedText, "scoped lambda output lost its embedded NUL when reparsed");
 }
 
 void testStandaloneLambdaText()
@@ -179,76 +168,59 @@ void testStandaloneLambdaText()
   mustache.tokenize(source, &root);
 
   mustache::Data legacyData(mustache::Data::TypeMap, 0);
-  legacyData.set("call", mustache::Data::lambda(
-      std::make_unique<LegacyLambda>(&observed)));
+  legacyData.set("call", mustache::Data::lambda(std::make_unique<LegacyLambda>(&observed)));
   std::string output;
   mustache.render(&root, &legacyData, NULL, &output);
-  expect(observed == expectedText,
-      "legacy lambda lost standalone section boundaries");
-  expect(output == expectedText,
-      "legacy standalone lambda output changed when reparsed");
+  expect(observed == expectedText, "legacy lambda lost standalone section boundaries");
+  expect(output == expectedText, "legacy standalone lambda output changed when reparsed");
 
   const std::vector<uint8_t> serial = root.serializeValue();
   std::unique_ptr<mustache::Node> decoded =
-      mustache::Node::unserializeOwned(std::string_view(
-          reinterpret_cast<const char *>(serial.data()), serial.size()));
+      mustache::Node::unserializeOwned(std::string_view(reinterpret_cast<const char *>(serial.data()), serial.size()));
   observed.clear();
   output.clear();
   mustache.render(decoded.get(), &legacyData, NULL, &output);
-  expect(observed == expectedText && output == expectedText,
-      "serialized AST lost standalone lambda section boundaries");
+  expect(
+      observed == expectedText && output == expectedText, "serialized AST lost standalone lambda section boundaries");
 
   mustache::Data scopedData(mustache::Data::TypeMap, 0);
-  scopedData.set("call", mustache::Data::lambda(
-      std::make_unique<ScopedLambda>(&observed)));
+  scopedData.set("call", mustache::Data::lambda(std::make_unique<ScopedLambda>(&observed)));
   observed.clear();
   output.clear();
   mustache.render(&root, &scopedData, NULL, &output);
-  expect(observed == expectedText,
-      "scoped lambda lost standalone section boundaries");
-  expect(output == expectedText,
-      "scoped standalone lambda output changed when reparsed");
+  expect(observed == expectedText, "scoped lambda lost standalone section boundaries");
+  expect(output == expectedText, "scoped standalone lambda output changed when reparsed");
 }
 
 void testExplicitSerializedByteLengths()
 {
   mustache::Node root;
   root.type = mustache::Node::TypeRoot;
-  std::unique_ptr<std::vector<uint8_t> > serial(root.serialize());
+  std::unique_ptr<std::vector<uint8_t>> serial(root.serialize());
 
   size_t position = 0;
-  std::unique_ptr<mustache::Node> fromBytes(
-      mustache::Node::unserialize(
-          serial->data(), serial->size(), 0, &position));
-  expect(fromBytes->type == mustache::Node::TypeRoot &&
-          position == serial->size(),
+  std::unique_ptr<mustache::Node> fromBytes(mustache::Node::unserialize(serial->data(), serial->size(), 0, &position));
+  expect(fromBytes->type == mustache::Node::TypeRoot && position == serial->size(),
       "pointer-plus-length AST decoding failed");
 
-  const std::string binary(
-      reinterpret_cast<const char *>(serial->data()), serial->size());
+  const std::string binary(reinterpret_cast<const char *>(serial->data()), serial->size());
   position = 0;
-  std::unique_ptr<mustache::Node> fromView(
-      mustache::Node::unserialize(
-          std::string_view(binary), 0, &position));
-  expect(fromView->type == mustache::Node::TypeRoot &&
-          position == binary.size(),
-      "string_view AST decoding failed");
+  std::unique_ptr<mustache::Node> fromView(mustache::Node::unserialize(std::string_view(binary), 0, &position));
+  expect(fromView->type == mustache::Node::TypeRoot && position == binary.size(), "string_view AST decoding failed");
 
   bool rejected = false;
   try {
     std::unique_ptr<mustache::Node> invalid(
-        mustache::Node::unserialize(
-            serial->data(), serial->size() - 1, 0, &position));
-  } catch( const mustache::Exception& ) {
+        mustache::Node::unserialize(serial->data(), serial->size() - 1, 0, &position));
+  } catch (const mustache::Exception&) {
     rejected = true;
   }
   expect(rejected, "an explicitly truncated AST byte range was accepted");
 
   rejected = false;
   try {
-    std::unique_ptr<mustache::Node> invalid(
-        mustache::Node::unserialize(NULL, 1, 0, &position));
-  } catch( const mustache::Exception& ) {
+    std::unique_ptr<mustache::Node> invalid(mustache::Node::unserialize(NULL, 1, 0, &position));
+  } catch (const mustache::Exception&) {
     rejected = true;
   }
   expect(rejected, "a non-empty null AST byte range was accepted");

@@ -7,15 +7,15 @@
  * automatically. The shared-library build defines MUSTACHE_BUILDING_LIBRARY.
  */
 #if defined(_WIN32) || defined(__CYGWIN__)
-#  if defined(MUSTACHE_STATIC_DEFINE)
-#    define MUSTACHE_API
-#  elif defined(MUSTACHE_BUILDING_LIBRARY)
-#    define MUSTACHE_API __declspec(dllexport)
-#  else
-#    define MUSTACHE_API __declspec(dllimport)
-#  endif
+#if defined(MUSTACHE_STATIC_DEFINE)
+#define MUSTACHE_API
+#elif defined(MUSTACHE_BUILDING_LIBRARY)
+#define MUSTACHE_API __declspec(dllexport)
 #else
-#  define MUSTACHE_API
+#define MUSTACHE_API __declspec(dllimport)
+#endif
+#else
+#define MUSTACHE_API
 #endif
 
 #endif

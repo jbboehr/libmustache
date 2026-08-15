@@ -19,7 +19,6 @@
 
 namespace mustache {
 
-
 /*! \class Tokenizer
     \brief Tokenizes a template
 
@@ -29,13 +28,13 @@ class Tokenizer {
   private:
     //! The default initial start string
     std::string _startSequence;
-    
+
     //! The default initial stop string
     std::string _stopSequence;
-    
+
     //! Whether to escape HTML by default
     bool _escapeByDefault;
-    
+
   public:
     /*! \struct Limits
         \brief Resource limits for parsing templates.
@@ -45,66 +44,64 @@ class Tokenizer {
         Nesting depth counts open sections and excludes the root node.
     */
     struct Limits {
-      std::size_t maxInputBytes;
-      std::size_t maxNestingDepth;
-      std::size_t maxNodes;
-      std::size_t maxTagBytes;
-      std::size_t maxDelimiterBytes;
+        std::size_t maxInputBytes;
+        std::size_t maxNestingDepth;
+        std::size_t maxNodes;
+        std::size_t maxTagBytes;
+        std::size_t maxDelimiterBytes;
 
-      MUSTACHE_API Limits();
+        MUSTACHE_API Limits();
     };
 
     //! Constructor
-    Tokenizer() : _startSequence("{{"), _stopSequence("}}"), _escapeByDefault(true) {};
-    
+    Tokenizer() :
+        _startSequence("{{"),
+        _stopSequence("}}"),
+        _escapeByDefault(true) {};
+
     //! Sets the start sequence
     MUSTACHE_API void setStartSequence(const std::string& start);
 
     //! Sets the start sequence from an explicitly sized view
     MUSTACHE_API void setStartSequence(std::string_view start);
-    
+
     //! Sets the start sequence
     MUSTACHE_API void setStartSequence(const char * start, int len = 0);
-    
+
     //! Sets the stop sequence
     MUSTACHE_API void setStopSequence(const std::string& stop);
 
     //! Sets the stop sequence from an explicitly sized view
     MUSTACHE_API void setStopSequence(std::string_view stop);
-    
+
     //! Sets the stop sequence
     MUSTACHE_API void setStopSequence(const char * stop, int len = 0);
-    
+
     //! Sets whether to escape HTML by default
     MUSTACHE_API void setEscapeByDefault(bool flag);
-    
+
     //! Gets the current start sequence
-    MUSTACHE_API const std::string & getStartSequence();
-    
+    MUSTACHE_API const std::string& getStartSequence();
+
     //! Gets the current stop sequence
-    MUSTACHE_API const std::string & getStopSequence();
-    
+    MUSTACHE_API const std::string& getStopSequence();
+
     //! Gets whether to escape HTML by default
     MUSTACHE_API bool getEscapeByDefault();
-    
+
     //! Tokenizes the given string template
-    MUSTACHE_API void tokenize(
-        std::string * tmpl, Node * root, bool escapeOutput = false);
+    MUSTACHE_API void tokenize(std::string * tmpl, Node * root, bool escapeOutput = false);
 
     //! Tokenizes the given string template with resource limits
-    MUSTACHE_API void tokenize(std::string * tmpl, Node * root,
-        const Limits& limits, bool escapeOutput = false);
+    MUSTACHE_API void tokenize(std::string * tmpl, Node * root, const Limits& limits, bool escapeOutput = false);
 
     //! Tokenizes an explicitly sized template view
-    MUSTACHE_API void tokenize(std::string_view tmpl, Node * root,
-        bool escapeOutput = false);
+    MUSTACHE_API void tokenize(std::string_view tmpl, Node * root, bool escapeOutput = false);
 
     //! Tokenizes an explicitly sized template view with resource limits
-    MUSTACHE_API void tokenize(std::string_view tmpl, Node * root,
-        const Limits& limits, bool escapeOutput = false);
+    MUSTACHE_API void tokenize(std::string_view tmpl, Node * root, const Limits& limits, bool escapeOutput = false);
 };
 
-
-} // namespace Mustache
+} // namespace mustache
 
 #endif

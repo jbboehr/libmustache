@@ -46,13 +46,13 @@ class Data {
         root-to-leaf path.
     */
     struct ParseLimits {
-      std::size_t maxInputBytes;
-      std::size_t maxNestingDepth;
-      std::size_t maxNodes;
-      std::size_t maxStringBytes;
-      std::size_t maxContainerEntries;
+        std::size_t maxInputBytes;
+        std::size_t maxNestingDepth;
+        std::size_t maxNodes;
+        std::size_t maxStringBytes;
+        std::size_t maxContainerEntries;
 
-      MUSTACHE_API ParseLimits();
+        MUSTACHE_API ParseLimits();
     };
 
     //! Enum of the supported data types. Existing values retain their numbers.
@@ -130,28 +130,21 @@ class Data {
         structural changes to the owning Data tree. The tree must not be
         structurally modified while a renderer is using it.
     */
-    MUSTACHE_API const Data * find(
-        const std::string& key) const noexcept;
+    MUSTACHE_API const Data * find(const std::string& key) const noexcept;
 
     //! Parse into a value. The pointer-returning forms remain for compatibility.
     static MUSTACHE_API Data fromJSON(const char * string);
-    static MUSTACHE_API Data fromJSON(
-        const char * string, const ParseLimits& limits);
+    static MUSTACHE_API Data fromJSON(const char * string, const ParseLimits& limits);
     static MUSTACHE_API Data fromJSON(std::string_view string);
-    static MUSTACHE_API Data fromJSON(
-        std::string_view string, const ParseLimits& limits);
+    static MUSTACHE_API Data fromJSON(std::string_view string, const ParseLimits& limits);
     static MUSTACHE_API Data * createFromJSON(const char * string);
-    static MUSTACHE_API Data * createFromJSON(
-        const char * string, const ParseLimits& limits);
+    static MUSTACHE_API Data * createFromJSON(const char * string, const ParseLimits& limits);
     static MUSTACHE_API Data fromYAML(const char * string);
-    static MUSTACHE_API Data fromYAML(
-        const char * string, const ParseLimits& limits);
+    static MUSTACHE_API Data fromYAML(const char * string, const ParseLimits& limits);
     static MUSTACHE_API Data fromYAML(std::string_view string);
-    static MUSTACHE_API Data fromYAML(
-        std::string_view string, const ParseLimits& limits);
+    static MUSTACHE_API Data fromYAML(std::string_view string, const ParseLimits& limits);
     static MUSTACHE_API Data * createFromYAML(const char * string);
-    static MUSTACHE_API Data * createFromYAML(
-        const char * string, const ParseLimits& limits);
+    static MUSTACHE_API Data * createFromYAML(const char * string, const ParseLimits& limits);
 
     MUSTACHE_API void swap(Data& other) noexcept;
 
@@ -168,12 +161,10 @@ class Data {
 #if defined(__GNUC__) && !defined(_WIN32)
     __attribute__((visibility("hidden")))
 #endif
-    static Data parseJSON(
-        std::string_view string, const ParseLimits& limits);
+    static Data parseJSON(std::string_view string, const ParseLimits& limits);
     static std::unique_ptr<Storage> makeStorage(Type type, int size);
     Storage& requireStorage(Type expected, const char * description);
-    const Storage& requireStorage(
-        Type expected, const char * description) const;
+    const Storage& requireStorage(Type expected, const char * description) const;
 };
 
 } // namespace mustache

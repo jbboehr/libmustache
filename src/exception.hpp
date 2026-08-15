@@ -8,7 +8,6 @@
 
 namespace mustache {
 
-
 /*! \class Exception
     \brief Exception class
 
@@ -16,9 +15,10 @@ namespace mustache {
 */
 class Exception : public std::runtime_error {
   public:
-      Exception(const std::string& desc) : std::runtime_error(desc) { }
+    Exception(const std::string& desc) :
+        std::runtime_error(desc)
+    {}
 };
-
 
 /*! \class TokenizerException
     \brief Exception class
@@ -29,13 +29,12 @@ class TokenizerException : public Exception {
   public:
     const int lineNo;
     const int charNo;
-    TokenizerException(const std::string& desc, int lineNo = 0, int charNo = 0) : 
+    TokenizerException(const std::string& desc, int lineNo = 0, int charNo = 0) :
         Exception(desc),
         lineNo(lineNo),
         charNo(charNo) {};
 };
 
-
-} // namespace Mustache
+} // namespace mustache
 
 #endif

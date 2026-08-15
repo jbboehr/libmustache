@@ -33,14 +33,13 @@ class Tokenizer;
     is always capped at 256 active nodes to protect the C++ call stack.
 */
 struct RenderLimits {
-  std::size_t maxOutputBytes;
-  std::size_t maxNestingDepth;
-  std::size_t maxNodeVisits;
-  std::size_t maxLambdaTemplateBytes;
+    std::size_t maxOutputBytes;
+    std::size_t maxNestingDepth;
+    std::size_t maxNodeVisits;
+    std::size_t maxLambdaTemplateBytes;
 
-  MUSTACHE_API RenderLimits();
+    MUSTACHE_API RenderLimits();
 };
-
 
 /*! \class Renderer
     \brief Renders a token tree
@@ -54,29 +53,30 @@ class Renderer {
     typedef std::function<const Node *(const std::string&)> PartialResolver;
 
     struct IndentationFrame {
-      explicit IndentationFrame(
-          std::vector<std::string_view> components = {}) :
-          components(std::move(components)), atLineStart(true) {}
+        explicit IndentationFrame(std::vector<std::string_view> components = {}) :
+            components(std::move(components)),
+            atLineStart(true)
+        {}
 
-      std::vector<std::string_view> components;
-      bool atLineStart;
+        std::vector<std::string_view> components;
+        bool atLineStart;
     };
 
     //! The root token node
     const Node * _node;
-    
+
     //! The root data node
     const Data * _data;
-    
+
     //! The data stack
     std::vector<const Data *> _stack;
-    
+
     //! Partials
     const Node::Partials * _partials;
 
     //! Optional lookup for opaque compiled partials
     PartialResolver _partialResolver;
-    
+
     //! Current output buffer
     std::string * _output;
 
@@ -99,10 +99,9 @@ class Renderer {
 
     //! Number of active section-lambda callback frames
     std::size_t _lambdaCallbackDepth;
-    
+
     //! Renders a single node
-    void _renderNode(const Node * node, std::size_t depth,
-        const std::string * partialIndentation = NULL,
+    void _renderNode(const Node * node, std::size_t depth, const std::string * partialIndentation = NULL,
         bool partialIndentationMetadata = false);
 
     //! Renders all children one level below their parent
@@ -128,31 +127,27 @@ class Renderer {
     void _consumeNodeVisit();
 
     //! Parses and charges every node in a lambda-generated AST
-    void _tokenizeLambda(Tokenizer * tokenizer, std::string_view source,
-        Node * root, bool escapeOutput);
+    void _tokenizeLambda(Tokenizer * tokenizer, std::string_view source, Node * root, bool escapeOutput);
     void _consumeLambdaNodes(const Node * node);
 
     //! Reconstructs bounded section text for a lambda callback
-    std::string _lambdaSectionText(const Node * node,
-        std::string_view start, std::string_view stop, std::size_t depth);
-    void _appendLambdaNodeTemplate(const Node * node,
-        std::string_view start, std::string_view stop, std::string * output,
-        std::size_t depth);
-    void _appendLambdaTemplate(
-        std::string * output, std::string_view value);
-    
+    std::string _lambdaSectionText(const Node * node, std::string_view start, std::string_view stop, std::size_t depth);
+    void _appendLambdaNodeTemplate(
+        const Node * node, std::string_view start, std::string_view stop, std::string * output, std::size_t depth);
+    void _appendLambdaTemplate(std::string * output, std::string_view value);
+
     const Data * _lookup(const Node * node);
 
     void setPartialResolver(PartialResolver resolver);
 
     friend class Mustache;
-    
+
     bool _strictPaths;
-    
+
   public:
     //! The default output buffer length
     static const int outputBufferLength = 1000;
-    
+
     //! Constructor
     MUSTACHE_API Renderer();
 
@@ -160,34 +155,32 @@ class Renderer {
     Renderer& operator=(const Renderer&) = delete;
     Renderer(Renderer&&) = delete;
     Renderer& operator=(Renderer&&) = delete;
-    
+
     //! Destructor
     MUSTACHE_API ~Renderer();
-    
+
     //! Clears any assigned values
     MUSTACHE_API void clear();
-    
+
     //! Initializes the renderer
-    MUSTACHE_API void init(const Node * node, const Data * data,
-        const Node::Partials * partials, std::string * output);
+    MUSTACHE_API void init(const Node * node, const Data * data, const Node::Partials * partials, std::string * output);
 
     //! Initializes the renderer with an explicit resource policy
-    MUSTACHE_API void init(const Node * node, const Data * data,
-        const Node::Partials * partials, std::string * output,
+    MUSTACHE_API void init(const Node * node, const Data * data, const Node::Partials * partials, std::string * output,
         const RenderLimits& limits);
-    
+
     //! Sets the current root token node
     MUSTACHE_API void setNode(const Node * node);
-    
+
     //! Sets the current root data node
     MUSTACHE_API void setData(const Data * data);
-    
+
     //! Sets the current partials
     MUSTACHE_API void setPartials(const Node::Partials * partials);
-    
+
     //! Sets the current output buffer
     MUSTACHE_API void setOutput(std::string * output);
-    
+
     //! Renders using the stored variables
     MUSTACHE_API void render();
 
@@ -197,11 +190,9 @@ class Renderer {
         on this renderer. A retained renderer pointer is rejected when no such
         callback is active.
     */
-    MUSTACHE_API void renderForLambda(
-        const Node * node, std::string * output);
+    MUSTACHE_API void renderForLambda(const Node * node, std::string * output);
 };
 
-
-} // namespace Mustache
+} // namespace mustache
 
 #endif

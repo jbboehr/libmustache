@@ -21,13 +21,10 @@ class Mustache;
 class CompiledTemplate {
   public:
     MUSTACHE_API CompiledTemplate() noexcept;
-    MUSTACHE_API CompiledTemplate(
-        const CompiledTemplate& other) noexcept;
-    MUSTACHE_API CompiledTemplate& operator=(
-        const CompiledTemplate& other) noexcept;
+    MUSTACHE_API CompiledTemplate(const CompiledTemplate& other) noexcept;
+    MUSTACHE_API CompiledTemplate& operator=(const CompiledTemplate& other) noexcept;
     MUSTACHE_API CompiledTemplate(CompiledTemplate&& other) noexcept;
-    MUSTACHE_API CompiledTemplate& operator=(
-        CompiledTemplate&& other) noexcept;
+    MUSTACHE_API CompiledTemplate& operator=(CompiledTemplate&& other) noexcept;
     MUSTACHE_API ~CompiledTemplate();
 
     //! Returns true when this handle contains no compiled template.

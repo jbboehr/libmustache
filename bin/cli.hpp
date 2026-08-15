@@ -12,8 +12,7 @@ namespace mustache_cli {
     Arguments exclude the executable name. All failures are converted to a
     diagnostic and a nonzero result so no exception escapes this boundary.
 */
-int run(const std::vector<std::string>& arguments,
-    std::ostream& output, std::ostream& error) noexcept;
+int run(const std::vector<std::string>& arguments, std::ostream& output, std::ostream& error) noexcept;
 
 } // namespace mustache_cli
 

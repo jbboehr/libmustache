@@ -21,13 +21,10 @@
 #include "tokenizer.hpp"
 #include "utils.hpp"
 
-
 extern "C" MUSTACHE_API const char * mustache_version();
 extern "C" MUSTACHE_API int mustache_version_int();
 
-
 namespace mustache {
-
 
 /*! \class Mustache
     \brief Container class for a tokenizer and a renderer
@@ -39,128 +36,128 @@ class Mustache {
   public:
     //! Tokenizer
     Tokenizer tokenizer;
-    
+
     //! Renderer
     Renderer renderer;
-    
+
     //! Utility method for Tokenizer::tokenize()
     MUSTACHE_API void tokenize(std::string * tmpl, Node * root);
 
     //! Utility method for Tokenizer::tokenize() with resource limits
-    MUSTACHE_API void tokenize(std::string * tmpl, Node * root,
-        const Tokenizer::Limits& limits);
+    MUSTACHE_API void tokenize(std::string * tmpl, Node * root, const Tokenizer::Limits& limits);
 
     //! Utility method for Tokenizer::tokenize()
     MUSTACHE_API void tokenize(std::string_view tmpl, Node * root);
 
     //! Utility method for Tokenizer::tokenize() with resource limits
-    MUSTACHE_API void tokenize(std::string_view tmpl, Node * root,
-        const Tokenizer::Limits& limits);
+    MUSTACHE_API void tokenize(std::string_view tmpl, Node * root, const Tokenizer::Limits& limits);
 
     //! Compiles an immutable template handle
     MUSTACHE_API CompiledTemplate compile(std::string_view source);
 
     //! Compiles an immutable template handle with resource limits
-    MUSTACHE_API CompiledTemplate compile(std::string_view source,
-        const Tokenizer::Limits& limits);
-    
+    MUSTACHE_API CompiledTemplate compile(std::string_view source, const Tokenizer::Limits& limits);
+
     //! Utility method for Renderer::init() and Renderer::render()
-    MUSTACHE_API void render(const Node * node, const Data * data,
-        const Node::Partials * partials, std::string * output);
+    MUSTACHE_API void render(
+        const Node * node, const Data * data, const Node::Partials * partials, std::string * output);
 
     //! Utility method for bounded Renderer::init() and Renderer::render()
-    MUSTACHE_API void render(const Node * node, const Data * data,
-        const Node::Partials * partials, std::string * output,
-        const RenderLimits& limits);
+    MUSTACHE_API void render(const Node * node, const Data * data, const Node::Partials * partials,
+        std::string * output, const RenderLimits& limits);
 
     //! Renders an immutable compiled template
-    MUSTACHE_API std::string render(
-        const CompiledTemplate& compiled, const Data& data) const;
+    MUSTACHE_API std::string render(const CompiledTemplate& compiled, const Data& data) const;
 
     //! Renders an immutable compiled template with resource limits
     MUSTACHE_API std::string render(
-        const CompiledTemplate& compiled, const Data& data,
-        const RenderLimits& limits) const;
+        const CompiledTemplate& compiled, const Data& data, const RenderLimits& limits) const;
 
     //! Renders an immutable compiled template with compiled partials
     MUSTACHE_API std::string render(
-        const CompiledTemplate& compiled, const Data& data,
-        const PartialMap& partials) const;
+        const CompiledTemplate& compiled, const Data& data, const PartialMap& partials) const;
 
     //! Renders compiled templates and partials with resource limits
-    MUSTACHE_API std::string render(
-        const CompiledTemplate& compiled, const Data& data,
-        const PartialMap& partials, const RenderLimits& limits) const;
-    
+    MUSTACHE_API std::string render(const CompiledTemplate& compiled, const Data& data, const PartialMap& partials,
+        const RenderLimits& limits) const;
+
     //! Utility method for Tokenizer::setStartSequence()
-    void setStartSequence(const std::string& start) {
+    void setStartSequence(const std::string& start)
+    {
       return tokenizer.setStartSequence(start);
     };
 
     //! Utility method for Tokenizer::setStartSequence()
-    void setStartSequence(std::string_view start) {
+    void setStartSequence(std::string_view start)
+    {
       tokenizer.setStartSequence(start);
     };
-    
+
     //! Utility method for Tokenizer::setStartSequence()
-    void setStartSequence(const char * start, long len = 0) {
-      if( start == NULL ) {
+    void setStartSequence(const char * start, long len = 0)
+    {
+      if (start == NULL) {
         throw Exception("Missing start delimiter");
       }
-      if( len < 0 ) {
+      if (len < 0) {
         throw Exception("Invalid start delimiter length");
       }
-      if( len == 0 ) {
+      if (len == 0) {
         tokenizer.setStartSequence(start);
       } else {
-        tokenizer.setStartSequence(
-            std::string_view(start, static_cast<size_t>(len)));
+        tokenizer.setStartSequence(std::string_view(start, static_cast<size_t>(len)));
       }
     };
-    
+
     //! Utility method for Tokenizer::setStopSequence()
-    void setStopSequence(const std::string& stop) {
+    void setStopSequence(const std::string& stop)
+    {
       tokenizer.setStopSequence(stop);
     };
 
     //! Utility method for Tokenizer::setStopSequence()
-    void setStopSequence(std::string_view stop) {
+    void setStopSequence(std::string_view stop)
+    {
       tokenizer.setStopSequence(stop);
     };
-    
+
     //! Utility method for Tokenizer::setStopSequence()
-    void setStopSequence(const char * stop, long len = 0) {
-      if( stop == NULL ) {
+    void setStopSequence(const char * stop, long len = 0)
+    {
+      if (stop == NULL) {
         throw Exception("Missing stop delimiter");
       }
-      if( len < 0 ) {
+      if (len < 0) {
         throw Exception("Invalid stop delimiter length");
       }
-      if( len == 0 ) {
+      if (len == 0) {
         tokenizer.setStopSequence(stop);
       } else {
-        tokenizer.setStopSequence(
-            std::string_view(stop, static_cast<size_t>(len)));
+        tokenizer.setStopSequence(std::string_view(stop, static_cast<size_t>(len)));
       }
     };
-    
+
     //! Utility method for Tokenizer::setEscapeByDefault()
-    void setEscapeByDefault(bool flag) {
+    void setEscapeByDefault(bool flag)
+    {
       tokenizer.setEscapeByDefault(flag);
     };
-    
+
     //! Utility method for Tokenizer::getStartSequence()
-    const std::string & getStartSequence() {
+    const std::string& getStartSequence()
+    {
       return tokenizer.getStartSequence();
     }
-    
+
     //! Utility method for Tokenizer::getStopSequence()
-    const std::string & getStopSequence() {
+    const std::string& getStopSequence()
+    {
       return tokenizer.getStopSequence();
     };
-    
+
     //! Utility method for Tokenizer::getEscapeByDefault()
-    bool getEscapeByDefault() {
+    bool getEscapeByDefault()
+    {
       return tokenizer.getEscapeByDefault();
     };
 };
@@ -169,29 +166,21 @@ class Mustache {
 MUSTACHE_API CompiledTemplate compile(std::string_view source);
 
 //! Compiles a template with explicit resource limits
-MUSTACHE_API CompiledTemplate compile(
-    std::string_view source, const Tokenizer::Limits& limits);
+MUSTACHE_API CompiledTemplate compile(std::string_view source, const Tokenizer::Limits& limits);
 
 //! Renders a compiled template with no partials
-MUSTACHE_API std::string render(
-    const CompiledTemplate& compiled, const Data& data);
+MUSTACHE_API std::string render(const CompiledTemplate& compiled, const Data& data);
 
 //! Renders a compiled template with explicit resource limits
-MUSTACHE_API std::string render(
-    const CompiledTemplate& compiled, const Data& data,
-    const RenderLimits& limits);
+MUSTACHE_API std::string render(const CompiledTemplate& compiled, const Data& data, const RenderLimits& limits);
 
 //! Renders a compiled template with compiled partials
-MUSTACHE_API std::string render(
-    const CompiledTemplate& compiled, const Data& data,
-    const PartialMap& partials);
+MUSTACHE_API std::string render(const CompiledTemplate& compiled, const Data& data, const PartialMap& partials);
 
 //! Renders compiled templates and partials with explicit resource limits
 MUSTACHE_API std::string render(
-    const CompiledTemplate& compiled, const Data& data,
-    const PartialMap& partials, const RenderLimits& limits);
+    const CompiledTemplate& compiled, const Data& data, const PartialMap& partials, const RenderLimits& limits);
 
-
-} // namespace Mustache
+} // namespace mustache
 
 #endif

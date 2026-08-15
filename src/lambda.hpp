@@ -38,19 +38,16 @@ class LambdaRenderContext {
     LambdaRenderContext() noexcept = default;
 
     LambdaRenderContext(const LambdaRenderContext&) noexcept = default;
-    LambdaRenderContext& operator=(
-        const LambdaRenderContext&) noexcept = default;
+    LambdaRenderContext& operator=(const LambdaRenderContext&) noexcept = default;
     LambdaRenderContext(LambdaRenderContext&&) noexcept = default;
-    LambdaRenderContext& operator=(
-        LambdaRenderContext&&) noexcept = default;
+    LambdaRenderContext& operator=(LambdaRenderContext&&) noexcept = default;
     ~LambdaRenderContext() = default;
 
     //! Returns whether this callback frame remains active.
     MUSTACHE_API bool active() const;
 
     //! Renders a node through the active callback frame.
-    MUSTACHE_API void render(
-        const Node& node, std::string& output) const;
+    MUSTACHE_API void render(const Node& node, std::string& output) const;
 
     //! Renders a node and returns owned output.
     MUSTACHE_API std::string render(const Node& node) const;
@@ -81,7 +78,8 @@ class MUSTACHE_API Lambda {
         adapter. New callers should prefer this overload so embedded NULs and
         non-NUL-terminated inputs retain their explicit length.
     */
-    std::string invoke(std::string_view text, Renderer * renderer) {
+    std::string invoke(std::string_view text, Renderer * renderer)
+    {
       std::string ownedText(text);
       return invoke(&ownedText, renderer);
     }
@@ -91,11 +89,9 @@ class MUSTACHE_API Lambda {
         The default implementation adapts to the legacy virtual method. New
         implementations may override only this overload for section use.
     */
-    virtual std::string invoke(
-        std::string_view text, LambdaRenderContext context);
+    virtual std::string invoke(std::string_view text, LambdaRenderContext context);
 };
 
-
-} // namespace Mustache
+} // namespace mustache
 
 #endif
