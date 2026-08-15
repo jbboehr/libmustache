@@ -24,11 +24,11 @@ or a change in the pinned suite inventory fails the test executable.
 | Interpolation | 39 | 0 | 0 | 39 |
 | Inverted sections | 22 | 0 | 0 | 22 |
 | Partials | 11 | 0 | 0 | 11 |
-| Sections | 29 | 1 | 0 | 30 |
+| Sections | 30 | 0 | 0 | 30 |
 | Dynamic names | 0 | 21 | 0 | 21 |
 | Inheritance | 0 | 22 | 0 | 22 |
 | Lambdas | 10 | 0 | 0 | 10 |
-| **Total** | **137** | **44** | **0** | **181** |
+| **Total** | **138** | **43** | **0** | **181** |
 
 CI succeeds only when there are zero unexpected failures and zero unexpected
 passes. Known failures remain visible in the summary and are not counted as
@@ -40,7 +40,8 @@ There are no known failures among the core tests that are executed. Standalone
 section, inverted-section, closing, comment, delimiter-change, and partial
 tags are stripped with exact LF, CRLF, beginning-of-input, and end-of-input
 behavior. Standalone partial indentation is applied to template lines without
-incorrectly indenting line endings introduced by rendered data.
+incorrectly indenting line endings introduced by rendered data. Implicit
+iterators traverse nested arrays and other container contexts.
 
 ## Explicitly unsupported cases
 
@@ -48,8 +49,6 @@ incorrectly indenting line endings introduced by rendered data.
   partial names are not implemented.
 - All 22 inheritance extension tests are skipped because parent and block tags
   are not implemented.
-- `sections.yml / Implicit Iterator - Array` is skipped because nested-array
-  implicit iteration is not implemented.
 
 Each skipped case is parsed far enough to record its suite and name, then
 reported with its reason. The expected per-suite inventory prevents an updated

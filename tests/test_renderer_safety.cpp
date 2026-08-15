@@ -265,6 +265,30 @@ std::string nestedPartial(std::string inner, std::size_t depth)
   return source;
 }
 
+void testContainerCurrentContext()
+{
+  const mustache::CompiledTemplate nestedArrays = mustache::compile("{{#list}}({{#.}}{{.}}{{/.}}){{/list}}");
+  const mustache::Data arrayData = mustache::Data::object({{"list",
+      mustache::Data::array(
+          {mustache::Data::array({mustache::Data::integer(1), mustache::Data::integer(2), mustache::Data::integer(3)}),
+              mustache::Data::array(
+                  {mustache::Data::string("a"), mustache::Data::string("b"), mustache::Data::string("c")})})}});
+  expect(mustache::render(nestedArrays, arrayData) == "(123)(abc)",
+      "the implicit iterator did not traverse a nested array");
+
+  const mustache::CompiledTemplate currentObject = mustache::compile("{{#object}}{{#.}}{{value}}{{/.}}{{/object}}");
+  const mustache::Data objectData =
+      mustache::Data::object({{"object", mustache::Data::object({{"value", mustache::Data::string("object")}})}});
+  expect(mustache::render(currentObject, objectData) == "object",
+      "the implicit iterator did not treat an object as the current context");
+
+  const mustache::CompiledTemplate currentList = mustache::compile("{{#.}}{{.}}{{/.}}");
+  const mustache::Data listData =
+      mustache::Data::list({mustache::Data::string("list"), mustache::Data::string("-context")});
+  expect(mustache::render(currentList, listData) == "list-context",
+      "the implicit iterator did not traverse a compatibility list");
+}
+
 void testLimitDefaultsAndOutputAccounting()
 {
   mustache::RenderLimits defaults;
@@ -567,6 +591,7 @@ static_assert(
 
 int main()
 {
+  testContainerCurrentContext();
   testLimitDefaultsAndOutputAccounting();
   testDepthAndWorkLimits();
   testPartialIndentationOutputAccounting();

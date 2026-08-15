@@ -39,7 +39,6 @@ struct SpecSuiteRecord {
 // A known failure that starts passing is an unexpected pass until this entry is
 // removed. A missing or duplicated entry fails the inventory validation.
 static SpecExpectationRecord specExpectations[] = {
-    {"sections.yml", "Implicit Iterator - Array", SpecExpectedSkip, "nested array iteration is not implemented", 1, 0},
     {"~dynamic-names.yml", NULL, SpecExpectedSkip, "dynamic partial names are not implemented", 21, 0},
     {"~inheritance.yml", NULL, SpecExpectedSkip, "template inheritance is not implemented", 22, 0}};
 

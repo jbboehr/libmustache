@@ -786,12 +786,11 @@ const Data * Renderer::_lookup(const Node * node)
 {
   const Data * data = _stack.back();
 
-  if (data->type() != Data::TypeMap && data->type() != Data::TypeList && data->type() != Data::TypeArray) {
-    // Simple
-    if (node->data->compare(".") == 0) {
-      return data;
-    }
-  } else if (data->type() == Data::TypeMap) {
+  if (node->data->compare(".") == 0) {
+    return data;
+  }
+
+  if (data->type() == Data::TypeMap) {
     // Check top level
     const Data * found = data->find(*node->data);
     if (found != NULL) {
