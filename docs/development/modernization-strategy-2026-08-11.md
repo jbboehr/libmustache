@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-11
 
-**Last revised:** 2026-08-13
+**Last revised:** 2026-08-15
 
 **Status:** Proposed implementation strategy
 
@@ -185,6 +185,12 @@ then run `fuzz_node_unserialize` with `-max_total_time=3600`, the committed
 dictionary, and the corpus copy in the build tree. Keep any generated crash
 artifact and add its minimized input as a regression test before fixing it.
 
+The recorded extended decoder run used Clang 21.1.8 with ASan/UBSan,
+`-max_total_time=3600`, `-max_len=4096`, `-timeout=5`, and the committed
+dictionary and corpus. It completed 169,692,478 executions in 3,601 seconds,
+with 536 MiB peak RSS and no crash, timeout, sanitizer finding, or failure
+artifact.
+
 Do not design a replacement serialization format in this phase. Preserve safe
 legacy reads while the PHP benchmark in Phase 7 determines whether persistent
 compiled ASTs have enough value to justify a new format.
@@ -279,6 +285,12 @@ dictionary, and the copied tokenizer corpus in the build tree. Serialization
 round-trip failures after successful parsing are fuzz findings, not expected
 parser rejections; the fuzzer uses compatible explicit serialization limits so
 those invariants remain observable.
+
+The recorded extended tokenizer run used Clang 21.1.8 with ASan/UBSan,
+`-max_total_time=3600`, `-max_len=4096`, `-timeout=5`, and the committed
+dictionary and corpus. It completed 14,972,000 executions in 3,601 seconds,
+with 553 MiB peak RSS and no crash, timeout, sanitizer finding, or failure
+artifact.
 
 **Definition of done:** the AST contains no owning or silently borrowed raw
 pointers; partial lifetime is explicit; existing parser and rendering behavior
