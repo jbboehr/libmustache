@@ -48,6 +48,16 @@ add_executable(test_renderer_safety test_renderer_safety.cpp)
 target_link_libraries(test_renderer_safety PRIVATE mustache_static)
 mustache_apply_build_options(test_renderer_safety)
 
+add_executable(test_allocation_failure test_allocation_failure.cpp)
+target_link_libraries(test_allocation_failure PRIVATE mustache_static)
+mustache_apply_build_options(test_allocation_failure)
+if(NOT MSVC)
+    # Replacement new/delete use malloc/free; GCC -Werror treats that pairing
+    # as mismatched-new-delete after inlining into std::make_unique.
+    target_compile_options(test_allocation_failure PRIVATE
+        -Wno-mismatched-new-delete)
+endif()
+
 if(MUSTACHE_BUILD_CLI)
     add_executable(test_cli
         test_cli.cpp
@@ -99,6 +109,7 @@ add_test(NAME length_aware_api COMMAND test_length_aware_api)
 add_test(NAME tokenizer_safety COMMAND test_tokenizer_safety)
 add_test(NAME compiled_template COMMAND test_compiled_template)
 add_test(NAME renderer_safety COMMAND test_renderer_safety)
+add_test(NAME allocation_failure COMMAND test_allocation_failure)
 if(MUSTACHE_BUILD_CLI)
     add_test(NAME cli COMMAND test_cli)
 endif()

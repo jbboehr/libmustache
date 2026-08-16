@@ -631,6 +631,14 @@ Run the C++ suite and the php-mustache PHPT suite under sanitizers where
 practical. Sanitizer-clean tests are necessary but do not replace explicit
 resource limits, parser invariants, and ownership design.
 
+The isolated `test_allocation_failure` executable deterministically replaces
+ordinary C++ allocation and sweeps every failure position through tokenization,
+JSON and YAML conversion, AST serialization and deserialization, and compiled
+rendering with lambdas and partials. Each sweep requires a final successful
+operation and verifies that failures neither publish partial destination state
+nor make reusable inputs unusable. Running the test under the sanitizer job
+also checks that every injected unwind releases its transient allocations.
+
 For the ABI-breaking release:
 
 - update the CMake ABI declaration and Libtool `-version-info` together;
