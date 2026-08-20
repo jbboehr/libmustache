@@ -8,6 +8,7 @@ ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = \
 	README.md \
 	LICENSE.md \
+	docs/development/abi-6-source-migration-2026-08-20.md \
 	CMakeLists.txt \
 	.clang-tidy \
 	.appveyor.yml \

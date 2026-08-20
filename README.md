@@ -246,7 +246,8 @@ class SectionLambda : public mustache::Lambda {
     std::string invoke(std::string_view,
         mustache::LambdaRenderContext context) override
     {
-      mustache::Node name(mustache::Node::TypeVariable, "name");
+      mustache::Node name(
+          mustache::Node::TypeVariable, "name", mustache::Node::FlagEscape);
       return context.render(name);
     }
 };
@@ -262,6 +263,10 @@ pointer obtained through that hook must never be retained.
 
 Code migrating from ABI 5 should replace direct representation access as
 follows:
+
+The complete compatibility classification, AST-cache policy, and binding
+checklist are in the
+[ABI 6 source-migration guide](docs/development/abi-6-source-migration-2026-08-20.md).
 
 | ABI 5 API | ABI 6 replacement |
 |---|---|

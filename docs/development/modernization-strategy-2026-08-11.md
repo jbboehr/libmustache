@@ -2,9 +2,9 @@
 
 **Date:** 2026-08-11
 
-**Last revised:** 2026-08-15
+**Last revised:** 2026-08-20
 
-**Status:** Proposed implementation strategy
+**Status:** Active implementation and release strategy
 
 This document describes the planned modernization of libmustache after the
 build-system hardening work. It incorporates the findings from the
@@ -80,6 +80,15 @@ The modernization development line now reports package version 0.6.0 and ABI
 not considered stable or released until this modernization is complete; the
 project will make this single ABI transition rather than assigning a new ABI
 number to every incompatible commit on the unreleased development line.
+
+The current public-header audit, exact source replacements, and retention
+policy are recorded in the
+[ABI 6 source-migration guide](abi-6-source-migration-2026-08-20.md). The
+development branch does not yet attach compiler deprecation attributes to
+transitional APIs: php-mustache must first be migrated and tested, and
+warnings-as-errors consumers must not be broken before a replacement has been
+validated. Before 0.6.0, the downstream results will determine which surfaces
+can be removed and which must remain for the complete 0.6 ABI lifetime.
 
 The current AST byte format is publicly exposed by php-mustache through the
 `MustacheAST` constructor, string conversion, and PHP serialization hooks. It
@@ -656,8 +665,9 @@ For the ABI-breaking release:
 - update the CMake ABI declaration and Libtool `-version-info` together;
 - keep `scripts/check-version-consistency.sh` enforcing their agreement;
 - update CMake, Autotools, Nix, vcpkg, and consumer version metadata;
-- publish a source-migration guide for removed public fields and ownership
-  operations; and
+- maintain the published
+  [ABI 6 source-migration guide](abi-6-source-migration-2026-08-20.md) for
+  removed public fields, ownership operations, and transitional APIs; and
 - state the legacy AST compatibility window and selected serialization policy.
 
 **Definition of done:** all build systems, installed-consumer tests, sanitizer
@@ -666,6 +676,11 @@ ABI consistency checks pass; no unresolved high-severity finding remains; and
 the migration and compatibility policies are published with the release.
 
 ## Immediate implementation order
+
+As of 2026-08-20, the C++ safety work in steps 1 through 5, 7, and 8 is
+implemented on the 0.6 development branch. The remaining release-critical
+sequence is the representative downstream build, php-mustache migration and
+benchmark, compatibility-surface decision, and release verification.
 
 1. Fix specification accounting and commit the behavior/deviation ledger.
 2. Add scalar golden tests and import the php-mustache AST byte fixtures.
