@@ -559,6 +559,10 @@ capabilities fail safely; and sanitizer tests cover every error path.
 
 ## Phase 7: Migrate and benchmark php-mustache
 
+The operational starting state, verified downstream touchpoints, migration
+slices, and test gates are recorded in the
+[php-mustache migration handoff](php-mustache-handoff-2026-08-20.md).
+
 php-mustache should continue converting PHP values into an owned C++ snapshot:
 
 ```text
