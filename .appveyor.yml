@@ -15,6 +15,7 @@ environment:
       VCPKG_DEFAULT_TRIPLET: x64-windows
 
 install:
+  - git submodule update --init --recursive
   - ps: |
       $baseline = (Get-Content -Raw vcpkg.json | ConvertFrom-Json).'builtin-baseline'
       if ($baseline -notmatch '^[0-9a-f]{40}$') {
