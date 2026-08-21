@@ -15,6 +15,19 @@ environment:
       VCPKG_DEFAULT_TRIPLET: x64-windows
 
 install:
+  - ps: |
+      $baseline = (Get-Content -Raw vcpkg.json | ConvertFrom-Json).'builtin-baseline'
+      if ($baseline -notmatch '^[0-9a-f]{40}$') {
+        throw "Invalid vcpkg builtin baseline: $baseline"
+      }
+      git -C C:\tools\vcpkg fetch --no-tags origin $baseline
+      if ($LASTEXITCODE -ne 0) {
+        throw "Failed to fetch vcpkg baseline $baseline"
+      }
+      git -C C:\tools\vcpkg cat-file -e "${baseline}:versions/baseline.json"
+      if ($LASTEXITCODE -ne 0) {
+        throw "Fetched baseline does not contain versions/baseline.json: $baseline"
+      }
   - >-
     vcpkg install
     --triplet %VCPKG_DEFAULT_TRIPLET%
