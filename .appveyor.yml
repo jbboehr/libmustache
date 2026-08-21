@@ -28,8 +28,16 @@ install:
       if ($LASTEXITCODE -ne 0) {
         throw "Fetched baseline does not contain versions/baseline.json: $baseline"
       }
+      git -C C:\tools\vcpkg checkout --detach --force $baseline
+      if ($LASTEXITCODE -ne 0) {
+        throw "Failed to check out vcpkg baseline $baseline"
+      }
+      & C:\tools\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+      if ($LASTEXITCODE -ne 0) {
+        throw "Failed to bootstrap vcpkg at baseline $baseline"
+      }
   - >-
-    vcpkg install
+    C:\tools\vcpkg\vcpkg.exe install
     --triplet %VCPKG_DEFAULT_TRIPLET%
     --x-install-root=%APPVEYOR_BUILD_FOLDER%\vcpkg_installed
 
