@@ -1,6 +1,5 @@
 #include "mustache_config.h"
 
-#include <clocale>
 #include <cstdio>
 #include <limits>
 #include <memory>
@@ -331,47 +330,6 @@ void testJSONData()
   expectJSONRejected("JSON byte-order mark", byteOrderMark, mustache::Data::ParseLimits(), "Invalid JSON data");
 }
 
-void testJSONNumericLocale()
-{
-  const char * currentLocale = std::setlocale(LC_NUMERIC, NULL);
-  if (currentLocale == NULL) {
-    std::fprintf(stderr, "could not read the current numeric locale\n");
-    ++failures;
-    return;
-  }
-  const std::string savedLocale(currentLocale);
-
-  const char * commaLocales[] = {"de_DE.UTF-8", "de_DE.utf8", "de_DE", "fr_FR.UTF-8", "fr_FR.utf8", "fr_FR"};
-  bool commaLocaleAvailable = false;
-  for (const char * locale : commaLocales) {
-    if (std::setlocale(LC_NUMERIC, locale) != NULL) {
-      const std::lconv * conventions = std::localeconv();
-      if (conventions != NULL && conventions->decimal_point != NULL && conventions->decimal_point[0] != '.') {
-        commaLocaleAvailable = true;
-        break;
-      }
-    }
-  }
-
-  if (commaLocaleAvailable) {
-    try {
-      mustache::Data data = mustache::Data::fromJSON("{\"decimal\":1.50,\"exponent\":1.50e2}");
-      expectEqual("locale-independent JSON decimal spelling", data.find("decimal")->toString(), "1.50");
-      expectEqual("locale-independent JSON exponent spelling", data.find("exponent")->toString(), "1.50e2");
-      expect(data.find("decimal")->floatingValue() == 1.5 && data.find("exponent")->floatingValue() == 150.0,
-          "numeric locale changed parsed JSON floating-point values");
-    } catch (const mustache::Exception& exception) {
-      std::fprintf(stderr, "locale-independent JSON parsing failed: %s\n", exception.what());
-      ++failures;
-    }
-  }
-
-  if (std::setlocale(LC_NUMERIC, savedLocale.c_str()) == NULL) {
-    std::fprintf(stderr, "could not restore the numeric locale\n");
-    ++failures;
-  }
-}
-
 void testYAMLData()
 {
   const char yaml[] = "nullValue: null\n"
@@ -598,7 +556,6 @@ int main()
 {
   testDirectData();
   testJSONData();
-  testJSONNumericLocale();
   testYAMLData();
   testParseLimits();
   return failures == 0 ? 0 : 1;
