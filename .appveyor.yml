@@ -58,7 +58,11 @@ build_script:
   - copy /Y vcpkg_installed\%VCPKG_DEFAULT_TRIPLET%\bin\*.dll artifacts\bin\
 
 test_script:
-  - ctest --test-dir build -C Release --output-on-failure
+  - >-
+    ctest --test-dir build -C Release
+    --output-on-failure
+    --output-junit %APPVEYOR_BUILD_FOLDER%\build\ctest-results.xml
+    --output-log %APPVEYOR_BUILD_FOLDER%\build\ctest-output.log
   - set PATH=%APPVEYOR_BUILD_FOLDER%\artifacts\bin;%PATH%
   - artifacts\bin\mustachec.exe -v
   - >-
@@ -82,6 +86,16 @@ test_script:
     -DMUSTACHE_CONSUMER_LINKAGE=static
   - cmake --build consumer-static --config Release --parallel
   - consumer-static\Release\mustache_consumer.exe
+
+# Failed tests skip normal artifact packaging, so publish diagnostics in the finalizer.
+on_finish:
+  - ps: |
+      foreach ($relativePath in @('build\ctest-results.xml', 'build\ctest-output.log')) {
+        $path = Join-Path $env:APPVEYOR_BUILD_FOLDER $relativePath
+        if (Test-Path -LiteralPath $path) {
+          Push-AppveyorArtifact $path -FileName (Split-Path $path -Leaf)
+        }
+      }
 
 artifacts:
   - path: artifacts

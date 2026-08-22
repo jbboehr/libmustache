@@ -126,6 +126,17 @@ jobs:
         working-directory: build-autotools
         run: make distcheck
 
+      - name: Upload Autotools failure logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: autotools-failure-logs-${{ matrix.os }}-${{ matrix.compiler.name }}
+          path: |
+            build-autotools/**/config.log
+            build-autotools/**/tests/*.log
+          if-no-files-found: ignore
+          retention-days: 14
+
   cmake:
     name: CMake (${{ matrix.compiler.name }})
     runs-on: ubuntu-24.04
@@ -170,7 +181,10 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/libmustache" \
             -DMUSTACHE_WARNINGS_AS_ERRORS=ON
           cmake --build build-cmake --parallel
-          ctest --test-dir build-cmake --output-on-failure
+          ctest --test-dir build-cmake \
+            --output-on-failure \
+            --output-junit "$GITHUB_WORKSPACE/build-cmake/ctest-results.xml" \
+            --output-log "$GITHUB_WORKSPACE/build-cmake/ctest-output.log"
           cmake --install build-cmake
 
           cmake -S tests/cmake-subproject -B build-subproject -G Ninja \
@@ -207,6 +221,17 @@ jobs:
             -o pkg-config-consumer
           LD_LIBRARY_PATH="$RUNNER_TEMP/libmustache/lib" ./pkg-config-consumer
 
+      - name: Upload CTest results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ctest-linux-${{ matrix.compiler.name }}
+          path: |
+            build-cmake/ctest-results.xml
+            build-cmake/ctest-output.log
+          if-no-files-found: warn
+          retention-days: 14
+
   cmake-macos:
     name: CMake (macOS, AppleClang)
     runs-on: macos-14
@@ -228,7 +253,10 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/libmustache" \
             -DMUSTACHE_WARNINGS_AS_ERRORS=ON
           cmake --build build-cmake --parallel
-          ctest --test-dir build-cmake --output-on-failure
+          ctest --test-dir build-cmake \
+            --output-on-failure \
+            --output-junit "$GITHUB_WORKSPACE/build-cmake/ctest-results.xml" \
+            --output-log "$GITHUB_WORKSPACE/build-cmake/ctest-output.log"
           cmake --install build-cmake
 
       - name: Verify installed shared and static packages
@@ -250,6 +278,17 @@ jobs:
 
           cmake -S tests/cmake-find-quiet -B build-find-quiet -G Ninja \
             -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/libmustache"
+
+      - name: Upload CTest results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ctest-macos-AppleClang
+          path: |
+            build-cmake/ctest-results.xml
+            build-cmake/ctest-output.log
+          if-no-files-found: warn
+          retention-days: 14
 
   sanitizers:
     name: Sanitizers (${{ matrix.compiler.name }})
@@ -303,7 +342,10 @@ jobs:
             -DMUSTACHE_WARNINGS_AS_ERRORS=ON \
             -DMUSTACHE_ENABLE_FUZZING=${{ matrix.compiler.name == 'Clang' && 'ON' || 'OFF' }}
           cmake --build build-sanitized --parallel
-          ctest --test-dir build-sanitized --output-on-failure
+          ctest --test-dir build-sanitized \
+            --output-on-failure \
+            --output-junit "$GITHUB_WORKSPACE/build-sanitized/ctest-results.xml" \
+            --output-log "$GITHUB_WORKSPACE/build-sanitized/ctest-output.log"
 
           autoreconf --force --install --verbose
           mkdir build-sanitized-autotools
@@ -313,6 +355,37 @@ jobs:
             --enable-warnings-as-errors
           make --jobs="$(nproc)"
           make check
+
+      - name: Upload sanitizer CTest results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sanitizer-ctest-results-${{ matrix.compiler.name }}
+          path: |
+            build-sanitized/ctest-results.xml
+            build-sanitized/ctest-output.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload sanitizer Autotools failure logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sanitizer-autotools-failure-logs-${{ matrix.compiler.name }}
+          path: |
+            build-sanitized-autotools/config.log
+            build-sanitized-autotools/tests/*.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload sanitizer fuzz reproducers
+        if: ${{ !cancelled() && matrix.compiler.name == 'Clang' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sanitizer-fuzz-reproducers-${{ matrix.compiler.name }}
+          path: build-sanitized/tests/fuzz-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
 
   nix-matrix:
     name: Generate Nix matrix
