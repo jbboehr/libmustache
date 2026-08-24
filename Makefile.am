@@ -8,7 +8,17 @@ ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = \
 	README.md \
 	LICENSE.md \
+	benchmarks/CMakeLists.txt \
+	benchmarks/ast-cache-vs-source.cpp \
+	benchmarks/ast-cache-vs-source.php \
+	benchmarks/results/ast-cache-vs-source-2026-08-23-cpp-run1.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-23-cpp-run2.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-23-cpp-run3.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-23-php-run1.json \
+	benchmarks/results/ast-cache-vs-source-2026-08-23-php-run2.json \
+	benchmarks/results/ast-cache-vs-source-2026-08-23-php-run3.json \
 	docs/development/abi-6-source-migration-2026-08-20.md \
+	docs/development/ast-cache-benchmark-2026-08-22.md \
 	CMakeLists.txt \
 	.clang-tidy \
 	.appveyor.yml \

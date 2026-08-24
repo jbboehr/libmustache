@@ -630,6 +630,18 @@ The result controls the serialization roadmap:
 In neither case should the legacy decoder be maintained indefinitely without a
 specific compatibility commitment.
 
+**Decision recorded 2026-08-22:** the
+[PHP cache benchmark](ast-cache-benchmark-2026-08-22.md) selected cached source
+for cross-request persistence. AST cache hits won for flat templates but lost
+for nested partial graphs in warm and fresh-process cases, missed the warm
+large-flat p95 threshold, used 2.16 to 2.38 times the cache space, and cost 16
+to 19 times as much to serialize and store at medium and large sizes. Do not
+design a replacement persistent AST format from these results. The next
+performance slice is request- or object-local reuse of an opaque compiled
+template and compiled partial graph. Keep checked legacy AST reads through
+libmustache 0.6.x and php-mustache 0.x; removal requires a separately
+announced incompatible release.
+
 **Definition of done:** the full supported PHPT suite passes against the new
 library API; PHP conversion and callbacks pass sanitizer-backed tests where
 practical; the benchmark method and results are committed or otherwise

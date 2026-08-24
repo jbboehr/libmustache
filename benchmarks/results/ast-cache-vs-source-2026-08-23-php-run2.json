@@ -1,0 +1,1052 @@
+{
+    "metadata": {
+        "generated_at_utc": "2026-08-23T18:22:36+00:00",
+        "php_version": "8.3.33",
+        "php_sapi": "cli",
+        "php_binary": "\/nix\/store\/qdcbdrw4f77vj3y405n31pvcmcjg23cp-php-with-extensions-8.3.33\/bin\/php",
+        "mustache_extension_version": "0.9.3",
+        "libmustache_revision": "56643b061aadb72a6d8b9675709884109ffa5f7f",
+        "php_mustache_revision": "3b4aaf2d4a121666244f36142a38123ed1625a52",
+        "samples": 101,
+        "warmups": 10,
+        "cold_samples": 31,
+        "apcu": "5.1.28",
+        "material_win_percent": 20,
+        "gc_during_timed_samples": "disabled",
+        "cold_worker_model": "fresh PHP CLI process; startup and fixture loading excluded; APCu primed before first timed fetch"
+    },
+    "workloads": {
+        "small-flat": {
+            "target_source_bytes": 1024,
+            "source_bytes": 1211,
+            "ast_bytes": 2649,
+            "php_source_payload_bytes": 1306,
+            "php_ast_payload_bytes": 2743,
+            "rendered_bytes": 805,
+            "cases": {
+                "parse_source_graph": {
+                    "median_us": 7.81,
+                    "p95_us": 8.11,
+                    "min_us": 7.7,
+                    "max_us": 12.73,
+                    "throughput_per_second": 128040.97311139565,
+                    "php_peak_delta_bytes": 440,
+                    "sink": 0
+                },
+                "decode_ast_graph": {
+                    "median_us": 4.62,
+                    "p95_us": 4.69,
+                    "min_us": 4.55,
+                    "max_us": 4.76,
+                    "throughput_per_second": 216450.21645021645,
+                    "php_peak_delta_bytes": 440,
+                    "sink": 0
+                },
+                "render_source_graph": {
+                    "median_us": 10.47,
+                    "p95_us": 10.59,
+                    "min_us": 10.38,
+                    "max_us": 11.42,
+                    "throughput_per_second": 95510.98376313275,
+                    "php_peak_delta_bytes": 952,
+                    "sink": 0
+                },
+                "compile_render_source_graph": {
+                    "median_us": 10.63,
+                    "p95_us": 11.76,
+                    "min_us": 10.52,
+                    "max_us": 18.78,
+                    "throughput_per_second": 94073.37723424271,
+                    "php_peak_delta_bytes": 2664,
+                    "sink": 0
+                },
+                "decode_render_ast_graph": {
+                    "median_us": 7.34,
+                    "p95_us": 12.59,
+                    "min_us": 7.2,
+                    "max_us": 86.8,
+                    "throughput_per_second": 136239.78201634876,
+                    "php_peak_delta_bytes": 1392,
+                    "sink": 0
+                },
+                "reuse_ast_render": {
+                    "median_us": 2.64,
+                    "p95_us": 2.87,
+                    "min_us": 2.61,
+                    "max_us": 4.47,
+                    "throughput_per_second": 378787.8787878788,
+                    "php_peak_delta_bytes": 952,
+                    "sink": 0
+                },
+                "php_cache_hit_source": {
+                    "median_us": 10.71,
+                    "p95_us": 10.8,
+                    "min_us": 10.61,
+                    "max_us": 18.18,
+                    "throughput_per_second": 93370.68160597573,
+                    "php_peak_delta_bytes": 14376,
+                    "sink": 0
+                },
+                "php_cache_hit_ast": {
+                    "median_us": 7.58,
+                    "p95_us": 7.64,
+                    "min_us": 7.51,
+                    "max_us": 7.68,
+                    "throughput_per_second": 131926.12137203166,
+                    "php_peak_delta_bytes": 20312,
+                    "sink": 0
+                },
+                "serialize_source_graph": {
+                    "median_us": 0.12,
+                    "p95_us": 0.14,
+                    "min_us": 0.11,
+                    "max_us": 0.19,
+                    "throughput_per_second": 8333333.333333333,
+                    "php_peak_delta_bytes": 4160,
+                    "sink": 0
+                },
+                "serialize_ast_graph": {
+                    "median_us": 5.13,
+                    "p95_us": 7.84,
+                    "min_us": 5.05,
+                    "max_us": 11.6,
+                    "throughput_per_second": 194931.7738791423,
+                    "php_peak_delta_bytes": 5376,
+                    "sink": 0
+                },
+                "apcu_cache_hit_source": {
+                    "median_us": 10.79,
+                    "p95_us": 11.6,
+                    "min_us": 10.62,
+                    "max_us": 35,
+                    "throughput_per_second": 92678.40593141798,
+                    "php_peak_delta_bytes": 15912,
+                    "sink": 0
+                },
+                "apcu_cache_hit_ast": {
+                    "median_us": 7.68,
+                    "p95_us": 7.75,
+                    "min_us": 7.59,
+                    "max_us": 16.43,
+                    "throughput_per_second": 130208.33333333333,
+                    "php_peak_delta_bytes": 23384,
+                    "sink": 0
+                },
+                "apcu_store_source": {
+                    "median_us": 0.56,
+                    "p95_us": 0.58,
+                    "min_us": 0.54,
+                    "max_us": 0.64,
+                    "throughput_per_second": 1785714.2857142857,
+                    "php_peak_delta_bytes": 4160,
+                    "sink": 0
+                },
+                "apcu_store_ast": {
+                    "median_us": 5.94,
+                    "p95_us": 5.99,
+                    "min_us": 5.89,
+                    "max_us": 6.01,
+                    "throughput_per_second": 168350.16835016836,
+                    "php_peak_delta_bytes": 5376,
+                    "sink": 0
+                },
+                "cold_php_cache_hit_source": {
+                    "median_us": 30.27,
+                    "p95_us": 40.26,
+                    "min_us": 29.47,
+                    "max_us": 98.23,
+                    "throughput_per_second": 33036.00925008259,
+                    "php_peak_delta_bytes": 14376,
+                    "sink": 805
+                },
+                "cold_php_cache_hit_ast": {
+                    "median_us": 22.29,
+                    "p95_us": 24.12,
+                    "min_us": 21.62,
+                    "max_us": 26.26,
+                    "throughput_per_second": 44863.16733961418,
+                    "php_peak_delta_bytes": 20312,
+                    "sink": 805
+                },
+                "cold_apcu_cache_hit_source": {
+                    "median_us": 30.57,
+                    "p95_us": 60.15,
+                    "min_us": 29.77,
+                    "max_us": 80.6,
+                    "throughput_per_second": 32711.808963035655,
+                    "php_peak_delta_bytes": 15912,
+                    "sink": 805
+                },
+                "cold_apcu_cache_hit_ast": {
+                    "median_us": 22.89,
+                    "p95_us": 23.51,
+                    "min_us": 22,
+                    "max_us": 26.32,
+                    "throughput_per_second": 43687.1996505024,
+                    "php_peak_delta_bytes": 23384,
+                    "sink": 805
+                }
+            }
+        },
+        "small-graph": {
+            "target_source_bytes": 1024,
+            "source_bytes": 1181,
+            "ast_bytes": 2812,
+            "php_source_payload_bytes": 1476,
+            "php_ast_payload_bytes": 3107,
+            "rendered_bytes": 937,
+            "cases": {
+                "parse_source_graph": {
+                    "median_us": 8.47,
+                    "p95_us": 8.71,
+                    "min_us": 8.3,
+                    "max_us": 36.09,
+                    "throughput_per_second": 118063.75442739078,
+                    "php_peak_delta_bytes": 1008,
+                    "sink": 0
+                },
+                "decode_ast_graph": {
+                    "median_us": 5.28,
+                    "p95_us": 5.39,
+                    "min_us": 5.2,
+                    "max_us": 16.56,
+                    "throughput_per_second": 189393.9393939394,
+                    "php_peak_delta_bytes": 1008,
+                    "sink": 0
+                },
+                "render_source_graph": {
+                    "median_us": 12.01,
+                    "p95_us": 12.17,
+                    "min_us": 11.84,
+                    "max_us": 22.93,
+                    "throughput_per_second": 83263.94671107411,
+                    "php_peak_delta_bytes": 1400,
+                    "sink": 0
+                },
+                "compile_render_source_graph": {
+                    "median_us": 12.47,
+                    "p95_us": 20.59,
+                    "min_us": 12.24,
+                    "max_us": 21.38,
+                    "throughput_per_second": 80192.46190858059,
+                    "php_peak_delta_bytes": 3704,
+                    "sink": 0
+                },
+                "decode_render_ast_graph": {
+                    "median_us": 12.09,
+                    "p95_us": 17.73,
+                    "min_us": 11.77,
+                    "max_us": 64.93,
+                    "throughput_per_second": 82712.9859387924,
+                    "php_peak_delta_bytes": 2408,
+                    "sink": 0
+                },
+                "reuse_ast_render": {
+                    "median_us": 6.32,
+                    "p95_us": 6.37,
+                    "min_us": 6.28,
+                    "max_us": 6.43,
+                    "throughput_per_second": 158227.84810126582,
+                    "php_peak_delta_bytes": 1400,
+                    "sink": 0
+                },
+                "php_cache_hit_source": {
+                    "median_us": 12.56,
+                    "p95_us": 14.41,
+                    "min_us": 12.39,
+                    "max_us": 21.43,
+                    "throughput_per_second": 79617.83439490446,
+                    "php_peak_delta_bytes": 16096,
+                    "sink": 0
+                },
+                "php_cache_hit_ast": {
+                    "median_us": 12.56,
+                    "p95_us": 12.69,
+                    "min_us": 12.37,
+                    "max_us": 41.18,
+                    "throughput_per_second": 79617.83439490446,
+                    "php_peak_delta_bytes": 22168,
+                    "sink": 0
+                },
+                "serialize_source_graph": {
+                    "median_us": 0.19,
+                    "p95_us": 0.21,
+                    "min_us": 0.18,
+                    "max_us": 0.28,
+                    "throughput_per_second": 5263157.894736842,
+                    "php_peak_delta_bytes": 4160,
+                    "sink": 0
+                },
+                "serialize_ast_graph": {
+                    "median_us": 6.54,
+                    "p95_us": 6.58,
+                    "min_us": 6.49,
+                    "max_us": 49.02,
+                    "throughput_per_second": 152905.19877675842,
+                    "php_peak_delta_bytes": 7456,
+                    "sink": 0
+                },
+                "apcu_cache_hit_source": {
+                    "median_us": 12.74,
+                    "p95_us": 14.46,
+                    "min_us": 12.56,
+                    "max_us": 68.94,
+                    "throughput_per_second": 78492.93563579278,
+                    "php_peak_delta_bytes": 17632,
+                    "sink": 0
+                },
+                "apcu_cache_hit_ast": {
+                    "median_us": 12.74,
+                    "p95_us": 21.61,
+                    "min_us": 12.54,
+                    "max_us": 43.2,
+                    "throughput_per_second": 78492.93563579278,
+                    "php_peak_delta_bytes": 26264,
+                    "sink": 0
+                },
+                "apcu_store_source": {
+                    "median_us": 0.68,
+                    "p95_us": 0.69,
+                    "min_us": 0.66,
+                    "max_us": 0.77,
+                    "throughput_per_second": 1470588.2352941176,
+                    "php_peak_delta_bytes": 4160,
+                    "sink": 0
+                },
+                "apcu_store_ast": {
+                    "median_us": 7.45,
+                    "p95_us": 7.52,
+                    "min_us": 7.4,
+                    "max_us": 7.55,
+                    "throughput_per_second": 134228.1879194631,
+                    "php_peak_delta_bytes": 7456,
+                    "sink": 0
+                },
+                "cold_php_cache_hit_source": {
+                    "median_us": 37.11,
+                    "p95_us": 71.7,
+                    "min_us": 36.11,
+                    "max_us": 143.78,
+                    "throughput_per_second": 26946.914578280786,
+                    "php_peak_delta_bytes": 16096,
+                    "sink": 937
+                },
+                "cold_php_cache_hit_ast": {
+                    "median_us": 37.98,
+                    "p95_us": 50.8,
+                    "min_us": 36.76,
+                    "max_us": 54.03,
+                    "throughput_per_second": 26329.647182727753,
+                    "php_peak_delta_bytes": 22168,
+                    "sink": 937
+                },
+                "cold_apcu_cache_hit_source": {
+                    "median_us": 37.21,
+                    "p95_us": 45.21,
+                    "min_us": 35.8,
+                    "max_us": 48.32,
+                    "throughput_per_second": 26874.496103198064,
+                    "php_peak_delta_bytes": 17632,
+                    "sink": 937
+                },
+                "cold_apcu_cache_hit_ast": {
+                    "median_us": 38.93,
+                    "p95_us": 52.29,
+                    "min_us": 37.81,
+                    "max_us": 66.94,
+                    "throughput_per_second": 25687.130747495507,
+                    "php_peak_delta_bytes": 26264,
+                    "sink": 937
+                }
+            }
+        },
+        "medium-flat": {
+            "target_source_bytes": 32768,
+            "source_bytes": 33047,
+            "ast_bytes": 71277,
+            "php_source_payload_bytes": 33143,
+            "php_ast_payload_bytes": 71372,
+            "rendered_bytes": 22057,
+            "cases": {
+                "parse_source_graph": {
+                    "median_us": 262.45,
+                    "p95_us": 302.09,
+                    "min_us": 257.02,
+                    "max_us": 748.409,
+                    "throughput_per_second": 3810.2495713469234,
+                    "php_peak_delta_bytes": 440,
+                    "sink": 0
+                },
+                "decode_ast_graph": {
+                    "median_us": 164.079,
+                    "p95_us": 204.09,
+                    "min_us": 132.7,
+                    "max_us": 266.44,
+                    "throughput_per_second": 6094.6251500801445,
+                    "php_peak_delta_bytes": 440,
+                    "sink": 0
+                },
+                "render_source_graph": {
+                    "median_us": 252.51,
+                    "p95_us": 296.599,
+                    "min_us": 248.92,
+                    "max_us": 398.74,
+                    "throughput_per_second": 3960.239198447586,
+                    "php_peak_delta_bytes": 24632,
+                    "sink": 0
+                },
+                "compile_render_source_graph": {
+                    "median_us": 253.66,
+                    "p95_us": 323.19,
+                    "min_us": 248.41,
+                    "max_us": 483.01,
+                    "throughput_per_second": 3942.284948356067,
+                    "php_peak_delta_bytes": 61928,
+                    "sink": 0
+                },
+                "decode_render_ast_graph": {
+                    "median_us": 179.53,
+                    "p95_us": 202.68,
+                    "min_us": 175.78,
+                    "max_us": 623.67,
+                    "throughput_per_second": 5570.099704784716,
+                    "php_peak_delta_bytes": 25072,
+                    "sink": 0
+                },
+                "reuse_ast_render": {
+                    "median_us": 54.09,
+                    "p95_us": 71.36,
+                    "min_us": 53.47,
+                    "max_us": 93.09,
+                    "throughput_per_second": 18487.705675725643,
+                    "php_peak_delta_bytes": 24632,
+                    "sink": 0
+                },
+                "php_cache_hit_source": {
+                    "median_us": 252.61,
+                    "p95_us": 293.36,
+                    "min_us": 249.34,
+                    "max_us": 407.67,
+                    "throughput_per_second": 3958.6714698547166,
+                    "php_peak_delta_bytes": 62304,
+                    "sink": 0
+                },
+                "php_cache_hit_ast": {
+                    "median_us": 180.52,
+                    "p95_us": 229.2,
+                    "min_us": 178.11,
+                    "max_us": 291.88,
+                    "throughput_per_second": 5539.552404165744,
+                    "php_peak_delta_bytes": 99176,
+                    "sink": 0
+                },
+                "serialize_source_graph": {
+                    "median_us": 0.41,
+                    "p95_us": 0.45,
+                    "min_us": 0.35,
+                    "max_us": 0.49,
+                    "throughput_per_second": 2439024.3902439023,
+                    "php_peak_delta_bytes": 36928,
+                    "sink": 0
+                },
+                "serialize_ast_graph": {
+                    "median_us": 122.09,
+                    "p95_us": 175.92,
+                    "min_us": 120.79,
+                    "max_us": 245.14,
+                    "throughput_per_second": 8190.679007289705,
+                    "php_peak_delta_bytes": 75008,
+                    "sink": 0
+                },
+                "apcu_cache_hit_source": {
+                    "median_us": 255.36,
+                    "p95_us": 342.53,
+                    "min_us": 250.24,
+                    "max_us": 736.61,
+                    "throughput_per_second": 3916.0401002506264,
+                    "php_peak_delta_bytes": 86824,
+                    "sink": 0
+                },
+                "apcu_cache_hit_ast": {
+                    "median_us": 181.27,
+                    "p95_us": 219.88,
+                    "min_us": 178.42,
+                    "max_us": 304.72,
+                    "throughput_per_second": 5516.632647432008,
+                    "php_peak_delta_bytes": 164696,
+                    "sink": 0
+                },
+                "apcu_store_source": {
+                    "median_us": 8.76,
+                    "p95_us": 8.85,
+                    "min_us": 8.68,
+                    "max_us": 34.16,
+                    "throughput_per_second": 114155.25114155251,
+                    "php_peak_delta_bytes": 36928,
+                    "sink": 0
+                },
+                "apcu_store_ast": {
+                    "median_us": 140.06,
+                    "p95_us": 173.71,
+                    "min_us": 137.11,
+                    "max_us": 285.41,
+                    "throughput_per_second": 7139.797229758675,
+                    "php_peak_delta_bytes": 75008,
+                    "sink": 0
+                },
+                "cold_php_cache_hit_source": {
+                    "median_us": 364.54,
+                    "p95_us": 408.92,
+                    "min_us": 351.28,
+                    "max_us": 417.42,
+                    "throughput_per_second": 2743.1831897734132,
+                    "php_peak_delta_bytes": 62304,
+                    "sink": 22057
+                },
+                "cold_php_cache_hit_ast": {
+                    "median_us": 245.78,
+                    "p95_us": 285.99,
+                    "min_us": 239.65,
+                    "max_us": 328.62,
+                    "throughput_per_second": 4068.6793066970463,
+                    "php_peak_delta_bytes": 99176,
+                    "sink": 22057
+                },
+                "cold_apcu_cache_hit_source": {
+                    "median_us": 362.329,
+                    "p95_us": 404.799,
+                    "min_us": 353.51,
+                    "max_us": 467.989,
+                    "throughput_per_second": 2759.922611769966,
+                    "php_peak_delta_bytes": 99168,
+                    "sink": 22057
+                },
+                "cold_apcu_cache_hit_ast": {
+                    "median_us": 255,
+                    "p95_us": 329.31,
+                    "min_us": 246.67,
+                    "max_us": 342.669,
+                    "throughput_per_second": 3921.5686274509803,
+                    "php_peak_delta_bytes": 172904,
+                    "sink": 22057
+                }
+            }
+        },
+        "medium-graph": {
+            "target_source_bytes": 32768,
+            "source_bytes": 33031,
+            "ast_bytes": 76508,
+            "php_source_payload_bytes": 33328,
+            "php_ast_payload_bytes": 76804,
+            "rendered_bytes": 28083,
+            "cases": {
+                "parse_source_graph": {
+                    "median_us": 220.07,
+                    "p95_us": 327.779,
+                    "min_us": 213.73,
+                    "max_us": 397.57,
+                    "throughput_per_second": 4544.008724496751,
+                    "php_peak_delta_bytes": 1008,
+                    "sink": 0
+                },
+                "decode_ast_graph": {
+                    "median_us": 136.37,
+                    "p95_us": 192.469,
+                    "min_us": 134.03,
+                    "max_us": 477.12,
+                    "throughput_per_second": 7332.991127080736,
+                    "php_peak_delta_bytes": 1008,
+                    "sink": 0
+                },
+                "render_source_graph": {
+                    "median_us": 293.84,
+                    "p95_us": 360.29,
+                    "min_us": 289.32,
+                    "max_us": 461.61,
+                    "throughput_per_second": 3403.2126327252927,
+                    "php_peak_delta_bytes": 29048,
+                    "sink": 0
+                },
+                "compile_render_source_graph": {
+                    "median_us": 294.09,
+                    "p95_us": 339.42,
+                    "min_us": 290.21,
+                    "max_us": 446.13,
+                    "throughput_per_second": 3400.319630045224,
+                    "php_peak_delta_bytes": 67192,
+                    "sink": 0
+                },
+                "decode_render_ast_graph": {
+                    "median_us": 328.66,
+                    "p95_us": 389.06,
+                    "min_us": 312.19,
+                    "max_us": 484.56,
+                    "throughput_per_second": 3042.6580660865334,
+                    "php_peak_delta_bytes": 30056,
+                    "sink": 0
+                },
+                "reuse_ast_render": {
+                    "median_us": 177.29,
+                    "p95_us": 214.15,
+                    "min_us": 174.279,
+                    "max_us": 284.55,
+                    "throughput_per_second": 5640.476056179142,
+                    "php_peak_delta_bytes": 29048,
+                    "sink": 0
+                },
+                "php_cache_hit_source": {
+                    "median_us": 301.48,
+                    "p95_us": 365.059,
+                    "min_us": 295.939,
+                    "max_us": 392.89,
+                    "throughput_per_second": 3316.9696165583123,
+                    "php_peak_delta_bytes": 68696,
+                    "sink": 0
+                },
+                "php_cache_hit_ast": {
+                    "median_us": 329.73,
+                    "p95_us": 435.66,
+                    "min_us": 319.88,
+                    "max_us": 604.56,
+                    "throughput_per_second": 3032.7843993570496,
+                    "php_peak_delta_bytes": 110056,
+                    "sink": 0
+                },
+                "serialize_source_graph": {
+                    "median_us": 0.49,
+                    "p95_us": 0.54,
+                    "min_us": 0.45,
+                    "max_us": 0.61,
+                    "throughput_per_second": 2040816.3265306123,
+                    "php_peak_delta_bytes": 36928,
+                    "sink": 0
+                },
+                "serialize_ast_graph": {
+                    "median_us": 139.56,
+                    "p95_us": 166.97,
+                    "min_us": 138,
+                    "max_us": 297.389,
+                    "throughput_per_second": 7165.3768988248785,
+                    "php_peak_delta_bytes": 82720,
+                    "sink": 0
+                },
+                "apcu_cache_hit_source": {
+                    "median_us": 302.88,
+                    "p95_us": 347.81,
+                    "min_us": 295,
+                    "max_us": 426.73,
+                    "throughput_per_second": 3301.637612255679,
+                    "php_peak_delta_bytes": 88800,
+                    "sink": 0
+                },
+                "apcu_cache_hit_ast": {
+                    "median_us": 328.18,
+                    "p95_us": 376.24,
+                    "min_us": 316.75,
+                    "max_us": 448.34,
+                    "throughput_per_second": 3047.1082942287767,
+                    "php_peak_delta_bytes": 175256,
+                    "sink": 0
+                },
+                "apcu_store_source": {
+                    "median_us": 8.98,
+                    "p95_us": 9.1,
+                    "min_us": 8.88,
+                    "max_us": 15.06,
+                    "throughput_per_second": 111358.57461024499,
+                    "php_peak_delta_bytes": 36928,
+                    "sink": 0
+                },
+                "apcu_store_ast": {
+                    "median_us": 158.73,
+                    "p95_us": 234.809,
+                    "min_us": 156.48,
+                    "max_us": 322.72,
+                    "throughput_per_second": 6300.0063000063,
+                    "php_peak_delta_bytes": 82720,
+                    "sink": 0
+                },
+                "cold_php_cache_hit_source": {
+                    "median_us": 426.53,
+                    "p95_us": 499.58,
+                    "min_us": 411.369,
+                    "max_us": 508.72,
+                    "throughput_per_second": 2344.5009729679036,
+                    "php_peak_delta_bytes": 68696,
+                    "sink": 28083
+                },
+                "cold_php_cache_hit_ast": {
+                    "median_us": 478.52,
+                    "p95_us": 508.93,
+                    "min_us": 461.149,
+                    "max_us": 513.17,
+                    "throughput_per_second": 2089.7768118364957,
+                    "php_peak_delta_bytes": 110056,
+                    "sink": 28083
+                },
+                "cold_apcu_cache_hit_source": {
+                    "median_us": 433.1,
+                    "p95_us": 455.29,
+                    "min_us": 415.88,
+                    "max_us": 508.57,
+                    "throughput_per_second": 2308.9355806972985,
+                    "php_peak_delta_bytes": 105560,
+                    "sink": 28083
+                },
+                "cold_apcu_cache_hit_ast": {
+                    "median_us": 480.179,
+                    "p95_us": 575.039,
+                    "min_us": 461.33,
+                    "max_us": 588.99,
+                    "throughput_per_second": 2082.556713225693,
+                    "php_peak_delta_bytes": 187880,
+                    "sink": 28083
+                }
+            }
+        },
+        "large-flat": {
+            "target_source_bytes": 262144,
+            "source_bytes": 262342,
+            "ast_bytes": 565562,
+            "php_source_payload_bytes": 262439,
+            "php_ast_payload_bytes": 565658,
+            "rendered_bytes": 175122,
+            "cases": {
+                "parse_source_graph": {
+                    "median_us": 2226.029,
+                    "p95_us": 2359.419,
+                    "min_us": 2142.819,
+                    "max_us": 2879.229,
+                    "throughput_per_second": 449.23044578484826,
+                    "php_peak_delta_bytes": 440,
+                    "sink": 0
+                },
+                "decode_ast_graph": {
+                    "median_us": 1198.03,
+                    "p95_us": 1570.239,
+                    "min_us": 1048.44,
+                    "max_us": 1626.949,
+                    "throughput_per_second": 834.7036384731601,
+                    "php_peak_delta_bytes": 440,
+                    "sink": 0
+                },
+                "render_source_graph": {
+                    "median_us": 2681.3,
+                    "p95_us": 2860.028,
+                    "min_us": 2595.848,
+                    "max_us": 2999.078,
+                    "throughput_per_second": 372.953418118077,
+                    "php_peak_delta_bytes": 176184,
+                    "sink": 0
+                },
+                "compile_render_source_graph": {
+                    "median_us": 2687.22,
+                    "p95_us": 2984.378,
+                    "min_us": 2589.059,
+                    "max_us": 3980.368,
+                    "throughput_per_second": 372.13179419623253,
+                    "php_peak_delta_bytes": 442856,
+                    "sink": 0
+                },
+                "decode_render_ast_graph": {
+                    "median_us": 1468.089,
+                    "p95_us": 1653.719,
+                    "min_us": 1422.159,
+                    "max_us": 1961.519,
+                    "throughput_per_second": 681.1576137414013,
+                    "php_peak_delta_bytes": 176624,
+                    "sink": 0
+                },
+                "reuse_ast_render": {
+                    "median_us": 415.559,
+                    "p95_us": 493.06,
+                    "min_us": 405.06,
+                    "max_us": 621.329,
+                    "throughput_per_second": 2406.397166226697,
+                    "php_peak_delta_bytes": 176184,
+                    "sink": 0
+                },
+                "php_cache_hit_source": {
+                    "median_us": 2070.718,
+                    "p95_us": 2204.798,
+                    "min_us": 1998.029,
+                    "max_us": 2358.608,
+                    "throughput_per_second": 482.9242803703836,
+                    "php_peak_delta_bytes": 443232,
+                    "sink": 0
+                },
+                "php_cache_hit_ast": {
+                    "median_us": 1530.399,
+                    "p95_us": 1972.889,
+                    "min_us": 1429.919,
+                    "max_us": 2024.999,
+                    "throughput_per_second": 653.424368416341,
+                    "php_peak_delta_bytes": 746344,
+                    "sink": 0
+                },
+                "serialize_source_graph": {
+                    "median_us": 2.22,
+                    "p95_us": 2.81,
+                    "min_us": 2.15,
+                    "max_us": 7.99,
+                    "throughput_per_second": 450450.4504504505,
+                    "php_peak_delta_bytes": 266304,
+                    "sink": 0
+                },
+                "serialize_ast_graph": {
+                    "median_us": 1064.769,
+                    "p95_us": 1152.249,
+                    "min_us": 1032.839,
+                    "max_us": 1228.969,
+                    "throughput_per_second": 939.1708436289937,
+                    "php_peak_delta_bytes": 570624,
+                    "sink": 0
+                },
+                "apcu_cache_hit_source": {
+                    "median_us": 2085.68,
+                    "p95_us": 2274.459,
+                    "min_us": 1991.019,
+                    "max_us": 2472.409,
+                    "throughput_per_second": 479.45993632772047,
+                    "php_peak_delta_bytes": 545576,
+                    "sink": 0
+                },
+                "apcu_cache_hit_ast": {
+                    "median_us": 1482.349,
+                    "p95_us": 1867.789,
+                    "min_us": 1434.29,
+                    "max_us": 2051.809,
+                    "throughput_per_second": 674.6049681957488,
+                    "php_peak_delta_bytes": 1155928,
+                    "sink": 0
+                },
+                "apcu_store_source": {
+                    "median_us": 67.35,
+                    "p95_us": 78.73,
+                    "min_us": 66.78,
+                    "max_us": 103.23,
+                    "throughput_per_second": 14847.809948032665,
+                    "php_peak_delta_bytes": 266304,
+                    "sink": 0
+                },
+                "apcu_store_ast": {
+                    "median_us": 1202.889,
+                    "p95_us": 1337.66,
+                    "min_us": 1172.27,
+                    "max_us": 1685.899,
+                    "throughput_per_second": 831.3319017797985,
+                    "php_peak_delta_bytes": 570624,
+                    "sink": 0
+                },
+                "cold_php_cache_hit_source": {
+                    "median_us": 2895.989,
+                    "p95_us": 3152.298,
+                    "min_us": 2807.509,
+                    "max_us": 3470.588,
+                    "throughput_per_second": 345.30517899066604,
+                    "php_peak_delta_bytes": 443232,
+                    "sink": 175122
+                },
+                "cold_php_cache_hit_ast": {
+                    "median_us": 1905.069,
+                    "p95_us": 2017.439,
+                    "min_us": 1846.239,
+                    "max_us": 2052.869,
+                    "throughput_per_second": 524.915370519388,
+                    "php_peak_delta_bytes": 746344,
+                    "sink": 175122
+                },
+                "cold_apcu_cache_hit_source": {
+                    "median_us": 2913.849,
+                    "p95_us": 3075.859,
+                    "min_us": 2810.919,
+                    "max_us": 3287.239,
+                    "throughput_per_second": 343.1886827354472,
+                    "php_peak_delta_bytes": 709472,
+                    "sink": 175122
+                },
+                "cold_apcu_cache_hit_ast": {
+                    "median_us": 1967.109,
+                    "p95_us": 2058.429,
+                    "min_us": 1905.249,
+                    "max_us": 2060.999,
+                    "throughput_per_second": 508.3602382989453,
+                    "php_peak_delta_bytes": 1315688,
+                    "sink": 175122
+                }
+            }
+        },
+        "large-graph": {
+            "target_source_bytes": 262144,
+            "source_bytes": 262156,
+            "ast_bytes": 606668,
+            "php_source_payload_bytes": 262454,
+            "php_ast_payload_bytes": 606965,
+            "rendered_bytes": 223368,
+            "cases": {
+                "parse_source_graph": {
+                    "median_us": 1705.749,
+                    "p95_us": 1943.359,
+                    "min_us": 1640.9,
+                    "max_us": 2169.299,
+                    "throughput_per_second": 586.2527253423569,
+                    "php_peak_delta_bytes": 1008,
+                    "sink": 0
+                },
+                "decode_ast_graph": {
+                    "median_us": 1130,
+                    "p95_us": 1221.24,
+                    "min_us": 1095.01,
+                    "max_us": 1266.17,
+                    "throughput_per_second": 884.9557522123894,
+                    "php_peak_delta_bytes": 1008,
+                    "sink": 0
+                },
+                "render_source_graph": {
+                    "median_us": 2382.048,
+                    "p95_us": 2557.089,
+                    "min_us": 2290.349,
+                    "max_us": 2834.438,
+                    "throughput_per_second": 419.80682169292976,
+                    "php_peak_delta_bytes": 225656,
+                    "sink": 0
+                },
+                "compile_render_source_graph": {
+                    "median_us": 2412.439,
+                    "p95_us": 2590.359,
+                    "min_us": 2334.158,
+                    "max_us": 2940.419,
+                    "throughput_per_second": 414.5182531040163,
+                    "php_peak_delta_bytes": 489080,
+                    "sink": 0
+                },
+                "decode_render_ast_graph": {
+                    "median_us": 2753.299,
+                    "p95_us": 2938.748,
+                    "min_us": 2547.999,
+                    "max_us": 3350.429,
+                    "throughput_per_second": 363.200654923421,
+                    "php_peak_delta_bytes": 226664,
+                    "sink": 0
+                },
+                "reuse_ast_render": {
+                    "median_us": 1406.999,
+                    "p95_us": 1529.249,
+                    "min_us": 1350.919,
+                    "max_us": 1653.689,
+                    "throughput_per_second": 710.7325591560477,
+                    "php_peak_delta_bytes": 225656,
+                    "sink": 0
+                },
+                "php_cache_hit_source": {
+                    "median_us": 2408.249,
+                    "p95_us": 2597.809,
+                    "min_us": 2323.819,
+                    "max_us": 2726.499,
+                    "throughput_per_second": 415.23945405977537,
+                    "php_peak_delta_bytes": 490584,
+                    "sink": 0
+                },
+                "php_cache_hit_ast": {
+                    "median_us": 2737.969,
+                    "p95_us": 2925.549,
+                    "min_us": 2555.199,
+                    "max_us": 3198.029,
+                    "throughput_per_second": 365.23423019033453,
+                    "php_peak_delta_bytes": 835048,
+                    "sink": 0
+                },
+                "serialize_source_graph": {
+                    "median_us": 2.26,
+                    "p95_us": 2.38,
+                    "min_us": 2.21,
+                    "max_us": 2.64,
+                    "throughput_per_second": 442477.8761061947,
+                    "php_peak_delta_bytes": 266304,
+                    "sink": 0
+                },
+                "serialize_ast_graph": {
+                    "median_us": 1152.51,
+                    "p95_us": 1303.169,
+                    "min_us": 1113.34,
+                    "max_us": 1521.609,
+                    "throughput_per_second": 867.6714301828184,
+                    "php_peak_delta_bytes": 611584,
+                    "sink": 0
+                },
+                "apcu_cache_hit_source": {
+                    "median_us": 2414.819,
+                    "p95_us": 2585.099,
+                    "min_us": 2317.039,
+                    "max_us": 2693.969,
+                    "throughput_per_second": 414.10971174237073,
+                    "php_peak_delta_bytes": 543456,
+                    "sink": 0
+                },
+                "apcu_cache_hit_ast": {
+                    "median_us": 2749.679,
+                    "p95_us": 3047.629,
+                    "min_us": 2505.969,
+                    "max_us": 3154.689,
+                    "throughput_per_second": 363.6788148725724,
+                    "php_peak_delta_bytes": 1236120,
+                    "sink": 0
+                },
+                "apcu_store_source": {
+                    "median_us": 67.38,
+                    "p95_us": 72.42,
+                    "min_us": 66.78,
+                    "max_us": 123.72,
+                    "throughput_per_second": 14841.199168892847,
+                    "php_peak_delta_bytes": 266304,
+                    "sink": 0
+                },
+                "apcu_store_ast": {
+                    "median_us": 1302.489,
+                    "p95_us": 1426.399,
+                    "min_us": 1263.819,
+                    "max_us": 1662.23,
+                    "throughput_per_second": 767.7608025864326,
+                    "php_peak_delta_bytes": 611584,
+                    "sink": 0
+                },
+                "cold_php_cache_hit_source": {
+                    "median_us": 3337.208,
+                    "p95_us": 3638.108,
+                    "min_us": 3175.768,
+                    "max_us": 3924.668,
+                    "throughput_per_second": 299.65168488149374,
+                    "php_peak_delta_bytes": 490584,
+                    "sink": 223368
+                },
+                "cold_php_cache_hit_ast": {
+                    "median_us": 3797.788,
+                    "p95_us": 4326.068,
+                    "min_us": 3640.768,
+                    "max_us": 4379.128,
+                    "throughput_per_second": 263.31116955448806,
+                    "php_peak_delta_bytes": 835048,
+                    "sink": 223368
+                },
+                "cold_apcu_cache_hit_source": {
+                    "median_us": 3363.398,
+                    "p95_us": 3564.508,
+                    "min_us": 3237.388,
+                    "max_us": 3659.848,
+                    "throughput_per_second": 297.31836672317695,
+                    "php_peak_delta_bytes": 756824,
+                    "sink": 223368
+                },
+                "cold_apcu_cache_hit_ast": {
+                    "median_us": 3918.638,
+                    "p95_us": 4188.098,
+                    "min_us": 3723.858,
+                    "max_us": 4210.527,
+                    "throughput_per_second": 255.19070656692452,
+                    "php_peak_delta_bytes": 1445352,
+                    "sink": 223368
+                }
+            }
+        }
+    }
+}

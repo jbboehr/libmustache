@@ -1,0 +1,4 @@
+add_executable(mustache_ast_cache_vs_source ast-cache-vs-source.cpp)
+target_link_libraries(mustache_ast_cache_vs_source PRIVATE mustache_static)
+mustache_apply_build_options(mustache_ast_cache_vs_source)
+mustache_enable_clang_tidy(mustache_ast_cache_vs_source)

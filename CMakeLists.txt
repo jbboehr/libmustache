@@ -172,6 +172,7 @@ function(mustache_enable_clang_tidy target)
 endfunction()
 
 add_subdirectory(src)
+add_subdirectory(benchmarks EXCLUDE_FROM_ALL)
 
 if(MUSTACHE_BUILD_CLI)
     add_subdirectory(bin)

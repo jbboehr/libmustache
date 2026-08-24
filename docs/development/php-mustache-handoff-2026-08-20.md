@@ -67,8 +67,9 @@ as a release commitment.
   callback.
 - Treat serialized AST strings as untrusted. Apply explicit decode limits and
   require complete canonical input.
-- Do not choose a permanent AST format until the PHP cache benchmark compares
-  validated decoding with source reparsing.
+- Follow the recorded [cache benchmark](ast-cache-benchmark-2026-08-22.md):
+  persist source, do not introduce another AST format, and keep checked legacy
+  reads only for the compatibility window below.
 
 ## Verified downstream touchpoints
 
@@ -235,7 +236,8 @@ This slice should not add unsafe compatibility shims to libmustache.
   request-appropriate limits.
 - Resolve mixed source/AST partial ownership without borrowed owning pointers.
 - Preserve `Mustache::parse()`, `MustacheAST::toArray()`, PHP serialization,
-  wakeup, and APCu behavior until the benchmark decision is implemented.
+  wakeup, and APCu reads throughout php-mustache 0.x. Deprecate AST writes when
+  compiled-handle and source-cache guidance ship.
 
 ### Slice 4: Migrate lambda capabilities
 
@@ -289,6 +291,18 @@ If decoding does not win materially, cache source, deprecate AST writes, and
 retain checked legacy reads for a documented migration window. If decoding
 wins materially, design one canonical versioned format, write only that format,
 read the old format during a bounded window, and version PHP cache keys.
+
+**Result, 2026-08-22:** the
+[completed benchmark](ast-cache-benchmark-2026-08-22.md) selected source for
+cross-request caches. The checked decoder remains a compatibility reader; a new
+persistent AST format is not justified. Warm and fresh-process partial graphs
+both favored source, and serialization-plus-APCu-store cost strengthened that
+decision. Reusing an already resident AST and a C++ `CompiledTemplate` was
+materially faster than reparsing, so the follow-up is an opaque request- or
+object-local `CompiledTemplate` owner, including its compiled partial graph,
+not another serialized format. Keep checked reads through libmustache 0.6.x
+and php-mustache 0.x; removal requires a separately announced incompatible
+release.
 
 ## Test gates
 

@@ -76,7 +76,7 @@ compatibility with ABI 5.
 | `Mustache`, `Tokenizer`, public `Node`, and stateful `Renderer` APIs | Retained compatibility surface | Migrate ordinary rendering to compiled handles; keep only code that genuinely manipulates an AST here. |
 | `Data(Type, int)` and `Data::init()` | Retained compatibility adapter | Replace with named factories and builders. |
 | `Data::createFromJSON()` and `createFromYAML()` | Retained ownership adapter | Replace with `fromJSON()` and `fromYAML()`. |
-| Pointer-returning `Node::serialize()` and `Node::unserialize()` | Retained ownership adapter | Replace with `serializeValue()` and `unserializeOwned()`. Long-term persistence depends on the PHP benchmark. |
+| Pointer-returning `Node::serialize()` and `Node::unserialize()` | Retained ownership adapter | Replace with `serializeValue()` and `unserializeOwned()`. Persist source for new PHP caches; legacy AST reads remain compatible through the window below. |
 | `Lambda::invoke(std::string *, Renderer *)` and `Renderer::renderForLambda()` | Downstream-gated transitional API | Keep until php-mustache uses scoped contexts. Never retain the renderer pointer. |
 | `Node::to_template_string()` and `children_to_template_string()` | Transitional API | Needed by compatibility code; not used by the bounded compiled renderer. |
 | Installed `Stack` template | Transitional API | No longer used by the renderer. Prefer a standard container. |
@@ -255,18 +255,21 @@ newly compiled ABI 6 templates may use metadata an ABI 5 decoder does not
 understand. Do not replace durable ABI 5 cache entries in place if old
 processes must continue reading them.
 
-The legacy byte format does not yet have a permanent support commitment. When
-php-mustache is migrated, benchmark validated decoding against cached-source
-reparsing, including PHP serialization and APCu overhead. That result decides
-whether to retain a versioned AST format or deprecate AST writes and cache
-source instead. Until then:
+The [PHP cache benchmark](ast-cache-benchmark-2026-08-22.md) compared validated
+decoding with cached-source reparsing, including warm and fresh-process cases,
+PHP serialization, and APCu fetch/store overhead. It selected source for new
+cross-request caches and rejected investment in another persistent AST format.
+Therefore:
 
-- retain checked reads of existing ABI 5 data;
+- retain checked reads of existing ABI 5 data throughout libmustache 0.6.x and
+  php-mustache 0.x;
+- deprecate AST writes when the PHP compiled-handle path and source-cache
+  guidance ship;
+- remove legacy reads only in a separately announced incompatible release;
 - use versioned cache keys when ABI 5 and ABI 6 processes can overlap;
 - treat serialized input as untrusted and supply request-appropriate limits;
   and
-- do not design a second format solely from a microbenchmark of the C++
-  decoder.
+- cache source rather than writing new durable AST entries.
 
 ## Migrating lambdas
 
@@ -364,5 +367,6 @@ specific message is documented as stable.
     and cache round-trip tests before deployment.
 
 For php-mustache specifically, complete the owned zval-to-`Data` conversion,
-lambda-context migration, and AST decode-versus-reparse benchmark before
-removing any downstream-gated compatibility surface.
+lambda-context migration, compiled-handle ownership, and source-cache guidance
+before deprecating AST writes. Keep checked reads for the compatibility window
+above.
