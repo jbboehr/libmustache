@@ -11,12 +11,18 @@ EXTRA_DIST = \
 	benchmarks/CMakeLists.txt \
 	benchmarks/ast-cache-vs-source.cpp \
 	benchmarks/ast-cache-vs-source.php \
+	benchmarks/cista-archive.cpp \
+	benchmarks/cista-archive.hpp \
+	benchmarks/test-cista-archive.cpp \
 	benchmarks/results/ast-cache-vs-source-2026-08-23-cpp-run1.csv \
 	benchmarks/results/ast-cache-vs-source-2026-08-23-cpp-run2.csv \
 	benchmarks/results/ast-cache-vs-source-2026-08-23-cpp-run3.csv \
 	benchmarks/results/ast-cache-vs-source-2026-08-23-php-run1.json \
 	benchmarks/results/ast-cache-vs-source-2026-08-23-php-run2.json \
 	benchmarks/results/ast-cache-vs-source-2026-08-23-php-run3.json \
+	benchmarks/results/ast-cache-vs-source-2026-08-24-cista-run1.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-24-cista-run2.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-24-cista-run3.csv \
 	docs/development/abi-6-source-migration-2026-08-20.md \
 	docs/development/ast-cache-benchmark-2026-08-22.md \
 	CMakeLists.txt \

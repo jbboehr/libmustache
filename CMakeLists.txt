@@ -35,6 +35,7 @@ option(MUSTACHE_WARNINGS_AS_ERRORS "Treat project compiler warnings as errors" O
 option(MUSTACHE_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(MUSTACHE_ENABLE_FUZZING "Build the Clang libFuzzer targets and smoke tests" OFF)
 option(MUSTACHE_ENABLE_CLANG_TIDY "Run clang-tidy on production targets" OFF)
+option(MUSTACHE_ENABLE_CISTA_BENCHMARK "Build the experimental Cista archive benchmark" OFF)
 
 if(MUSTACHE_ENABLE_CLANG_TIDY)
     find_program(MUSTACHE_CLANG_TIDY_EXECUTABLE NAMES clang-tidy REQUIRED)
@@ -83,6 +84,12 @@ endif()
 
 find_package(nlohmann_json 3.10.5 CONFIG REQUIRED)
 set(MUSTACHE_JSON_TARGET nlohmann_json::nlohmann_json)
+
+if(MUSTACHE_ENABLE_CISTA_BENCHMARK)
+    # nixpkgs packages Cista 0.16 with CMake metadata reporting version 0.7,
+    # so requesting the package version would reject the available dependency.
+    find_package(cista CONFIG REQUIRED)
+endif()
 
 if(MSVC)
     find_package(yaml CONFIG REQUIRED)
@@ -172,7 +179,11 @@ function(mustache_enable_clang_tidy target)
 endfunction()
 
 add_subdirectory(src)
-add_subdirectory(benchmarks EXCLUDE_FROM_ALL)
+if(MUSTACHE_ENABLE_CISTA_BENCHMARK)
+    add_subdirectory(benchmarks)
+else()
+    add_subdirectory(benchmarks EXCLUDE_FROM_ALL)
+endif()
 
 if(MUSTACHE_BUILD_CLI)
     add_subdirectory(bin)

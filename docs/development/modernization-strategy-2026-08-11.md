@@ -630,17 +630,49 @@ The result controls the serialization roadmap:
 In neither case should the legacy decoder be maintained indefinitely without a
 specific compatibility commitment.
 
-**Decision recorded 2026-08-22:** the
+**Decision updated 2026-08-24:** the
 [PHP cache benchmark](ast-cache-benchmark-2026-08-22.md) selected cached source
-for cross-request persistence. AST cache hits won for flat templates but lost
-for nested partial graphs in warm and fresh-process cases, missed the warm
-large-flat p95 threshold, used 2.16 to 2.38 times the cache space, and cost 16
-to 19 times as much to serialize and store at medium and large sizes. Do not
-design a replacement persistent AST format from these results. The next
-performance slice is request- or object-local reuse of an opaque compiled
-template and compiled partial graph. Keep checked legacy AST reads through
-libmustache 0.6.x and php-mustache 0.x; removal requires a separately
-announced incompatible release.
+for current cross-request persistence. Legacy AST hits won for flat templates
+but lost for nested partial graphs in warm and fresh-process cases, missed the
+warm large-flat p95 threshold, used 2.16 to 2.38 times the cache space, and cost
+16 to 19 times as much to serialize and store at medium and large sizes. A
+later checked Cista direct-view prototype removed the graph reconstruction
+penalty and cleared the native latency threshold, but used 4.35 to 4.80 times
+the source bytes and has not been measured through PHP serialization or APCu.
+Those measurements used `WITH_STATIC_VERSION`, ordinary Cista bounds checks,
+and libmustache's semantic validator, but not Cista's `DEEP_CHECK` or
+`WITH_INTEGRITY` modes. They therefore establish feasibility, not the final
+security/performance result.
+
+Before crossing the PHP boundary, finish the libmustache experiment behind an
+optional, default-off `MUSTACHE_ENABLE_ARCHIVED_TEMPLATES` feature. Keep Cista
+private and expose a libmustache-owned `ArchivedTemplateView` beside the normal
+owned `Node`/`CompiledTemplate` path. Both representations should use one
+renderer algorithm through internal node-view adapters; callers must not first
+reconstruct a `Node` tree merely to render a checked archive. Complete lambda
+and inline-partial semantics, enable `WITH_STATIC_VERSION | WITH_INTEGRITY |
+DEEP_CHECK` (or the equivalent upstream security modes), fuzz validation and
+rendering, and rerun the native benchmark before the one-fetch/one-render
+PHP/APCu experiment. The integrity checksum detects accidental corruption; it
+does not authenticate hostile cache contents.
+
+If this feature proceeds, vendor a reviewed, pinned Cista snapshot and its MIT
+license as a private implementation dependency. Record its provenance and
+update procedure, and avoid a submodule or configure-time `FetchContent`.
+Packagers may receive a default-off `MUSTACHE_USE_SYSTEM_CISTA` override, but
+the vendored and system configurations must both be tested. No `cista::*` type
+may appear in installed public headers. The archive header and PHP cache key
+must identify the libmustache archive schema, Cista snapshot, pointer width,
+endianness, and other compiler/platform assumptions. Cista updates and schema
+changes require explicit compatibility review and golden-fixture tests rather
+than silently changing existing cache bytes.
+
+The next end-to-end performance slice is the real one-fetch/one-render PHP/APCu
+path after those native gates pass. Do not adopt a replacement format unless
+that path clears the threshold and the format's semantic, compatibility,
+fuzzing, and security requirements are met.
+Keep checked legacy AST reads through libmustache 0.6.x and php-mustache 0.x;
+removal requires a separately announced incompatible release.
 
 **Definition of done:** the full supported PHPT suite passes against the new
 library API; PHP conversion and callbacks pass sanitizer-backed tests where

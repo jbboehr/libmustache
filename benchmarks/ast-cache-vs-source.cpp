@@ -1,5 +1,9 @@
 #include "mustache.hpp"
 
+#if defined(MUSTACHE_CISTA_BENCHMARK)
+#include "cista-archive.hpp"
+#endif
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -203,6 +207,9 @@ struct Workload {
     std::size_t sourceCount = 0;
     std::size_t sourceBytes = 0;
     std::size_t astBytes = 0;
+#if defined(MUSTACHE_CISTA_BENCHMARK)
+    std::vector<std::uint8_t> cistaEncoded;
+#endif
 };
 
 struct Sample {
@@ -270,6 +277,24 @@ template <typename Operation> Result measure(Operation operation)
   };
 }
 
+#if defined(MUSTACHE_CISTA_BENCHMARK)
+std::vector<std::uint8_t> compileCistaGraph(mustache::Mustache& engine, const Workload& workload)
+{
+  mustache::Node root;
+  engine.tokenize(workload.sources[0], &root);
+  mustache::Node::Partials partials;
+  if (workload.sourceCount > 1) {
+    const std::array<const char *, 3> names = {"layout", "card", "badge"};
+    for (std::size_t index = 1; index < workload.sourceCount; ++index) {
+      std::unique_ptr<mustache::Node> partial = std::make_unique<mustache::Node>();
+      engine.tokenize(workload.sources[index], partial.get());
+      partials.emplace(names[index - 1], std::move(partial));
+    }
+  }
+  return mustache_benchmark::serializeCistaArchive(root, partials);
+}
+#endif
+
 Workload makeWorkload(const char * name, std::size_t targetBytes, bool nestedPartials)
 {
   const std::string graphRoot =
@@ -320,7 +345,10 @@ Workload makeWorkload(const char * name, std::size_t targetBytes, bool nestedPar
     sourceCount = 1;
   }
 
-  Workload workload{name, std::move(sources), {}, sourceCount, 0, 0};
+  Workload workload{};
+  workload.name = name;
+  workload.sources = std::move(sources);
+  workload.sourceCount = sourceCount;
   mustache::Mustache engine;
   for (std::size_t i = 0; i < workload.sourceCount; ++i) {
     workload.sourceBytes += workload.sources[i].size();
@@ -329,6 +357,9 @@ Workload makeWorkload(const char * name, std::size_t targetBytes, bool nestedPar
     workload.encoded[i] = parsed.serializeValue();
     workload.astBytes += workload.encoded[i].size();
   }
+#if defined(MUSTACHE_CISTA_BENCHMARK)
+  workload.cistaEncoded = compileCistaGraph(engine, workload);
+#endif
   return workload;
 }
 
@@ -385,6 +416,12 @@ void verify(const Workload& workload)
   if (compiledOutput.empty() || compiledOutput != decodedOutput) {
     throw std::runtime_error(std::string("source and decoded rendering differ for ") + workload.name);
   }
+#if defined(MUSTACHE_CISTA_BENCHMARK)
+  const std::string cistaOutput = mustache_benchmark::renderCistaArchive(byteView(workload.cistaEncoded), data);
+  if (compiledOutput != cistaOutput) {
+    throw std::runtime_error(std::string("source and Cista rendering differ for ") + workload.name);
+  }
+#endif
   for (std::size_t i = 0; i < workload.sourceCount; ++i) {
     const std::unique_ptr<mustache::Node> decoded = mustache::Node::unserializeOwned(byteView(workload.encoded[i]));
     if (decoded->serializeValue() != workload.encoded[i]) {
@@ -395,9 +432,15 @@ void verify(const Workload& workload)
 
 void printResult(const Workload& workload, const char * operation, const Result& result)
 {
+#if defined(MUSTACHE_CISTA_BENCHMARK)
+  std::printf("%s,%zu,%zu,%zu,%s,%.3f,%.3f,%llu,%llu\n", workload.name, workload.sourceBytes, workload.astBytes,
+      workload.cistaEncoded.size(), operation, result.medianMicroseconds, result.p95Microseconds,
+      static_cast<unsigned long long>(result.medianAllocations), static_cast<unsigned long long>(result.medianBytes));
+#else
   std::printf("%s,%zu,%zu,%s,%.3f,%.3f,%llu,%llu\n", workload.name, workload.sourceBytes, workload.astBytes, operation,
       result.medianMicroseconds, result.p95Microseconds, static_cast<unsigned long long>(result.medianAllocations),
       static_cast<unsigned long long>(result.medianBytes));
+#endif
 }
 
 } // namespace
@@ -414,7 +457,11 @@ int main()
         makeWorkload("large-graph", 262144, true),
     };
 
+#if defined(MUSTACHE_CISTA_BENCHMARK)
+    std::puts("size,source_bytes,ast_bytes,cista_bytes,operation,median_us,p95_us,allocations,allocated_bytes");
+#else
     std::puts("size,source_bytes,ast_bytes,operation,median_us,p95_us,allocations,allocated_bytes");
+#endif
     for (const Workload& workload : workloads) {
       verify(workload);
       mustache::Mustache engine;
@@ -440,6 +487,13 @@ int main()
         return digest;
       });
       printResult(workload, "decode_ast_graph", decode);
+
+#if defined(MUSTACHE_CISTA_BENCHMARK)
+      const Result compileAndSerializeCista = measure([&engine, &workload]() -> std::size_t {
+        return compileCistaGraph(engine, workload).size();
+      });
+      printResult(workload, "compile_serialize_cista_graph", compileAndSerializeCista);
+#endif
 
       const mustache::Data data = makeData();
       const mustache::CompiledTemplate residentRoot = engine.compile(workload.sources[0]);
@@ -480,6 +534,13 @@ int main()
         return output.size();
       });
       printResult(workload, "decode_render_ast_graph", decodeAndRender);
+
+#if defined(MUSTACHE_CISTA_BENCHMARK)
+      const Result validateAndRenderCista = measure([&workload, &data]() -> std::size_t {
+        return mustache_benchmark::renderCistaArchive(byteView(workload.cistaEncoded), data).size();
+      });
+      printResult(workload, "validate_render_cista_graph", validateAndRenderCista);
+#endif
     }
   } catch (const std::exception& exception) {
     std::fprintf(stderr, "benchmark failed: %s\n", exception.what());

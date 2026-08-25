@@ -68,8 +68,22 @@ as a release commitment.
 - Treat serialized AST strings as untrusted. Apply explicit decode limits and
   require complete canonical input.
 - Follow the recorded [cache benchmark](ast-cache-benchmark-2026-08-22.md):
-  persist source, do not introduce another AST format, and keep checked legacy
-  reads only for the compatibility window below.
+  persist source today and keep checked legacy reads only for the compatibility
+  window below. A Cista direct-view prototype passed the native performance
+  threshold, but its measurements did not enable Cista's deep-check or
+  integrity modes. It is not a production format unless a hardened native
+  rerun and a one-fetch/one-render PHP/APCu benchmark both pass and the
+  remaining semantic, compatibility, and security work is completed.
+- Keep Cista entirely inside libmustache. The extension should receive a
+  libmustache-owned `ArchivedTemplateView`, not include Cista headers or expose
+  Cista types in PHP-facing implementation interfaces. Ordinary inputs should
+  continue through the owned `Node`/`CompiledTemplate` path; cached archive
+  bytes may use the checked view path. Both paths must share rendering
+  semantics inside libmustache.
+- Bound an archived view's lifetime to the Zend string or other aligned backing
+  storage that owns its bytes. If a Zend/APCu result does not satisfy the
+  archive's alignment requirement, copy it into checked aligned storage before
+  constructing the view; never retain the view after that storage is released.
 
 ## Verified downstream touchpoints
 
@@ -292,17 +306,27 @@ retain checked legacy reads for a documented migration window. If decoding
 wins materially, design one canonical versioned format, write only that format,
 read the old format during a bounded window, and version PHP cache keys.
 
-**Result, 2026-08-22:** the
-[completed benchmark](ast-cache-benchmark-2026-08-22.md) selected source for
-cross-request caches. The checked decoder remains a compatibility reader; a new
-persistent AST format is not justified. Warm and fresh-process partial graphs
-both favored source, and serialization-plus-APCu-store cost strengthened that
-decision. Reusing an already resident AST and a C++ `CompiledTemplate` was
-materially faster than reparsing, so the follow-up is an opaque request- or
-object-local `CompiledTemplate` owner, including its compiled partial graph,
-not another serialized format. Keep checked reads through libmustache 0.6.x
-and php-mustache 0.x; removal requires a separately announced incompatible
-release.
+**Result, updated 2026-08-24:** the
+[completed legacy-format benchmark](ast-cache-benchmark-2026-08-22.md) selected
+source for current cross-request caches. Warm and fresh-process legacy partial
+graphs both favored source, and serialization-plus-APCu-store cost strengthened
+that decision. A later checked Cista direct-view prototype removed the graph
+ownership penalty and was 73% to 81% faster than source compile plus render on
+the medium and large native workloads. Its payload was 4.35 to 4.80 times
+source, and PHP serialization and APCu have not been measured. The prototype
+also used `WITH_STATIC_VERSION` without Cista's `DEEP_CHECK` or
+`WITH_INTEGRITY`, so its timing is not yet the production security result.
+
+The next slice belongs in libmustache: implement the optional, default-off
+archived-template view with the same complete semantics as owned nodes, keep
+Cista private, enable the version, integrity, and deep-check modes, fuzz the
+archive boundary, and rerun the native benchmark. Only after that gate passes
+should php-mustache add a one-fetch/one-render APCu experiment. That experiment
+must measure the actual Zend-string lifetime, alignment or aligned-copy cost,
+PHP serialization, APCu copying, payload size, peak memory, and writer cost;
+request-local reuse is not a substitute. Keep checked legacy reads through
+libmustache 0.6.x and php-mustache 0.x; removal requires a separately announced
+incompatible release.
 
 ## Test gates
 

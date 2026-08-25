@@ -9,6 +9,7 @@
   autoreconfHook,
   cmake ? null,
   clang-tools ? null,
+  cista ? null,
   nlohmann_json,
   libyaml,
   mustache_spec,
@@ -21,6 +22,7 @@
   sanitizerSupport ? false,
   fuzzSupport ? false,
   clangTidySupport ? false,
+  cistaBenchmarkSupport ? false,
 }:
 stdenv.mkDerivation (finalAttrs: {
   pname =
@@ -29,7 +31,8 @@ stdenv.mkDerivation (finalAttrs: {
     + lib.optionalString staticOnlySupport "-static-only"
     + lib.optionalString sanitizerSupport "-sanitized"
     + lib.optionalString fuzzSupport "-fuzz"
-    + lib.optionalString clangTidySupport "-clang-tidy";
+    + lib.optionalString clangTidySupport "-clang-tidy"
+    + lib.optionalString cistaBenchmarkSupport "-cista-benchmark";
   version = "0.6.0";
 
   src =
@@ -61,7 +64,7 @@ stdenv.mkDerivation (finalAttrs: {
   separateDebugInfo = debugSupport;
   dontStrip = sanitizerSupport || fuzzSupport;
 
-  buildInputs = [nlohmann_json];
+  buildInputs = [nlohmann_json] ++ lib.optional cistaBenchmarkSupport cista;
   propagatedBuildInputs = [libyaml];
   nativeBuildInputs =
     lib.optional checkSupport mustache_spec
@@ -98,6 +101,7 @@ stdenv.mkDerivation (finalAttrs: {
       (lib.cmakeBool "MUSTACHE_ENABLE_SANITIZERS" sanitizerSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_FUZZING" fuzzSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_CLANG_TIDY" clangTidySupport)
+      (lib.cmakeBool "MUSTACHE_ENABLE_CISTA_BENCHMARK" cistaBenchmarkSupport)
       "-DCMAKE_BUILD_TYPE=${
         if debugSupport || sanitizerSupport
         then "Debug"

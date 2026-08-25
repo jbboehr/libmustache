@@ -113,6 +113,13 @@
             cmakeSupport = true;
             clangTidySupport = true;
           };
+          libmustache-cista-benchmark = makePackage {
+            cmakeSupport = true;
+            cista = pkgs.cista;
+            debugSupport = true;
+            sanitizerSupport = true;
+            cistaBenchmarkSupport = true;
+          };
           pre-commit = pre-commit-check;
         };
 
@@ -128,7 +135,7 @@
 
         devShells.default = pkgs.mkShell {
           inputsFrom = [packages.libmustache packages.libmustache-cmake];
-          packages = pre-commit-check.enabledPackages ++ [pkgs.llvmPackages.clang-tools];
+          packages = pre-commit-check.enabledPackages ++ [pkgs.cista pkgs.llvmPackages.clang-tools];
           shellHook = pre-commit-check.shellHook;
         };
 

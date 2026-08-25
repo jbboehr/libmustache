@@ -1,11 +1,14 @@
 # Cached AST decoding versus source reparsing
 
-Date: 2026-08-22; measurements refreshed after review on 2026-08-23
+Date: 2026-08-22; measurements refreshed after review on 2026-08-23 and with
+a Cista feasibility experiment on 2026-08-24
 
 ## Decision
 
-Cache template source across PHP requests. Do not design or write a new
-persistent AST format from the current results.
+Cache template source across PHP requests today, and do not use the legacy AST
+as the basis of a new format. A checked Cista direct-view prototype now makes a
+new persistent compiled format a live candidate, but it is not yet a production
+decision.
 
 Validated AST decoding is intrinsically faster than parsing, and it wins for
 flat templates. It does not provide a consistent end-to-end win for the
@@ -15,21 +18,30 @@ large sizes across warm and fresh-process cases. The legacy AST is also 2.16
 to 2.38 times the source size. Serializing and storing that AST in APCu is 16
 to 19 times slower than serializing and storing source at those sizes.
 
-The more valuable optimization is request- or object-local reuse of an opaque
-compiled template and its compiled partial graph. Reusing the existing AST in
-one request was 41% faster for medium and large partial graphs and 79% to 84%
-faster for flat templates than compiling source for every render. Direct C++
-reuse of `CompiledTemplate` was 78% to 86% faster. A PHP compiled-handle path
-should be benchmarked after it exists, without exposing `Node` or introducing
-a persistent format.
+On 2026-08-24, an opt-in Cista experiment rendered a checked immutable archive
+directly, without rebuilding `Node` trees or cloning partials. It was 73% to
+81% faster than source compilation plus rendering at median and p95 for the
+medium and large workloads. This clears the native portion of the predeclared
+20% threshold and removes the old partial-ownership penalty. It does not yet
+clear the PHP gate: PHP serialization and APCu fetch/store have not been
+measured, the payload is 4.35 to 4.80 times source, and the prototype does not
+support lambdas or inline-partial ownership. It also used
+`WITH_STATIC_VERSION` without Cista's `DEEP_CHECK` or `WITH_INTEGRITY`, so the
+published timings are not the final production-security configuration.
+
+Request-local compiled reuse remains useful when one request renders the same
+view repeatedly, but that is not the typical one-view/one-render PHP workload
+and is not the primary cross-request optimization.
 
 The compatibility window is now explicit: libmustache keeps checked legacy AST
 reads throughout the 0.6 release series, and php-mustache keeps them throughout
-its 0.x release series. AST writes should be deprecated when the PHP compiled
-handle and source-cache guidance ship. Removing the reader requires a separate
+its 0.x release series. AST writes should be deprecated when source-cache
+guidance or a replacement format ships. Removing the reader requires a separate
 incompatible release decision and migration notice. New cache guidance should
-prefer source, and the project should not invest in another AST format without
-a materially different production workload.
+prefer source until the Cista design is exercised through php-mustache's actual
+one-fetch/one-render APCu boundary. A production format still requires a
+canonical compatibility model, full Mustache semantics, fuzzing, and an
+explicit security review.
 
 ## Predeclared threshold
 
@@ -38,12 +50,16 @@ cache-hit path reduced both median and p95 latency by at least 20% for medium
 and large flat templates and nested partial graphs. This deliberately requires
 an end-to-end win large enough to pay for a second format, migration rules, and
 cache invalidation. The C++ construction result is diagnostic and cannot pass
-this gate by itself.
+the PHP gate by itself.
 
 The AST failed this threshold. It won warm flat-template medians by 28% to 30%,
 but the warm large-flat APCu p95 improved by only 15%. Fresh-process flat cases
 cleared 20%, but medium and large partial graphs regressed median and p95
 latency in both warm and fresh-process runs.
+
+The later Cista experiment cleared the native latency threshold for every
+medium and large shape, including nested partial graphs. It therefore warrants
+an end-to-end PHP/APCu experiment; it does not replace that experiment.
 
 ## Workload and oracles
 
@@ -56,6 +72,11 @@ The repository benchmark programs are:
 - [`benchmarks/ast-cache-vs-source.php`](../../benchmarks/ast-cache-vs-source.php),
   which exercises php-mustache's public source, `MustacheAST`, PHP
   serialization, APCu, request-local reuse, and fresh-process first-hit paths.
+
+When `MUSTACHE_ENABLE_CISTA_BENCHMARK=ON`, the C++ program also builds a
+flattened Cista archive and validates and renders directly from its immutable
+offset-based view. [`benchmarks/cista-archive.cpp`](../../benchmarks/cista-archive.cpp)
+is deliberately benchmark-only and is not linked into libmustache.
 
 Each program generates deterministic small, medium, and large cases at about
 1 KiB, 32 KiB, and 256 KiB. Every size has two shapes:
@@ -85,11 +106,16 @@ measurement is a native peak-RSS result.
 
 ## Environment and method
 
-- libmustache `56643b061aadb72a6d8b9675709884109ffa5f7f`
+- Legacy C++ and PHP runs: libmustache
+  `56643b061aadb72a6d8b9675709884109ffa5f7f`
+- Cista feasibility runs: libmustache base
+  `8065003173138a60c108e4878cd58a9f03a5d0d0` plus the Cista experiment in this
+  change
 - php-mustache `3b4aaf2d4a121666244f36142a38123ed1625a52`
 - PHP 8.3.33 NTS and php-mustache 0.9.3
 - APCu 5.1.28 with `apc.enable_cli=1`
 - GCC 15.2.0; C++ benchmark at `-O3 -DNDEBUG`; PHP extension at `-O2`
+- Cista 0.16 from nixpkgs for the 2026-08-24 native follow-up
 - AMD Ryzen 9 9950X3D; Linux 7.1.5; benchmark process pinned to CPU 0
 
 The PHP program took 101 individual-operation samples after ten warmups in each
@@ -111,6 +137,21 @@ cmake -S . -B build/benchmark \
   -DMUSTACHE_ENABLE_ASSERTIONS=OFF
 cmake --build build/benchmark --target mustache_ast_cache_vs_source -j4
 taskset -c 0 build/benchmark/benchmarks/mustache_ast_cache_vs_source
+```
+
+Run the Cista variant from the Nix development shell with:
+
+```sh
+nix develop --command cmake -S . -B build/benchmark-cista \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DMUSTACHE_BUILD_CLI=OFF \
+  -DMUSTACHE_ENABLE_TESTS=ON \
+  -DMUSTACHE_ENABLE_ASSERTIONS=OFF \
+  -DMUSTACHE_ENABLE_CISTA_BENCHMARK=ON
+nix develop --command cmake --build build/benchmark-cista -j4
+nix develop --command ctest --test-dir build/benchmark-cista --output-on-failure
+nix develop --command taskset -c 0 \
+  build/benchmark-cista/benchmarks/mustache_ast_cache_vs_source
 ```
 
 For PHP, build php-mustache `develop` against this libmustache checkout, load
@@ -141,18 +182,21 @@ The raw machine-readable results are retained beside the programs:
   and [run 3](../../benchmarks/results/ast-cache-vs-source-2026-08-23-php-run3.json);
 - [C++ run 1](../../benchmarks/results/ast-cache-vs-source-2026-08-23-cpp-run1.csv),
   [run 2](../../benchmarks/results/ast-cache-vs-source-2026-08-23-cpp-run2.csv),
-  and [run 3](../../benchmarks/results/ast-cache-vs-source-2026-08-23-cpp-run3.csv).
+  and [run 3](../../benchmarks/results/ast-cache-vs-source-2026-08-23-cpp-run3.csv); and
+- [Cista run 1](../../benchmarks/results/ast-cache-vs-source-2026-08-24-cista-run1.csv),
+  [run 2](../../benchmarks/results/ast-cache-vs-source-2026-08-24-cista-run2.csv),
+  and [run 3](../../benchmarks/results/ast-cache-vs-source-2026-08-24-cista-run3.csv).
 
 ## Payload size
 
-| Workload | Source bytes | AST bytes | AST/source | PHP source payload | PHP AST payload |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Small flat | 1,211 | 2,649 | 2.19x | 1,306 | 2,743 |
-| Small graph | 1,181 | 2,812 | 2.38x | 1,476 | 3,107 |
-| Medium flat | 33,047 | 71,277 | 2.16x | 33,143 | 71,372 |
-| Medium graph | 33,031 | 76,508 | 2.32x | 33,328 | 76,804 |
-| Large flat | 262,342 | 565,562 | 2.16x | 262,439 | 565,658 |
-| Large graph | 262,156 | 606,668 | 2.31x | 262,454 | 606,965 |
+| Workload | Source bytes | AST bytes | AST/source | Cista bytes | Cista/source | PHP source payload | PHP AST payload |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Small flat | 1,211 | 2,649 | 2.19x | 5,482 | 4.53x | 1,306 | 2,743 |
+| Small graph | 1,181 | 2,812 | 2.38x | 6,041 | 5.12x | 1,476 | 3,107 |
+| Medium flat | 33,047 | 71,277 | 2.16x | 144,082 | 4.36x | 33,143 | 71,372 |
+| Medium graph | 33,031 | 76,508 | 2.32x | 158,529 | 4.80x | 33,328 | 76,804 |
+| Large flat | 262,342 | 565,562 | 2.16x | 1,142,332 | 4.35x | 262,439 | 565,658 |
+| Large graph | 262,156 | 606,668 | 2.31x | 1,255,509 | 4.79x | 262,454 | 606,965 |
 
 ## Intrinsic construction cost
 
@@ -193,6 +237,85 @@ measurement. Decoding directly into one owned `Node` tree plus
 
 The current PHP AST path cannot realize the direct-owned result because
 independently owned `MustacheAST` partials must be cloned into the renderer.
+
+### Cista direct-view feasibility result
+
+The Cista prototype uses flat POD node records, integer child and sibling
+indices, and one shared byte arena. A checked read verifies Cista's static type
+version and bounds, then applies libmustache-specific framing, graph-shape,
+node-type, flag, string-range, nesting, node-count, and dotted-name limits. The
+renderer walks that immutable archive in place. Times below are median/p95
+microseconds aggregated across the three 2026-08-24 runs.
+
+| Workload | Compile + render source | Validate + render Cista | Median change | p95 change |
+| --- | ---: | ---: | ---: | ---: |
+| Medium flat | 260.61 / 280.25 | 52.40 / 54.48 | -79.9% | -80.6% |
+| Medium graph | 295.32 / 318.98 | 73.90 / 79.56 | -75.0% | -75.1% |
+| Large flat | 1,911.67 / 1,989.10 | 421.26 / 450.21 | -78.0% | -77.4% |
+| Large graph | 2,190.36 / 2,323.20 | 584.63 / 614.81 | -73.3% | -73.5% |
+
+The direct read requested 10 to 13 allocations for the medium and large flat
+cases, versus 4,395 and 34,651 for source compilation plus rendering. Partial
+graphs requested 218 and 1,631 allocations because rendering still allocates
+for partial indentation and output, versus 4,945 and 38,791 for source.
+
+The writer is more expensive. Compilation plus Cista serialization added 39%
+to 57% over source compilation, before any PHP or APCu store cost:
+
+| Workload | Compile source | Compile + serialize Cista | Median change |
+| --- | ---: | ---: | ---: |
+| Medium flat | 223.83 | 310.11 | +38.5% |
+| Medium graph | 234.98 | 331.53 | +41.1% |
+| Large flat | 1,593.81 | 2,494.84 | +56.5% |
+| Large graph | 1,697.85 | 2,659.25 | +56.6% |
+
+This is a feasibility result, not a proposed wire format. The prototype is
+native-layout dependent, has no published compatibility contract or checksum,
+rejects lambdas and inline-partial ownership, and has not crossed a Zend string
+or APCu boundary. Its direct-view performance is strong enough to justify that
+next experiment; its size and writer cost are reasons not to adopt it yet. The
+nixpkgs Cista 0.16 package also has inconsistent CMake version metadata and an
+unpropagated optional `fmt` definition, both worked around by the opt-in build.
+
+The recorded measurements used `WITH_STATIC_VERSION`, Cista's ordinary bounds
+checks, and a libmustache-specific semantic validator. They did not enable
+`DEEP_CHECK` or `WITH_INTEGRITY`. Cista's
+[serialization reference](https://github.com/felixguendling/cista/wiki/Serialization-Reference)
+requires deep checking for untrusted input. The experiment now uses
+`WITH_STATIC_VERSION | WITH_INTEGRITY | DEEP_CHECK`, but the retained CSVs
+predate that change; rerun and re-evaluate the benchmark before treating its
+latency as a production result. The integrity checksum is useful corruption
+detection, not authentication; caches exposed to hostile writers still need a
+separate trust boundary.
+
+### Dependency and API direction
+
+If the feasibility work continues, use this integration policy:
+
+- Keep archived templates optional and default off initially, under
+  `MUSTACHE_ENABLE_ARCHIVED_TEMPLATES`.
+- Vendor a reviewed and pinned Cista snapshot as a private implementation
+  dependency, together with its
+  [MIT license](https://github.com/felixguendling/cista/blob/master/LICENSE),
+  provenance, and update instructions. Cista officially supports a
+  [single-header integration](https://github.com/felixguendling/cista/wiki/Installation-and-Usage),
+  so this does not require a submodule or configure-time network access.
+- Optionally provide a default-off `MUSTACHE_USE_SYSTEM_CISTA` override for
+  packagers. Test both paths and fail configuration clearly when the requested
+  system version or features are unavailable.
+- Do not expose `cista::*` in installed headers. Expose a libmustache-owned
+  `ArchivedTemplateView` alongside the ordinary owned `Node`/`CompiledTemplate`
+  path, and route both through a shared renderer algorithm using internal view
+  adapters. Rendering a checked archive must not require rebuilding a `Node`
+  tree first.
+- Give the archive an explicit libmustache schema/version header and include
+  the pinned Cista snapshot, pointer width, endianness, and other relevant
+  compiler/platform assumptions in compatibility checks and PHP cache keys.
+  Treat any Cista update as a deliberate format event backed by golden fixtures
+  and rejection tests for incompatible bytes.
+- Require full lambda and inline-partial semantics, alignment and backing-store
+  lifetime tests, corruption fixtures, archive-validation/render fuzzing, and
+  the secured native rerun before exposing the experiment to php-mustache.
 
 ## PHP cache-hit result
 
@@ -264,24 +387,42 @@ extension's required clone. Times are median/p95 microseconds.
 
 ## Interpretation and follow-up
 
-The current format is not a poor decoder: it provides a real construction win.
-The cross-request product decision is still source because the win is
+The legacy format is not a poor decoder: it provides a real construction win.
+The current cross-request product decision remains source because its win is
 shape-dependent, the warm large-flat tail misses the threshold, nested partials
 reverse the result in both warm and fresh-process measurements, serialization
-plus store strongly favors source, and every AST consumes more than twice the
-cache space. A hybrid cache would add two formats and invalidation paths while
-leaving the partial-ownership problem unresolved.
+plus store strongly favors source, and every legacy AST consumes more than
+twice the cache space.
+
+The Cista result materially changes the next question. Direct validated archive
+views eliminate the graph reconstruction and ownership-clone costs, and their
+native read path comfortably clears the threshold. The remaining decision must
+be made at the real PHP boundary, where the larger payload, Zend string handling,
+alignment, PHP serialization, APCu copying, and one-fetch/one-render lifecycle
+can erase part of that gain.
 
 Recommended follow-up:
 
 1. Document cached source as the default persistent PHP cache value.
-2. Give `MustacheTemplate`, or a new opaque PHP type, request-local ownership
-   of `CompiledTemplate` plus its compiled partial graph.
-3. Benchmark that handle against repeated source rendering; do not serialize
-   it across requests.
-4. Keep accepting checked legacy AST payloads through libmustache 0.6.x and
-   php-mustache 0.x. Deprecate writes when the compiled-handle path ships;
-   require a separately announced incompatible release to remove reads.
-5. Revisit a canonical persistent format only if representative production
-   traces contradict these shapes or a new ownership design removes the graph
-   penalty and still clears the predeclared end-to-end threshold.
+2. Refactor libmustache so owned nodes and an archived-template view share one
+   rendering algorithm without exposing Cista types in public headers.
+3. Keep archived-template support optional and default off. Vendor a reviewed,
+   pinned Cista snapshot and license by default; consider a separately tested,
+   default-off system-package override for packagers.
+4. Add full lambda and inline-partial semantics, explicit
+   compiler/architecture/schema compatibility, `WITH_INTEGRITY` and
+   `DEEP_CHECK`, golden corruption and compatibility fixtures, alignment and
+   lifetime tests, and fuzzing of validation plus rendering. Rerun the native
+   benchmark in that configuration.
+5. Only after the secured native path passes, prototype the libmustache-owned
+   archived view behind an experimental php-mustache API and benchmark one APCu
+   fetch plus one render against cached source. Include warm and fresh-process
+   cases, payload-copy or aligned-copy cost, peak memory, and writer cost.
+6. Treat request-local compiled reuse as a secondary optimization only for
+   applications that render the same view repeatedly in one request.
+7. Keep accepting checked legacy AST payloads through libmustache 0.6.x and
+   php-mustache 0.x. Deprecate writes when source-cache guidance or a replacement
+   format ships; require a separately announced incompatible release to remove
+   reads.
+8. Adopt a canonical persistent format only if the complete PHP/APCu path still
+   clears the predeclared threshold for every medium and large shape.
