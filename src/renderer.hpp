@@ -50,6 +50,8 @@ struct RenderLimits {
 */
 class Renderer {
   private:
+    class NodeView;
+
     typedef std::function<const Node *(const std::string&)> PartialResolver;
 
     struct IndentationFrame {
@@ -101,11 +103,11 @@ class Renderer {
     std::size_t _lambdaCallbackDepth;
 
     //! Renders a single node
-    void _renderNode(const Node * node, std::size_t depth, const std::string * partialIndentation = NULL,
+    void _renderNode(NodeView node, std::size_t depth, const std::string * partialIndentation = NULL,
         bool partialIndentationMetadata = false);
 
     //! Renders all children one level below their parent
-    void _renderChildren(const Node * node, std::size_t depth);
+    void _renderChildren(NodeView node, std::size_t depth);
 
     //! Appends bounded output
     void _append(std::string_view value);
@@ -131,12 +133,16 @@ class Renderer {
     void _consumeLambdaNodes(const Node * node);
 
     //! Reconstructs bounded section text for a lambda callback
-    std::string _lambdaSectionText(const Node * node, std::string_view start, std::string_view stop, std::size_t depth);
+    std::string _lambdaSectionText(NodeView node, std::string_view start, std::string_view stop, std::size_t depth);
     void _appendLambdaNodeTemplate(
-        const Node * node, std::string_view start, std::string_view stop, std::string * output, std::size_t depth);
+        NodeView node, std::string_view start, std::string_view stop, std::string * output, std::size_t depth);
     void _appendLambdaTemplate(std::string * output, std::string_view value);
 
-    const Data * _lookup(const Node * node);
+    const Data * _lookup(NodeView node);
+
+    static std::string_view _requireNodeData(NodeView node);
+    static const std::string& _requireOwnedNodeData(NodeView node);
+    static const std::string * _validatePartialIndentationAt(NodeView parent, std::size_t index);
 
     void setPartialResolver(PartialResolver resolver);
 

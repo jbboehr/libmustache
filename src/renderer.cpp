@@ -2,6 +2,7 @@
 #include "renderer.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <utility>
 
 #include "tokenizer.hpp"
@@ -60,29 +61,107 @@ bool isPartialIndentation(std::string_view value)
   });
 }
 
-const std::string& requireNodeData(const Node& node)
-{
-  if (!node.data.has_value()) {
-    throw Exception("Invalid node without data");
-  }
-  return node.data.value();
-}
-
-const std::string * validatePartialIndentationAt(const Node::Children& children, std::size_t index)
-{
-  const Node * child = children[index].get();
-  if (child == NULL || (child->flags & Node::FlagPartialIndent) == 0) {
-    return NULL;
-  }
-  if (child->type != Node::TypeOutput || child->flags != (Node::FlagLambdaOnly | Node::FlagPartialIndent) ||
-      !child->data.has_value() || !isPartialIndentation(*child->data) || index + 1 >= children.size() ||
-      children[index + 1] == NULL || children[index + 1]->type != Node::TypePartial) {
-    throw Exception("Invalid standalone partial indentation metadata");
-  }
-  return &child->data.value();
-}
-
 } // namespace
+
+/*! Immutable view of one owned renderable node.
+
+    This adapter is intentionally Node-specific. It establishes the operations
+    used by the owned path; a later compile-time shared engine can pair those
+    operations with an archive-specific view and partial source without
+    exposing either representation publicly.
+*/
+class Renderer::NodeView {
+  public:
+    NodeView() noexcept :
+        node_(NULL)
+    {}
+
+    static NodeView fromNode(const Node * node) noexcept
+    {
+      return NodeView(node);
+    }
+
+    explicit operator bool() const noexcept
+    {
+      return node_ != NULL;
+    }
+
+    Node::Type type() const noexcept
+    {
+      assert(node_ != NULL);
+      return node_->type;
+    }
+
+    int flags() const noexcept
+    {
+      assert(node_ != NULL);
+      return node_->flags;
+    }
+
+    const std::string * data() const noexcept
+    {
+      assert(node_ != NULL);
+      return node_->data.has_value() ? &*node_->data : NULL;
+    }
+
+    std::size_t dataPartCount() const noexcept
+    {
+      assert(node_ != NULL);
+      return node_->dataParts.size();
+    }
+
+    const std::string& dataPart(std::size_t index) const noexcept
+    {
+      assert(node_ != NULL);
+      assert(index < node_->dataParts.size());
+      return node_->dataParts[index];
+    }
+
+    std::size_t childCount() const noexcept
+    {
+      assert(node_ != NULL);
+      return node_->children.size();
+    }
+
+    NodeView child(std::size_t index) const noexcept
+    {
+      assert(node_ != NULL);
+      assert(index < node_->children.size());
+      return NodeView(node_->children[index].get());
+    }
+
+    NodeView containerChild() const noexcept
+    {
+      assert(node_ != NULL);
+      return NodeView(node_->child.get());
+    }
+
+    const std::string * startSequence() const noexcept
+    {
+      assert(node_ != NULL);
+      return node_->startSequence.has_value() ? &*node_->startSequence : NULL;
+    }
+
+    const std::string * stopSequence() const noexcept
+    {
+      assert(node_ != NULL);
+      return node_->stopSequence.has_value() ? &*node_->stopSequence : NULL;
+    }
+
+    NodeView findPartial(const std::string& name) const
+    {
+      assert(node_ != NULL);
+      const Node::Partials::const_iterator partial = node_->partials.find(name);
+      return partial == node_->partials.end() ? NodeView() : NodeView(partial->second.get());
+    }
+
+  private:
+    explicit NodeView(const Node * node) noexcept :
+        node_(node)
+    {}
+
+    const Node * node_;
+};
 
 RenderLimits::RenderLimits() :
     maxOutputBytes(std::size_t{64} * 1024 * 1024),
@@ -229,7 +308,7 @@ void Renderer::render()
   }
 
   _stack.push_back(_data);
-  _renderNode(_node, 0);
+  _renderNode(NodeView::fromNode(_node), 0);
 }
 
 void Renderer::renderForLambda(const Node * node, std::string * output)
@@ -257,21 +336,54 @@ void Renderer::renderForLambda(const Node * node, std::string * output)
   const auto indentationGuard = onScopeExit([this]() {
     _indentationStack.pop_back();
   });
-  _renderNode(node, _activeDepth + 1);
+  _renderNode(NodeView::fromNode(node), _activeDepth + 1);
 }
 
-void Renderer::_renderChildren(const Node * node, std::size_t depth)
+std::string_view Renderer::_requireNodeData(NodeView node)
 {
-  for (std::size_t index = 0; index < node->children.size(); ++index) {
-    const std::unique_ptr<Node>& child = node->children[index];
-    const std::string * partialIndentation = validatePartialIndentationAt(node->children, index);
+  const std::string * data = node.data();
+  if (data == NULL) {
+    throw Exception("Invalid node without data");
+  }
+  return *data;
+}
+
+const std::string& Renderer::_requireOwnedNodeData(NodeView node)
+{
+  const std::string * data = node.data();
+  if (data == NULL) {
+    throw Exception("Invalid node without data");
+  }
+  return *data;
+}
+
+const std::string * Renderer::_validatePartialIndentationAt(NodeView parent, std::size_t index)
+{
+  const NodeView child = parent.child(index);
+  if (!child || (child.flags() & Node::FlagPartialIndent) == 0) {
+    return NULL;
+  }
+  const std::string * data = child.data();
+  if (child.type() != Node::TypeOutput || child.flags() != (Node::FlagLambdaOnly | Node::FlagPartialIndent) ||
+      data == NULL || !isPartialIndentation(*data) || index + 1 >= parent.childCount() || !parent.child(index + 1) ||
+      parent.child(index + 1).type() != Node::TypePartial) {
+    throw Exception("Invalid standalone partial indentation metadata");
+  }
+  return data;
+}
+
+void Renderer::_renderChildren(NodeView node, std::size_t depth)
+{
+  for (std::size_t index = 0; index < node.childCount(); ++index) {
+    const NodeView child = node.child(index);
+    const std::string * partialIndentation = _validatePartialIndentationAt(node, index);
     if (partialIndentation != NULL) {
-      _renderNode(child.get(), depth + 1, NULL, true);
-      _renderNode(node->children[index + 1].get(), depth + 1, partialIndentation);
+      _renderNode(child, depth + 1, NULL, true);
+      _renderNode(node.child(index + 1), depth + 1, partialIndentation);
       ++index;
       continue;
     }
-    _renderNode(child.get(), depth + 1);
+    _renderNode(child, depth + 1);
   }
 }
 
@@ -465,34 +577,34 @@ void Renderer::_appendLambdaTemplate(std::string * output, std::string_view valu
 }
 
 void Renderer::_appendLambdaNodeTemplate(
-    const Node * node, std::string_view start, std::string_view stop, std::string * output, std::size_t depth)
+    NodeView node, std::string_view start, std::string_view stop, std::string * output, std::size_t depth)
 {
-  if (node == NULL) {
+  if (!node) {
     throw Exception("Invalid null child node");
   }
   if (depth >= _limits.maxNestingDepth || depth >= renderNestingCeiling) {
     throw Exception("Render nesting limit exceeded");
   }
   _consumeNodeVisit();
-  if (!(node->type & Node::TypeHasNoString) && !node->data.has_value()) {
+  if (!(node.type() & Node::TypeHasNoString) && node.data() == NULL) {
     throw Exception("Invalid node without data");
   }
 
   bool appendChildren = false;
-  switch (node->type) {
+  switch (node.type()) {
     case Node::TypeComment:
       _appendLambdaTemplate(output, start);
       _appendLambdaTemplate(output, "!");
-      _appendLambdaTemplate(output, requireNodeData(*node));
+      _appendLambdaTemplate(output, _requireNodeData(node));
       _appendLambdaTemplate(output, stop);
       break;
     case Node::TypeOutput:
-      _appendLambdaTemplate(output, requireNodeData(*node));
+      _appendLambdaTemplate(output, _requireNodeData(node));
       break;
     case Node::TypePartial:
       _appendLambdaTemplate(output, start);
       _appendLambdaTemplate(output, ">");
-      _appendLambdaTemplate(output, requireNodeData(*node));
+      _appendLambdaTemplate(output, _requireNodeData(node));
       _appendLambdaTemplate(output, stop);
       break;
     case Node::TypeNegate:
@@ -500,17 +612,17 @@ void Renderer::_appendLambdaNodeTemplate(
     case Node::TypeStop:
     case Node::TypeVariable:
       _appendLambdaTemplate(output, start);
-      if (node->type == Node::TypeVariable && !(node->flags & Node::FlagEscape)) {
+      if (node.type() == Node::TypeVariable && !(node.flags() & Node::FlagEscape)) {
         _appendLambdaTemplate(output, "&");
       }
-      if (node->type == Node::TypeNegate) {
+      if (node.type() == Node::TypeNegate) {
         _appendLambdaTemplate(output, "^");
-      } else if (node->type == Node::TypeSection) {
+      } else if (node.type() == Node::TypeSection) {
         _appendLambdaTemplate(output, "#");
-      } else if (node->type == Node::TypeStop) {
+      } else if (node.type() == Node::TypeStop) {
         _appendLambdaTemplate(output, "/");
       }
-      _appendLambdaTemplate(output, requireNodeData(*node));
+      _appendLambdaTemplate(output, _requireNodeData(node));
       _appendLambdaTemplate(output, stop);
       appendChildren = true;
       break;
@@ -527,39 +639,39 @@ void Renderer::_appendLambdaNodeTemplate(
   }
 
   if (appendChildren) {
-    for (std::size_t index = 0; index < node->children.size(); ++index) {
-      validatePartialIndentationAt(node->children, index);
-      _appendLambdaNodeTemplate(node->children[index].get(), start, stop, output, depth + 1);
+    for (std::size_t index = 0; index < node.childCount(); ++index) {
+      _validatePartialIndentationAt(node, index);
+      _appendLambdaNodeTemplate(node.child(index), start, stop, output, depth + 1);
     }
   }
 }
 
 std::string Renderer::_lambdaSectionText(
-    const Node * node, std::string_view start, std::string_view stop, std::size_t depth)
+    NodeView node, std::string_view start, std::string_view stop, std::size_t depth)
 {
   std::string output;
-  for (std::size_t index = 0; index < node->children.size(); ++index) {
-    validatePartialIndentationAt(node->children, index);
-    const std::unique_ptr<Node>& child = node->children[index];
-    if (child == NULL) {
+  for (std::size_t index = 0; index < node.childCount(); ++index) {
+    _validatePartialIndentationAt(node, index);
+    const NodeView child = node.child(index);
+    if (!child) {
       throw Exception("Invalid null child node");
     }
-    if (child->type == Node::TypeStop) {
+    if (child.type() == Node::TypeStop) {
       if (depth + 1 >= _limits.maxNestingDepth || depth + 1 >= renderNestingCeiling) {
         throw Exception("Render nesting limit exceeded");
       }
       _consumeNodeVisit();
     } else {
-      _appendLambdaNodeTemplate(child.get(), start, stop, &output, depth + 1);
+      _appendLambdaNodeTemplate(child, start, stop, &output, depth + 1);
     }
   }
   return output;
 }
 
 void Renderer::_renderNode(
-    const Node * node, std::size_t depth, const std::string * partialIndentation, bool partialIndentationMetadata)
+    NodeView node, std::size_t depth, const std::string * partialIndentation, bool partialIndentationMetadata)
 {
-  if (node == NULL) {
+  if (!node) {
     throw Exception("Empty tree node");
   }
   if (depth >= _limits.maxNestingDepth || depth >= renderNestingCeiling) {
@@ -567,11 +679,13 @@ void Renderer::_renderNode(
   }
   _consumeNodeVisit();
 
-  if ((node->flags & Node::FlagPartialIndent) != 0 &&
-      (!partialIndentationMetadata || node->type != Node::TypeOutput ||
-          node->flags != (Node::FlagLambdaOnly | Node::FlagPartialIndent) || !node->data.has_value() ||
-          !isPartialIndentation(*node->data))) {
-    throw Exception("Invalid standalone partial indentation metadata");
+  if ((node.flags() & Node::FlagPartialIndent) != 0) {
+    const std::string * metadata = node.data();
+    if (!partialIndentationMetadata || node.type() != Node::TypeOutput ||
+        node.flags() != (Node::FlagLambdaOnly | Node::FlagPartialIndent) || metadata == NULL ||
+        !isPartialIndentation(*metadata)) {
+      throw Exception("Invalid standalone partial indentation metadata");
+    }
   }
 
   const std::size_t parentDepth = _activeDepth;
@@ -583,13 +697,13 @@ void Renderer::_renderNode(
   if (_stack.empty()) {
     throw Exception("Whoops, empty data");
   }
-  if (!(node->type & Node::TypeHasNoString) && !node->data.has_value()) {
+  if (!(node.type() & Node::TypeHasNoString) && node.data() == NULL) {
     throw Exception("Whoops, empty tag");
   }
 
   bool valIsEmpty = true;
   const Data * val = NULL;
-  if (node->type & Node::TypeHasData) {
+  if (node.type() & Node::TypeHasData) {
     val = _lookup(node);
   }
   if (val != NULL && !val->isEmpty()) {
@@ -604,7 +718,7 @@ void Renderer::_renderNode(
     _renderChildren(node, depth);
   };
 
-  switch (node->type) {
+  switch (node.type()) {
     case Node::TypeNone:
       break;
 
@@ -619,20 +733,20 @@ void Renderer::_renderNode(
       break;
 
     case Node::TypeOutput:
-      if (node->data.has_value()) {
-        if (node->flags & Node::FlagLambdaOnly) {
-          _consumeTemplateSource(*node->data);
+      if (const std::string * output = node.data()) {
+        if (node.flags() & Node::FlagLambdaOnly) {
+          _consumeTemplateSource(*output);
         } else {
-          _appendTemplateOutput(*node->data);
+          _appendTemplateOutput(*output);
         }
       }
       break;
 
     case Node::TypeContainer:
-      if (node->child == NULL) {
+      if (!node.containerChild()) {
         throw Exception("Empty container node");
       }
-      _renderNode(node->child.get(), depth + 1);
+      _renderNode(node.containerChild(), depth + 1);
       break;
 
     case Node::TypeTag:
@@ -641,7 +755,7 @@ void Renderer::_renderNode(
       if (!valIsEmpty) {
         switch (val->type()) {
           case Data::TypeString:
-            if (node->flags & Node::FlagEscape) {
+            if (node.flags() & Node::FlagEscape) {
               _appendEscaped(val->stringValue());
             } else {
               _append(val->stringValue());
@@ -651,7 +765,7 @@ void Renderer::_renderNode(
           case Data::TypeInteger:
           case Data::TypeDouble: {
             const std::string rendered = val->toString();
-            if (node->flags & Node::FlagEscape) {
+            if (node.flags() & Node::FlagEscape) {
               _appendEscaped(rendered);
             } else {
               _append(rendered);
@@ -664,12 +778,12 @@ void Renderer::_renderNode(
 
             Tokenizer tokenizer;
             Node nodeFromLambda;
-            _tokenizeLambda(&tokenizer, invoked, &nodeFromLambda, node->flags & Node::FlagEscape);
+            _tokenizeLambda(&tokenizer, invoked, &nodeFromLambda, node.flags() & Node::FlagEscape);
             _indentationStack.emplace_back();
             const auto indentationGuard = onScopeExit([this]() {
               _indentationStack.pop_back();
             });
-            _renderNode(&nodeFromLambda, depth + 1);
+            _renderNode(NodeView::fromNode(&nodeFromLambda), depth + 1);
             break;
           }
           case Data::TypeNone:
@@ -710,10 +824,14 @@ void Renderer::_renderNode(
             }
             break;
           case Data::TypeLambda: {
-            if (!node->startSequence.has_value() || !node->stopSequence.has_value()) {
+            const std::string * startSequence = node.startSequence();
+            const std::string * stopSequence = node.stopSequence();
+            if (startSequence == NULL || stopSequence == NULL) {
               throw Exception("Missing section delimiters");
             }
-            const std::string text = _lambdaSectionText(node, *node->startSequence, *node->stopSequence, depth);
+            const std::string_view start = *startSequence;
+            const std::string_view stop = *stopSequence;
+            const std::string text = _lambdaSectionText(node, start, stop, depth);
             std::string invoked;
             {
               LambdaRenderContext context(this);
@@ -727,15 +845,15 @@ void Renderer::_renderNode(
             _consumeLambdaTemplate(invoked.size());
 
             Tokenizer tokenizer;
-            tokenizer.setStartSequence(*node->startSequence);
-            tokenizer.setStopSequence(*node->stopSequence);
+            tokenizer.setStartSequence(start);
+            tokenizer.setStopSequence(stop);
             Node nodeFromLambda;
-            _tokenizeLambda(&tokenizer, invoked, &nodeFromLambda, node->flags & Node::FlagEscape);
+            _tokenizeLambda(&tokenizer, invoked, &nodeFromLambda, node.flags() & Node::FlagEscape);
             _indentationStack.emplace_back();
             const auto indentationGuard = onScopeExit([this]() {
               _indentationStack.pop_back();
             });
-            _renderNode(&nodeFromLambda, depth + 1);
+            _renderNode(NodeView::fromNode(&nodeFromLambda), depth + 1);
             break;
           }
           case Data::TypeNone:
@@ -746,7 +864,7 @@ void Renderer::_renderNode(
 
     case Node::TypePartial: {
       _beginTemplateTag();
-      const std::string& name = requireNodeData(*node);
+      const std::string& name = _requireOwnedNodeData(node);
       std::vector<std::string_view> indentation;
       if (partialIndentation != NULL) {
         if (!_indentationStack.empty()) {
@@ -756,7 +874,7 @@ void Renderer::_renderNode(
           indentation.push_back(*partialIndentation);
         }
       }
-      const auto renderPartial = [this, depth, &indentation](const Node * partial) {
+      const auto renderPartial = [this, depth, &indentation](NodeView partial) {
         _indentationStack.emplace_back(std::move(indentation));
         const auto indentationGuard = onScopeExit([this]() {
           _indentationStack.pop_back();
@@ -768,20 +886,20 @@ void Renderer::_renderNode(
         const Node * partial = _partialResolver(name);
         if (partial != NULL) {
           partialFound = true;
-          renderPartial(partial);
+          renderPartial(NodeView::fromNode(partial));
         }
       }
       if (!partialFound && _partials != NULL) {
         const Node::Partials::const_iterator partial = _partials->find(name);
         if (partial != _partials->end() && partial->second != NULL) {
           partialFound = true;
-          renderPartial(partial->second.get());
+          renderPartial(NodeView::fromNode(partial->second.get()));
         }
       }
-      if (!partialFound && !_node->partials.empty()) {
-        const Node::Partials::const_iterator partial = _node->partials.find(name);
-        if (partial != _node->partials.end() && partial->second != NULL) {
-          renderPartial(partial->second.get());
+      if (!partialFound) {
+        const NodeView partial = NodeView::fromNode(_node).findPartial(name);
+        if (partial) {
+          renderPartial(partial);
         }
       }
       break;
@@ -792,10 +910,10 @@ void Renderer::_renderNode(
   }
 }
 
-const Data * Renderer::_lookup(const Node * node)
+const Data * Renderer::_lookup(NodeView node)
 {
   const Data * data = _stack.back();
-  const std::string& name = requireNodeData(*node);
+  const std::string& name = _requireOwnedNodeData(node);
 
   if (name == ".") {
     return data;
@@ -816,8 +934,8 @@ const Data * Renderer::_lookup(const Node * node)
 
   // Get initial segment for dot notation
   const std::string * initial;
-  if (!node->dataParts.empty()) {
-    initial = &(node->dataParts.at(0));
+  if (node.dataPartCount() != 0) {
+    initial = &node.dataPart(0);
   } else {
     initial = &name;
   }
@@ -835,17 +953,16 @@ const Data * Renderer::_lookup(const Node * node)
   }
 
   // Resolve or dot notation
-  if (ref != NULL && node->dataParts.size() > 1) {
+  if (ref != NULL && node.dataPartCount() > 1) {
     // Dot notation
-    std::vector<std::string>::const_iterator vs_it;
-    for (vs_it = node->dataParts.begin(), vs_it++; vs_it != node->dataParts.end(); vs_it++) {
+    for (std::size_t index = 1; index < node.dataPartCount(); ++index) {
       if (ref == NULL) {
         break;
       } else if (ref->type() != Data::TypeMap) {
         ref = NULL; // Not sure about this
         break;
       } else {
-        ref = ref->find(*vs_it);
+        ref = ref->find(node.dataPart(index));
         if (ref == NULL) {
           ref = NULL; // Not sure about this
           break;
