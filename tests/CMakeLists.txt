@@ -1,12 +1,14 @@
-add_executable(test_spec
-    test_spec.cpp
-    test_spec.hpp
-    spec_expectations.hpp
-    fixtures/lambdas.cpp
-    fixtures/lambdas.hpp
-)
-target_link_libraries(test_spec PRIVATE mustache_static ${MUSTACHE_YAML_TARGET})
-mustache_apply_build_options(test_spec)
+if(MUSTACHE_HAVE_LIBYAML)
+    add_executable(test_spec
+        test_spec.cpp
+        test_spec.hpp
+        spec_expectations.hpp
+        fixtures/lambdas.cpp
+        fixtures/lambdas.hpp
+    )
+    target_link_libraries(test_spec PRIVATE mustache_static ${MUSTACHE_YAML_TARGET})
+    mustache_apply_build_options(test_spec)
+endif()
 
 add_executable(test_utils test_utils.cpp)
 target_link_libraries(test_utils PRIVATE mustache_static)
@@ -20,9 +22,11 @@ add_executable(test_data_behavior test_data_behavior.cpp)
 target_link_libraries(test_data_behavior PRIVATE mustache_static)
 mustache_apply_build_options(test_data_behavior)
 
-add_executable(test_json_numeric_locale test_json_numeric_locale.cpp)
-target_link_libraries(test_json_numeric_locale PRIVATE mustache_static)
-mustache_apply_build_options(test_json_numeric_locale)
+if(MUSTACHE_HAVE_LIBJSON)
+    add_executable(test_json_numeric_locale test_json_numeric_locale.cpp)
+    target_link_libraries(test_json_numeric_locale PRIVATE mustache_static)
+    mustache_apply_build_options(test_json_numeric_locale)
+endif()
 
 add_executable(test_node_serialization test_node_serialization.cpp)
 target_link_libraries(test_node_serialization PRIVATE mustache_static)
@@ -82,8 +86,10 @@ if(MUSTACHE_BUILD_CLI)
     mustache_apply_build_options(test_cli)
 endif()
 
-add_test(NAME spec COMMAND test_spec "${MUSTACHE_SPEC_DIR}")
-if(WIN32)
+if(MUSTACHE_HAVE_LIBYAML)
+    add_test(NAME spec COMMAND test_spec "${MUSTACHE_SPEC_DIR}")
+endif()
+if(WIN32 AND MUSTACHE_HAVE_LIBYAML)
     add_test(NAME spec_crlf
         COMMAND "${CMAKE_COMMAND}"
             "-DTEST_SPEC_EXECUTABLE=$<TARGET_FILE:test_spec>"
@@ -114,8 +120,10 @@ endif()
 add_test(NAME utils COMMAND test_utils)
 add_test(NAME misc COMMAND test_misc)
 add_test(NAME data_behavior COMMAND test_data_behavior)
-add_test(NAME json_numeric_locale COMMAND test_json_numeric_locale)
-set_tests_properties(json_numeric_locale PROPERTIES SKIP_RETURN_CODE 77)
+if(MUSTACHE_HAVE_LIBJSON)
+    add_test(NAME json_numeric_locale COMMAND test_json_numeric_locale)
+    set_tests_properties(json_numeric_locale PROPERTIES SKIP_RETURN_CODE 77)
+endif()
 add_test(NAME node_serialization COMMAND test_node_serialization)
 add_test(NAME node_template COMMAND test_node_template)
 add_test(NAME ownership COMMAND test_ownership)
@@ -145,8 +153,10 @@ if(MUSTACHE_ENABLE_FUZZING)
     add_executable(fuzz_tokenizer fuzz_tokenizer.cpp)
     mustache_configure_fuzz_target(fuzz_tokenizer)
 
-    add_executable(fuzz_data_parser fuzz_data_parser.cpp)
-    mustache_configure_fuzz_target(fuzz_data_parser)
+    if(MUSTACHE_HAVE_LIBJSON OR MUSTACHE_HAVE_LIBYAML)
+        add_executable(fuzz_data_parser fuzz_data_parser.cpp)
+        mustache_configure_fuzz_target(fuzz_data_parser)
+    endif()
 
     set(MUSTACHE_FUZZ_CORPUS_SOURCE
         "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus/node_unserialize")
@@ -160,19 +170,22 @@ if(MUSTACHE_ENABLE_FUZZING)
         "${CMAKE_CURRENT_BINARY_DIR}/fuzz-corpus/tokenizer")
     set(MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS
         "${CMAKE_CURRENT_BINARY_DIR}/fuzz-artifacts/tokenizer")
-    set(MUSTACHE_DATA_FUZZ_CORPUS_SOURCE
-        "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus/data_parser")
-    set(MUSTACHE_DATA_FUZZ_CORPUS_BINARY
-        "${CMAKE_CURRENT_BINARY_DIR}/fuzz-corpus/data_parser")
-    set(MUSTACHE_DATA_FUZZ_ARTIFACTS
-        "${CMAKE_CURRENT_BINARY_DIR}/fuzz-artifacts/data_parser")
     file(MAKE_DIRECTORY
         "${MUSTACHE_FUZZ_CORPUS_BINARY}"
         "${MUSTACHE_FUZZ_ARTIFACTS}"
         "${MUSTACHE_TOKENIZER_FUZZ_CORPUS_BINARY}"
-        "${MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS}"
-        "${MUSTACHE_DATA_FUZZ_CORPUS_BINARY}"
-        "${MUSTACHE_DATA_FUZZ_ARTIFACTS}")
+        "${MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS}")
+    if(MUSTACHE_HAVE_LIBJSON OR MUSTACHE_HAVE_LIBYAML)
+        set(MUSTACHE_DATA_FUZZ_CORPUS_SOURCE
+            "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus/data_parser")
+        set(MUSTACHE_DATA_FUZZ_CORPUS_BINARY
+            "${CMAKE_CURRENT_BINARY_DIR}/fuzz-corpus/data_parser")
+        set(MUSTACHE_DATA_FUZZ_ARTIFACTS
+            "${CMAKE_CURRENT_BINARY_DIR}/fuzz-artifacts/data_parser")
+        file(MAKE_DIRECTORY
+            "${MUSTACHE_DATA_FUZZ_CORPUS_BINARY}"
+            "${MUSTACHE_DATA_FUZZ_ARTIFACTS}")
+    endif()
     file(COPY "${MUSTACHE_FUZZ_CORPUS_SOURCE}/"
         DESTINATION "${MUSTACHE_FUZZ_CORPUS_BINARY}")
 
@@ -204,18 +217,20 @@ if(MUSTACHE_ENABLE_FUZZING)
         RUN_SERIAL TRUE
         TIMEOUT 30)
 
-    file(COPY "${MUSTACHE_DATA_FUZZ_CORPUS_SOURCE}/"
-        DESTINATION "${MUSTACHE_DATA_FUZZ_CORPUS_BINARY}")
-    add_test(NAME fuzz_data_parser_smoke
-        COMMAND fuzz_data_parser
-            -runs=1000
-            -max_len=4096
-            -timeout=5
-            "-dict=${CMAKE_CURRENT_SOURCE_DIR}/fuzz/data_parser.dict"
-            "-artifact_prefix=${MUSTACHE_DATA_FUZZ_ARTIFACTS}/"
-            "${MUSTACHE_DATA_FUZZ_CORPUS_BINARY}")
-    set_tests_properties(fuzz_data_parser_smoke PROPERTIES
-        LABELS fuzz
-        RUN_SERIAL TRUE
-        TIMEOUT 30)
+    if(MUSTACHE_HAVE_LIBJSON OR MUSTACHE_HAVE_LIBYAML)
+        file(COPY "${MUSTACHE_DATA_FUZZ_CORPUS_SOURCE}/"
+            DESTINATION "${MUSTACHE_DATA_FUZZ_CORPUS_BINARY}")
+        add_test(NAME fuzz_data_parser_smoke
+            COMMAND fuzz_data_parser
+                -runs=1000
+                -max_len=4096
+                -timeout=5
+                "-dict=${CMAKE_CURRENT_SOURCE_DIR}/fuzz/data_parser.dict"
+                "-artifact_prefix=${MUSTACHE_DATA_FUZZ_ARTIFACTS}/"
+                "${MUSTACHE_DATA_FUZZ_CORPUS_BINARY}")
+        set_tests_properties(fuzz_data_parser_smoke PROPERTIES
+            LABELS fuzz
+            RUN_SERIAL TRUE
+            TIMEOUT 30)
+    endif()
 endif()

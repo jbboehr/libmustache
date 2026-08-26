@@ -6,6 +6,8 @@ in
     stdenv ? pkgs.stdenv,
     clang-tools ? pkgs.llvmPackages.clang-tools,
     cista ? pkgs.cista,
+    nlohmann_json ? pkgs.nlohmann_json,
+    libyaml ? pkgs.libyaml,
     xxhash ? pkgs.xxhash,
     zlib ? pkgs.zlib,
     gitignoreFilterWith ?
@@ -33,7 +35,7 @@ in
     cistaBuiltinXxh3Support ? false,
   }:
     pkgs.callPackage ./nix/derivation.nix {
-      inherit stdenv clang-tools cista xxhash zlib mustache_spec libmustacheSrc;
+      inherit stdenv clang-tools cista nlohmann_json libyaml xxhash zlib mustache_spec libmustacheSrc;
       inherit checkSupport cmakeSupport staticOnlySupport debugSupport sanitizerSupport fuzzSupport clangTidySupport;
       inherit cistaBenchmarkSupport cistaBuiltinXxh3Support;
       inherit gitignoreFilterWith;

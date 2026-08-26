@@ -13,8 +13,8 @@ as an ordinary C++ library.
 ## Requirements
 
 - A C++17 compiler
-- nlohmann/json 3.10.5 or newer (build only)
-- libyaml
+- nlohmann/json 3.10.5 or newer for JSON input (optional; build only)
+- libyaml for YAML input (optional)
 - CMake 3.18 or Autoconf 2.69 with Automake and Libtool
 
 Clone the specification submodule when tests are required:
@@ -46,6 +46,19 @@ cmake -S . -B build \
 Maintainer and CI builds can add `-DMUSTACHE_WARNINGS_AS_ERRORS=ON` to promote
 project warnings to errors without changing the default for downstream builds.
 
+JSON and YAML support default to `AUTO`: each adapter is built when its
+dependency is detected and omitted otherwise. Use `ON` to require a format or
+`OFF` to disable it even when its dependency is installed:
+
+```sh
+cmake -S . -B build \
+  -DMUSTACHE_ENABLE_JSON=ON \
+  -DMUSTACHE_ENABLE_YAML=OFF
+```
+
+The accepted values are `AUTO`, `ON`, and `OFF`. A format set to `ON` makes
+configuration fail if its dependency is unavailable.
+
 Installed CMake packages expose separate components. The shared component is
 the default and does not require dependency development packages at consume
 time:
@@ -55,9 +68,10 @@ find_package(mustache 0.6 CONFIG REQUIRED)
 target_link_libraries(example PRIVATE mustache::mustache)
 ```
 
-Static consumers request the static component, which also locates libyaml.
-The header-only JSON parser is compiled entirely into libmustache and is not
-required when consuming an installed library:
+Static consumers request the static component. It also locates libyaml when
+the installed library was built with YAML support. The header-only JSON parser
+is compiled entirely into libmustache and is not required when consuming an
+installed library:
 
 ```cmake
 find_package(mustache 0.6 CONFIG REQUIRED COMPONENTS static)
@@ -80,6 +94,10 @@ Use `--without-mustache-spec` when configuring a source tree without the
 specification submodule. `./configure --help` lists the warning-as-error,
 hardening, sanitizer, coverage, and profiling options.
 
+JSON and YAML support are independently auto-detected by default. Use
+`--with-json=yes` or `--with-yaml=yes` to require the corresponding dependency,
+and `--without-json` or `--without-yaml` to disable an adapter explicitly.
+
 ## Nix
 
 ```sh
@@ -90,7 +108,16 @@ nix run .#mustachec -- -v
 ```
 
 The default Nix package uses Autotools; `libmustache-cmake` exercises the CMake
-packaging path.
+packaging path. When importing `default.nix`, pass `nlohmann_json = null` or
+`libyaml = null` to omit that dependency and explicitly disable the
+corresponding adapter.
+
+The parsing entry points remain available regardless of the selected feature
+set so builds have a stable C++ ABI. Calling `Data::fromJSON()` or
+`Data::fromYAML()` when its adapter was omitted throws `mustache::Exception`.
+The installed `mustache_config.h` advertises enabled adapters with
+`MUSTACHE_HAVE_LIBJSON` and `MUSTACHE_HAVE_LIBYAML`; `mustachec -v` reports the
+same feature state.
 
 The installed `mustache_config.h` defines `MUSTACHE_CXX_STANDARD` as `17` and
 defines `MUSTACHE_HAVE_CXX17`. `MUSTACHE_HAVE_CXX11` remains defined as a

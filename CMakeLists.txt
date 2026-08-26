@@ -36,6 +36,12 @@ option(MUSTACHE_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehavior
 option(MUSTACHE_ENABLE_FUZZING "Build the Clang libFuzzer targets and smoke tests" OFF)
 option(MUSTACHE_ENABLE_CLANG_TIDY "Run clang-tidy on production targets" OFF)
 option(MUSTACHE_ENABLE_CISTA_BENCHMARK "Build the experimental Cista archive benchmark" OFF)
+set(MUSTACHE_ENABLE_JSON AUTO CACHE STRING
+    "Build JSON support: AUTO, ON, or OFF")
+set_property(CACHE MUSTACHE_ENABLE_JSON PROPERTY STRINGS AUTO ON OFF)
+set(MUSTACHE_ENABLE_YAML AUTO CACHE STRING
+    "Build YAML support: AUTO, ON, or OFF")
+set_property(CACHE MUSTACHE_ENABLE_YAML PROPERTY STRINGS AUTO ON OFF)
 option(MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3
     "Use Cista runtime versioning and built-in integrity with the supplied XXH3"
     ${MUSTACHE_ENABLE_CISTA_BENCHMARK})
@@ -44,6 +50,17 @@ if(MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3 AND NOT MUSTACHE_ENABLE_CISTA_BENCHMARK
     message(FATAL_ERROR
         "MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3 requires MUSTACHE_ENABLE_CISTA_BENCHMARK")
 endif()
+
+foreach(MUSTACHE_OPTION IN ITEMS MUSTACHE_ENABLE_JSON MUSTACHE_ENABLE_YAML)
+    string(TOUPPER "${${MUSTACHE_OPTION}}" MUSTACHE_OPTION_VALUE)
+    if(NOT MUSTACHE_OPTION_VALUE MATCHES "^(AUTO|ON|OFF)$")
+        message(FATAL_ERROR
+            "${MUSTACHE_OPTION} must be AUTO, ON, or OFF")
+    endif()
+    set(${MUSTACHE_OPTION} "${MUSTACHE_OPTION_VALUE}" CACHE STRING
+        "Build support for the selected data format: AUTO, ON, or OFF" FORCE)
+    set_property(CACHE ${MUSTACHE_OPTION} PROPERTY STRINGS AUTO ON OFF)
+endforeach()
 
 if(MUSTACHE_ENABLE_CLANG_TIDY)
     find_program(MUSTACHE_CLANG_TIDY_EXECUTABLE NAMES clang-tidy REQUIRED)
@@ -90,8 +107,18 @@ if(MUSTACHE_ENABLE_FUZZING)
     endif()
 endif()
 
-find_package(nlohmann_json 3.10.5 CONFIG REQUIRED)
-set(MUSTACHE_JSON_TARGET nlohmann_json::nlohmann_json)
+set(MUSTACHE_HAVE_LIBJSON OFF)
+if(NOT MUSTACHE_ENABLE_JSON STREQUAL "OFF")
+    find_package(nlohmann_json 3.10.5 CONFIG QUIET)
+    if(TARGET nlohmann_json::nlohmann_json)
+        set(MUSTACHE_HAVE_LIBJSON ON)
+        set(MUSTACHE_JSON_TARGET nlohmann_json::nlohmann_json)
+    elseif(MUSTACHE_ENABLE_JSON STREQUAL "ON")
+        message(FATAL_ERROR
+            "MUSTACHE_ENABLE_JSON=ON requires nlohmann_json >= 3.10.5")
+    endif()
+endif()
+message(STATUS "JSON support: ${MUSTACHE_HAVE_LIBJSON}")
 
 if(MUSTACHE_ENABLE_CISTA_BENCHMARK)
     # nixpkgs packages Cista 0.16 with CMake metadata reporting version 0.7,
@@ -101,20 +128,38 @@ if(MUSTACHE_ENABLE_CISTA_BENCHMARK)
     find_package(xxHash CONFIG REQUIRED)
 endif()
 
-if(MSVC)
-    find_package(yaml CONFIG REQUIRED)
-    if(TARGET yaml)
-        set(MUSTACHE_YAML_TARGET yaml)
-    elseif(TARGET yaml::yaml)
-        set(MUSTACHE_YAML_TARGET yaml::yaml)
+set(MUSTACHE_HAVE_LIBYAML OFF)
+if(NOT MUSTACHE_ENABLE_YAML STREQUAL "OFF")
+    if(MSVC)
+        find_package(yaml CONFIG QUIET)
+        if(TARGET yaml)
+            set(MUSTACHE_YAML_TARGET yaml)
+            set(MUSTACHE_HAVE_LIBYAML ON)
+        elseif(TARGET yaml::yaml)
+            set(MUSTACHE_YAML_TARGET yaml::yaml)
+            set(MUSTACHE_HAVE_LIBYAML ON)
+        endif()
     else()
-        message(FATAL_ERROR "The yaml package did not provide a supported CMake target")
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+            pkg_check_modules(YAML QUIET IMPORTED_TARGET yaml-0.1)
+            if(TARGET PkgConfig::YAML)
+                set(MUSTACHE_YAML_TARGET PkgConfig::YAML)
+                set(MUSTACHE_HAVE_LIBYAML ON)
+            endif()
+        endif()
     endif()
+    if(MUSTACHE_ENABLE_YAML STREQUAL "ON" AND NOT MUSTACHE_HAVE_LIBYAML)
+        message(FATAL_ERROR
+            "MUSTACHE_ENABLE_YAML=ON requires libyaml")
+    endif()
+endif()
+message(STATUS "YAML support: ${MUSTACHE_HAVE_LIBYAML}")
 
+if(MUSTACHE_HAVE_LIBYAML)
+    set(MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE yaml-0.1)
 else()
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(YAML REQUIRED IMPORTED_TARGET yaml-0.1)
-    set(MUSTACHE_YAML_TARGET PkgConfig::YAML)
+    set(MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE "")
 endif()
 
 configure_file(

@@ -118,15 +118,22 @@ retained.
 
 ## Packaging boundary
 
-nlohmann/json is required only while compiling the private `json_parser.cpp`
-adapter:
+When JSON support is enabled, nlohmann/json is required only while compiling
+the private `json_parser.cpp` adapter:
 
 - CMake links its imported target only in the build interface;
 - the installed shared and static CMake targets do not reference it;
 - `mustache.pc` does not list it in `Requires.private`;
 - Autotools receives include flags through `nlohmann_json.pc` but no link
   library; and
-- Nix keeps it in `buildInputs`, while only libyaml remains propagated.
+- Nix keeps it in `buildInputs`, while libyaml is propagated only when YAML
+  support is enabled.
+
+JSON and YAML are independently auto-detected. CMake's
+`MUSTACHE_ENABLE_JSON` and `MUSTACHE_ENABLE_YAML` cache entries accept
+`AUTO`, `ON`, or `OFF`; Autotools provides the equivalent
+`--with-json`/`--with-yaml` controls. Omitting an adapter does not remove its
+public parsing symbols, which instead report that the feature is unavailable.
 
 On GNU and Clang builds, the complete adapter translation unit has hidden
 visibility. This covers nlohmann/json 3.10.5, which predates the dependency's

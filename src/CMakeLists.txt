@@ -1,7 +1,6 @@
 set(MUSTACHE_SOURCES
     compiled_template.cpp
     data.cpp
-    json_parser.cpp
     lambda.cpp
     mustache.cpp
     node.cpp
@@ -10,10 +9,23 @@ set(MUSTACHE_SOURCES
     tokenizer.cpp
     utils.cpp
 )
-set_property(SOURCE json_parser.cpp APPEND PROPERTY COMPILE_OPTIONS
-    "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility=hidden>"
-    "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility-inlines-hidden>"
-)
+if(MUSTACHE_HAVE_LIBJSON)
+    list(APPEND MUSTACHE_SOURCES json_parser.cpp)
+    set_property(SOURCE json_parser.cpp APPEND PROPERTY COMPILE_OPTIONS
+        "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility=hidden>"
+        "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility-inlines-hidden>"
+    )
+endif()
+
+set(MUSTACHE_PRIVATE_DEPENDENCIES)
+if(MUSTACHE_HAVE_LIBJSON)
+    list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES
+        "$<BUILD_INTERFACE:${MUSTACHE_JSON_TARGET}>")
+endif()
+if(MUSTACHE_HAVE_LIBYAML)
+    list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES
+        ${MUSTACHE_YAML_TARGET})
+endif()
 
 set(MUSTACHE_PUBLIC_HEADERS
     compiled_template.hpp
@@ -40,8 +52,7 @@ function(mustache_configure_library target)
     )
     target_link_libraries(${target}
         PRIVATE
-            $<BUILD_INTERFACE:${MUSTACHE_JSON_TARGET}>
-            ${MUSTACHE_YAML_TARGET}
+            ${MUSTACHE_PRIVATE_DEPENDENCIES}
     )
     mustache_apply_build_options(${target})
 endfunction()

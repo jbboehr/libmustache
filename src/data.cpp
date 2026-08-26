@@ -1,6 +1,8 @@
 #include "data.hpp"
 
+#ifdef MUSTACHE_HAVE_LIBYAML
 #include "yaml.h"
+#endif
 
 #include <algorithm>
 #include <cmath>
@@ -463,6 +465,7 @@ class ParseBudget {
     }
 };
 
+#if defined(MUSTACHE_HAVE_LIBJSON) || defined(MUSTACHE_HAVE_LIBYAML)
 void checkInputSize(std::string_view input, const Data::ParseLimits& limits, const char * format)
 {
   if (input.size() > limits.maxInputBytes) {
@@ -472,6 +475,7 @@ void checkInputSize(std::string_view input, const Data::ParseLimits& limits, con
     throw Exception(std::string(format) + " input contains NUL byte");
   }
 }
+#endif
 
 } // namespace
 
@@ -505,6 +509,7 @@ Data * Data::createFromJSON(const char * string, const ParseLimits& limits)
 
 Data Data::fromJSON(std::string_view string, const ParseLimits& limits)
 {
+#ifdef MUSTACHE_HAVE_LIBJSON
   checkInputSize(string, limits, "JSON");
   if (string.size() >= 3 && static_cast<unsigned char>(string[0]) == 0xef &&
       static_cast<unsigned char>(string[1]) == 0xbb && static_cast<unsigned char>(string[2]) == 0xbf) {
@@ -512,6 +517,11 @@ Data Data::fromJSON(std::string_view string, const ParseLimits& limits)
   }
 
   return parseJSON(string, limits);
+#else
+  static_cast<void>(string);
+  static_cast<void>(limits);
+  throw Exception("JSON support is not available");
+#endif
 }
 
 Data Data::fromYAML(const char * string)
@@ -541,6 +551,8 @@ Data * Data::createFromYAML(const char * string, const ParseLimits& limits)
 {
   return new Data(fromYAML(string, limits));
 }
+
+#ifdef MUSTACHE_HAVE_LIBYAML
 
 namespace {
 
@@ -817,8 +829,11 @@ Data createFromYAMLNode(yaml_document_t * document, yaml_node_t * node, ParseBud
 
 } // namespace
 
+#endif
+
 Data Data::fromYAML(std::string_view string, const ParseLimits& limits)
 {
+#ifdef MUSTACHE_HAVE_LIBYAML
   checkInputSize(string, limits, "YAML");
   preflightYAML(string, limits);
 
@@ -863,6 +878,11 @@ Data Data::fromYAML(std::string_view string, const ParseLimits& limits)
     yaml_parser_delete(&parser);
     throw;
   }
+#else
+  static_cast<void>(string);
+  static_cast<void>(limits);
+  throw Exception("YAML support is not available");
+#endif
 }
 
 } // namespace mustache

@@ -45,14 +45,33 @@ struct Options {
 
 void showUsage(std::ostream& output)
 {
-  output << "Usage: mustachec -t <template> [-d <data>] [options]\n"
-         << '\n'
-         << "Render a Mustache template using JSON or YAML data.\n"
+  output << "Usage: mustachec -t <template> [-d <data>] [options]\n" << '\n';
+#if defined(MUSTACHE_HAVE_LIBJSON) && defined(MUSTACHE_HAVE_LIBYAML)
+  output << "Render a Mustache template using JSON or YAML data.\n"
          << '\n'
          << "Options:\n"
          << "  -t, --template <file>     Template file (required)\n"
-         << "  -d, --data <file>         JSON or YAML data (default: null)\n"
-         << "  -l, --partial <name=file> Add a named partial; may be repeated\n"
+         << "  -d, --data <file>         JSON or YAML data (default: null)\n";
+#elif defined(MUSTACHE_HAVE_LIBJSON)
+  output << "Render a Mustache template using JSON data.\n"
+         << '\n'
+         << "Options:\n"
+         << "  -t, --template <file>     Template file (required)\n"
+         << "  -d, --data <file>         JSON data (default: null)\n";
+#elif defined(MUSTACHE_HAVE_LIBYAML)
+  output << "Render a Mustache template using YAML data.\n"
+         << '\n'
+         << "Options:\n"
+         << "  -t, --template <file>     Template file (required)\n"
+         << "  -d, --data <file>         YAML data (default: null)\n";
+#else
+  output << "Render a Mustache template without external data.\n"
+         << '\n'
+         << "Options:\n"
+         << "  -t, --template <file>     Template file (required)\n"
+         << "  -d, --data <file>         External data unavailable in this build\n";
+#endif
+  output << "  -l, --partial <name=file> Add a named partial; may be repeated\n"
          << "  -o, --output <file>       Write output to a file instead of stdout\n"
          << "  -n, --repeat <count>      Render 1-" << maxRepetitions << " times (default: 1)\n"
          << "  -r                         Deprecated ignored compatibility option\n"
@@ -263,12 +282,30 @@ DataFormat detectDataFormat(const std::string& path)
   throw std::runtime_error("Unsupported data file type for '" + path + "'; expected .json, .yml, or .yaml");
 }
 
+void requireDataFormatAvailable(DataFormat format)
+{
+  static_cast<void>(format);
+#ifndef MUSTACHE_HAVE_LIBJSON
+  if (format == DataFormat::Json) {
+    throw std::runtime_error(
+        "JSON support was not built into this mustachec; rebuild with MUSTACHE_ENABLE_JSON=ON or --with-json=yes");
+  }
+#endif
+#ifndef MUSTACHE_HAVE_LIBYAML
+  if (format == DataFormat::Yaml) {
+    throw std::runtime_error(
+        "YAML support was not built into this mustachec; rebuild with MUSTACHE_ENABLE_YAML=ON or --with-yaml=yes");
+  }
+#endif
+}
+
 mustache::Data readData(const Options& options, const mustache::Data::ParseLimits& limits)
 {
   if (options.dataPath.empty()) {
     return mustache::Data::null();
   }
   const DataFormat format = detectDataFormat(options.dataPath);
+  requireDataFormatAvailable(format);
   const std::string source = readFile(options.dataPath, "data file", limits.maxInputBytes);
   if (source.empty()) {
     throw std::runtime_error("Data file is empty: " + options.dataPath);

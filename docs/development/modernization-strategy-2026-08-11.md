@@ -411,11 +411,13 @@ removed. The replacement uses nlohmann/json's SAX callbacks to construct
 `Data` directly and preserves finite floating-point token spelling without a
 temporary parser DOM.
 
-The parser is a private header-only build dependency. CMake's build interface,
-Autotools compile flags, and Nix `buildInputs` make it available to the private
-`json_parser.cpp` adapter, but the installed static target and pkg-config file
-do not require it. This is an intentional improvement over json-c, whose link
-dependency was exposed to static consumers.
+When enabled, the parser is a private header-only build dependency. CMake's
+build interface, Autotools compile flags, and Nix `buildInputs` make it
+available to the private `json_parser.cpp` adapter, but the installed static
+target and pkg-config file do not require it. JSON and YAML support default to
+automatic dependency detection and can be independently required or disabled.
+This is an intentional improvement over json-c, whose link dependency was
+exposed to static consumers.
 
 `Data::createFromJSON` remains a compatibility facade. The parser is an
 implementation detail, and no partial root is published after syntax,

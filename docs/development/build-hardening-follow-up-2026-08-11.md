@@ -42,9 +42,10 @@ risks: [Repository review](repository-review-2026-08-11.md).
   2025-11-19 (`da1f056dc0775ac651bea7e3fbbf4066146a55f3`).
 - Installed CMake exports are component-aware. The default `shared` component
   has no consume-time dependency-metadata requirement; the `static` component
-  locates libyaml while respecting `QUIET`, `REQUIRED`, and optional component
-  semantics. nlohmann/json is a private header-only build dependency and does
-  not appear in either installed component.
+  locates libyaml when YAML support was built, while respecting `QUIET`,
+  `REQUIRED`, and optional component semantics. nlohmann/json is a private
+  header-only build dependency when JSON support is enabled and does not
+  appear in either installed component.
 - CMake top-level builds retain the CLI and test defaults, while embedded
   `add_subdirectory()` builds default both off. A dedicated fixture prevents
   regressions in this policy.

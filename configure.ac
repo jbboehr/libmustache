@@ -108,8 +108,6 @@ AC_CACHE_CHECK([whether $CXX supports private C++ symbol visibility],
 ])
 AS_IF([test "x$mustache_cv_cxx_visibility_hidden" = "xyes"], [
     MUSTACHE_JSON_CXXFLAGS="-fvisibility=hidden -fvisibility-inlines-hidden"
-], [
-    AC_MSG_ERROR([the C++ compiler must support private symbol visibility])
 ])
 AC_SUBST([MUSTACHE_JSON_CXXFLAGS])
 
@@ -226,16 +224,68 @@ AS_IF([test "x$with_mustache_spec" != "xno"], [
 AM_CONDITIONAL([MUSTACHE_SPEC_ENABLED],
     [test "x$mustache_spec_enabled" = "xyes"])
 
-PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.10.5], [
+AC_ARG_WITH([json],
+    [AS_HELP_STRING([--with-json@<:@=auto|yes|no@:>@],
+        [build JSON support using nlohmann/json @<:@default=auto@:>@])],
+    [], [with_json=auto])
+AS_CASE([$with_json],
+    [auto|yes|no], [],
+    [AC_MSG_ERROR([--with-json accepts only auto, yes, or no])])
+mustache_json_enabled=no
+AS_IF([test "x$with_json" != "xno"], [
+    PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.10.5], [
+        mustache_json_enabled=yes
+    ], [
+        AS_IF([test "x$with_json" = "xyes"], [
+            AC_MSG_ERROR([nlohmann_json >= 3.10.5 is required for --with-json=yes])
+        ])
+    ])
+])
+AS_IF([test "x$mustache_json_enabled" = "xyes"], [
+    AS_IF([test "x$mustache_cv_cxx_visibility_hidden" != "xyes"], [
+        AC_MSG_ERROR([JSON support requires private C++ symbol visibility])
+    ])
     AC_DEFINE([HAVE_LIBJSON], [1], [Defined if JSON support is enabled])
-], [
-    AC_MSG_ERROR([nlohmann_json >= 3.10.5 is required])
 ])
-PKG_CHECK_MODULES([YAML], [yaml-0.1], [
-    AC_DEFINE([HAVE_LIBYAML], [1], [Defined if libyaml is enabled])
-], [
-    AC_MSG_ERROR([libyaml is required])
+AM_CONDITIONAL([MUSTACHE_JSON_ENABLED],
+    [test "x$mustache_json_enabled" = "xyes"])
+AC_MSG_CHECKING([whether JSON support is enabled])
+AC_MSG_RESULT([$mustache_json_enabled])
+
+AC_ARG_WITH([yaml],
+    [AS_HELP_STRING([--with-yaml@<:@=auto|yes|no@:>@],
+        [build YAML support using libyaml @<:@default=auto@:>@])],
+    [], [with_yaml=auto])
+AS_CASE([$with_yaml],
+    [auto|yes|no], [],
+    [AC_MSG_ERROR([--with-yaml accepts only auto, yes, or no])])
+mustache_yaml_enabled=no
+AS_IF([test "x$with_yaml" != "xno"], [
+    PKG_CHECK_MODULES([YAML], [yaml-0.1], [
+        mustache_yaml_enabled=yes
+    ], [
+        AS_IF([test "x$with_yaml" = "xyes"], [
+            AC_MSG_ERROR([libyaml is required for --with-yaml=yes])
+        ])
+    ])
 ])
+AS_IF([test "x$mustache_yaml_enabled" = "xyes"], [
+    AC_DEFINE([HAVE_LIBYAML], [1], [Defined if YAML support is enabled])
+    MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE=yaml-0.1
+], [
+    YAML_CFLAGS=
+    YAML_LIBS=
+    MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE=
+])
+AC_SUBST([MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE])
+AM_CONDITIONAL([MUSTACHE_YAML_ENABLED],
+    [test "x$mustache_yaml_enabled" = "xyes"])
+AC_MSG_CHECKING([whether YAML support is enabled])
+AC_MSG_RESULT([$mustache_yaml_enabled])
+
+AM_CONDITIONAL([MUSTACHE_SPEC_TEST_ENABLED],
+    [test "x$mustache_spec_enabled" = "xyes" &&
+     test "x$mustache_yaml_enabled" = "xyes"])
 
 AC_CHECK_HEADERS([cstdlib dirent.h exception fstream iostream list map memory sstream stack stdexcept string utility vector yaml.h])
 AC_TYPE_INT32_T

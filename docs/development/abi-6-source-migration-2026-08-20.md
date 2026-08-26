@@ -45,9 +45,15 @@ branch. ABI 6 is not stable until 0.6.0 is released.
 - The installed static component is requested with
   `find_package(mustache 0.6 CONFIG REQUIRED COMPONENTS static)` and exports
   `mustache::mustache_static`.
-- nlohmann/json is a private build dependency. A shared-library consumer does
-  not need nlohmann/json or libyaml development files. A static consumer still
-  needs libyaml.
+- JSON and YAML input are optional build features. Both default to automatic
+  dependency detection; packagers can require or disable either adapter. The
+  parsing symbols remain available and throw `mustache::Exception` when their
+  adapter was omitted. `MUSTACHE_HAVE_LIBJSON` and `MUSTACHE_HAVE_LIBYAML` in
+  the installed configuration header report the selected feature set.
+- nlohmann/json is a private build dependency when JSON support is enabled. A
+  shared-library consumer does not need nlohmann/json or libyaml development
+  files. A static consumer needs libyaml only when the installed library was
+  built with YAML support.
 - `mustache_config.h` defines `MUSTACHE_CXX_STANDARD` as `17` and
   `MUSTACHE_HAVE_CXX17`. `MUSTACHE_HAVE_CXX11` remains temporarily as a
   source-compatibility alias.

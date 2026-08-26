@@ -102,23 +102,27 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t * data, std::size_t size)
   const char * input = size == 0 ? "" : reinterpret_cast<const char *>(data);
   const std::string_view view(input, size);
 
-  std::optional<mustache::Data> json;
+  std::optional<mustache::Data> parsed;
+#ifdef MUSTACHE_HAVE_LIBJSON
   try {
-    json.emplace(mustache::Data::fromJSON(view, limits));
+    parsed.emplace(mustache::Data::fromJSON(view, limits));
   } catch (const mustache::Exception&) {
   }
-  if (json.has_value()) {
-    validateParsedData(*json, limits);
+  if (parsed.has_value()) {
+    validateParsedData(*parsed, limits);
   }
+#endif
 
-  std::optional<mustache::Data> yaml;
+#ifdef MUSTACHE_HAVE_LIBYAML
+  parsed.reset();
   try {
-    yaml.emplace(mustache::Data::fromYAML(view, limits));
+    parsed.emplace(mustache::Data::fromYAML(view, limits));
   } catch (const mustache::Exception&) {
   }
-  if (yaml.has_value()) {
-    validateParsedData(*yaml, limits);
+  if (parsed.has_value()) {
+    validateParsedData(*parsed, limits);
   }
+#endif
 
   return 0;
 }

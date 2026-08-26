@@ -12,8 +12,8 @@
   cista ? null,
   xxhash ? null,
   zlib ? null,
-  nlohmann_json,
-  libyaml,
+  nlohmann_json ? null,
+  libyaml ? null,
   mustache_spec,
   gitignoreFilterWith,
   libmustacheSrc ? ../.,
@@ -69,9 +69,9 @@ stdenv.mkDerivation (finalAttrs: {
   dontStrip = sanitizerSupport || fuzzSupport;
 
   buildInputs =
-    [nlohmann_json]
+    lib.optional (nlohmann_json != null) nlohmann_json
     ++ lib.optionals cistaBenchmarkSupport [cista xxhash zlib];
-  propagatedBuildInputs = [libyaml];
+  propagatedBuildInputs = lib.optional (libyaml != null) libyaml;
   nativeBuildInputs =
     lib.optional checkSupport mustache_spec
     ++ lib.optionals cmakeSupport [cmake]
@@ -96,7 +96,9 @@ stdenv.mkDerivation (finalAttrs: {
     ++ lib.optional checkSupport "--with-mustache-spec=${mustache_spec}/share/mustache-spec/specs"
     ++ lib.optional checkSupport "--enable-warnings-as-errors"
     ++ lib.optionals staticOnlySupport ["--disable-shared" "--enable-static"]
-    ++ lib.optional sanitizerSupport "--enable-sanitizers";
+    ++ lib.optional sanitizerSupport "--enable-sanitizers"
+    ++ lib.optional (nlohmann_json == null) "--without-json"
+    ++ lib.optional (libyaml == null) "--without-yaml";
 
   cmakeFlags = assert !cistaBuiltinXxh3Support || cistaBenchmarkSupport;
     [
@@ -109,6 +111,16 @@ stdenv.mkDerivation (finalAttrs: {
       (lib.cmakeBool "MUSTACHE_ENABLE_CLANG_TIDY" clangTidySupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_CISTA_BENCHMARK" cistaBenchmarkSupport)
       (lib.cmakeBool "MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3" cistaBuiltinXxh3Support)
+      "-DMUSTACHE_ENABLE_JSON=${
+        if nlohmann_json == null
+        then "OFF"
+        else "AUTO"
+      }"
+      "-DMUSTACHE_ENABLE_YAML=${
+        if libyaml == null
+        then "OFF"
+        else "AUTO"
+      }"
       "-DCMAKE_BUILD_TYPE=${
         if debugSupport || sanitizerSupport
         then "Debug"
@@ -127,10 +139,37 @@ stdenv.mkDerivation (finalAttrs: {
     ''
       runHook preInstallCheck
 
-      "$out/bin/mustachec" -v
-      printf '%s\n' '{{name}}' > install-check.mustache
-      printf '%s\n' '{"name":"secure"}' > install-check.json
-      rendered=$("$out/bin/mustachec" -t install-check.mustache -d install-check.json)
+      "$out/bin/mustachec" -v > install-check-version.txt
+      grep -F '${
+        if nlohmann_json != null
+        then "JSON support: nlohmann/json"
+        else "JSON support: none"
+      }' \
+        install-check-version.txt
+      grep -F '${
+        if libyaml != null
+        then "YAML support: libyaml"
+        else "YAML support: none"
+      }' \
+        install-check-version.txt
+      ${
+        if nlohmann_json != null
+        then ''
+          printf '%s\n' '{{name}}' > install-check.mustache
+          printf '%s\n' '{"name":"secure"}' > install-check.json
+          rendered=$("$out/bin/mustachec" -t install-check.mustache -d install-check.json)
+        ''
+        else if libyaml != null
+        then ''
+          printf '%s\n' '{{name}}' > install-check.mustache
+          printf '%s\n' 'name: secure' > install-check.yaml
+          rendered=$("$out/bin/mustachec" -t install-check.mustache -d install-check.yaml)
+        ''
+        else ''
+          printf '%s' 'secure' > install-check.mustache
+          rendered=$("$out/bin/mustachec" -t install-check.mustache)
+        ''
+      }
       test "$rendered" = "secure"
 
       export PKG_CONFIG_PATH="$dev/lib/pkgconfig''${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
@@ -186,7 +225,12 @@ stdenv.mkDerivation (finalAttrs: {
       consumer-static/mustache_consumer
 
       cmake -S "$src/tests/cmake-find-quiet" -B find-quiet \
-        -DCMAKE_PREFIX_PATH="$dev;$lib"
+        -DCMAKE_PREFIX_PATH="$dev;$lib" \
+        -DMUSTACHE_EXPECT_STATIC_WITHOUT_DEPENDENCIES=${
+        if libyaml == null
+        then "ON"
+        else "OFF"
+      }
 
       cmake -S "$src/tests/cmake-subproject" -B subproject-build \
         -DCMAKE_BUILD_TYPE=Release \
@@ -198,6 +242,11 @@ stdenv.mkDerivation (finalAttrs: {
     + ''
       runHook postInstallCheck
     '';
+
+  # Explicitly disabled adapters must ignore caller/config-site overrides.
+  # Poison these variables so the no-YAML checks enforce that contract.
+  YAML_CFLAGS = lib.optionalString (libyaml == null) "-I/definitely-missing-libmustache-yaml-headers";
+  YAML_LIBS = lib.optionalString (libyaml == null) "-lmustache-disabled-yaml-must-not-link";
 
   meta = {
     description = "C++ implementation of Mustache templates";

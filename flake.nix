@@ -113,6 +113,24 @@
             cmakeSupport = true;
             clangTidySupport = true;
           };
+          libmustache-no-json = makePackage {
+            cmakeSupport = false;
+            nlohmann_json = null;
+          };
+          libmustache-minimal = makePackage {
+            cmakeSupport = false;
+            nlohmann_json = null;
+            libyaml = null;
+          };
+          libmustache-cmake-no-yaml = makePackage {
+            cmakeSupport = true;
+            libyaml = null;
+          };
+          libmustache-cmake-minimal = makePackage {
+            cmakeSupport = true;
+            nlohmann_json = null;
+            libyaml = null;
+          };
           libmustache-cista-benchmark = makePackage {
             cmakeSupport = true;
             cista = pkgs.cista;

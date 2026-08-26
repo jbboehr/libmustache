@@ -107,8 +107,12 @@ namespace {
 
 constexpr std::size_t maxAllocationAttempts = 4096;
 constexpr std::string_view tokenizationSource = "head\n{{#show}}\n{{name}}\n{{/show}}\n{{>card}}\n{{=<% %>=}}<%tail%>";
+#ifdef MUSTACHE_HAVE_LIBJSON
 constexpr std::string_view jsonInput = R"({"name":"Ada","enabled":true,"items":[1,{"nested":"value"},3.50]})";
+#endif
+#ifdef MUSTACHE_HAVE_LIBYAML
 constexpr std::string_view yamlInput = "name: Ada\nenabled: true\nitems:\n  - 1\n  - nested: value\n  - 3.50\n";
+#endif
 int failures = 0;
 
 void expect(bool condition, const char * message)
@@ -217,6 +221,7 @@ void testTokenizationFailureIsTransactional()
       });
 }
 
+#if defined(MUSTACHE_HAVE_LIBJSON) || defined(MUSTACHE_HAVE_LIBYAML)
 struct DataCase {
     DataCase()
     {
@@ -232,7 +237,9 @@ bool dataDestinationPreserved(const DataCase& state)
   return sentinel != nullptr && sentinel->type() == mustache::Data::TypeString &&
       sentinel->stringValue() == "preserved" && state.destination.objectItems().size() == 1;
 }
+#endif
 
+#ifdef MUSTACHE_HAVE_LIBJSON
 bool parsedDataIsComplete(const DataCase& state)
 {
   const mustache::Data * name = state.destination.find("name");
@@ -261,7 +268,9 @@ void testJSONFailureDoesNotPublishPartialData()
         expect(parsedDataIsComplete(state), "JSON parsing did not complete after the allocation-failure sweep");
       });
 }
+#endif
 
+#ifdef MUSTACHE_HAVE_LIBYAML
 void testYAMLFailureDoesNotPublishPartialData()
 {
   exerciseAllocationFailures(
@@ -284,6 +293,7 @@ void testYAMLFailureDoesNotPublishPartialData()
             "YAML parsing did not complete after the allocation-failure sweep");
       });
 }
+#endif
 
 mustache::Node makeSerializableTree()
 {
@@ -417,8 +427,12 @@ void testRenderingFailureDoesNotPublishPartialOutput()
 int main()
 {
   testTokenizationFailureIsTransactional();
+#ifdef MUSTACHE_HAVE_LIBJSON
   testJSONFailureDoesNotPublishPartialData();
+#endif
+#ifdef MUSTACHE_HAVE_LIBYAML
   testYAMLFailureDoesNotPublishPartialData();
+#endif
   testSerializationFailureDoesNotPublishPartialBytes();
   testDeserializationFailureDoesNotPublishPartialTree();
   testRenderingFailureDoesNotPublishPartialOutput();

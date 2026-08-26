@@ -101,8 +101,15 @@ int main()
   const std::string nodeTemplate = movedRoot.to_template_string("{{", "}}", templateLimits);
 
   mustache::Data::ParseLimits dataLimits;
+#ifdef MUSTACHE_HAVE_LIBJSON
   const char jsonData[] = {'"', 'c', 'o', 'm', 'p', 'i', 'l', 'e', 'd', '"'};
   const mustache::Data scalar = mustache::Data::fromJSON(std::string_view(jsonData, sizeof(jsonData)), dataLimits);
+#elif defined(MUSTACHE_HAVE_LIBYAML)
+  const mustache::Data scalar = mustache::Data::fromYAML("compiled", dataLimits);
+#else
+  static_cast<void>(dataLimits);
+  const mustache::Data scalar = mustache::Data::string("compiled");
+#endif
   mustache::CompiledTemplate compiled = mustache::compile("[{{>value}}]");
   mustache::PartialMap partials;
   partials.emplace("value", mustache::compile("{{.}}"));

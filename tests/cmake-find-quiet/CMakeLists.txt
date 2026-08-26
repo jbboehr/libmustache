@@ -11,7 +11,12 @@ endif()
 
 find_package(mustache QUIET CONFIG COMPONENTS static)
 
-if(mustache_FOUND)
+if(MUSTACHE_EXPECT_STATIC_WITHOUT_DEPENDENCIES)
+    if(NOT mustache_FOUND OR NOT TARGET mustache::mustache_static)
+        message(FATAL_ERROR
+            "The dependency-free static component was not found")
+    endif()
+elseif(mustache_FOUND)
     message(FATAL_ERROR
         "The static component was found without its required dependencies")
 endif()

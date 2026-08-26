@@ -132,7 +132,12 @@ class Data {
     */
     MUSTACHE_API const Data * find(const std::string& key) const noexcept;
 
-    //! Parse into a value. The pointer-returning forms remain for compatibility.
+    /*! Parse into a value. The pointer-returning forms remain for compatibility.
+
+        JSON and YAML support are optional build features. An entry point whose
+        adapter was not built throws Exception; MUSTACHE_HAVE_LIBJSON and
+        MUSTACHE_HAVE_LIBYAML in mustache_config.h advertise availability.
+    */
     static MUSTACHE_API Data fromJSON(const char * string);
     static MUSTACHE_API Data fromJSON(const char * string, const ParseLimits& limits);
     static MUSTACHE_API Data fromJSON(std::string_view string);

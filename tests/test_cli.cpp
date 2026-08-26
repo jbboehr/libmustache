@@ -106,6 +106,7 @@ void writeFile(const std::string& path, const std::string& contents)
   }
 }
 
+#ifdef MUSTACHE_HAVE_LIBJSON
 std::string readFile(const std::string& path)
 {
   std::ifstream input(path, std::ios::in | std::ios::binary);
@@ -116,6 +117,7 @@ std::string readFile(const std::string& path)
   }
   return contents.str();
 }
+#endif
 
 struct Invocation {
     int result;
@@ -170,6 +172,20 @@ void testHelpAndVersion()
   expect(help.output.find("Usage: mustachec -t <template> [-d <data>] [options]") != std::string::npos,
       "help omitted the render-only usage");
   expect(help.output.find("Compile") == std::string::npos, "help still advertised an unsupported compile mode");
+#if defined(MUSTACHE_HAVE_LIBJSON) && defined(MUSTACHE_HAVE_LIBYAML)
+  expect(help.output.find("using JSON or YAML data") != std::string::npos,
+      "help omitted the enabled JSON and YAML adapters");
+#elif defined(MUSTACHE_HAVE_LIBJSON)
+  expect(help.output.find("using JSON data") != std::string::npos && help.output.find("YAML data") == std::string::npos,
+      "help did not describe the JSON-only feature set");
+#elif defined(MUSTACHE_HAVE_LIBYAML)
+  expect(help.output.find("using YAML data") != std::string::npos && help.output.find("JSON data") == std::string::npos,
+      "help did not describe the YAML-only feature set");
+#else
+  expect(help.output.find("without external data") != std::string::npos &&
+          help.output.find("JSON or YAML data") == std::string::npos,
+      "help did not describe the dependency-free feature set");
+#endif
   expect(help.error.empty(), "help produced a diagnostic");
 
   const Invocation version = invoke({"-v"});
@@ -215,6 +231,7 @@ void testHelpAndVersion()
 
 void testSuccessfulRendering(TestDirectory& directory)
 {
+#ifdef MUSTACHE_HAVE_LIBJSON
   const std::string templatePath = directory.path("success.mustache");
   const std::string dataPath = directory.path("success.json");
   const std::string partialPath = directory.path("tail.mustache");
@@ -231,6 +248,7 @@ void testSuccessfulRendering(TestDirectory& directory)
       invoke({"-t" + templatePath, "-d" + dataPath, "-ltail=" + partialPath, "-n2", "-o" + outputPath});
   expectSuccess(fileOutput, std::string(), "render to an output file");
   expect(readFile(outputPath) == "Hello World (World)", "output file was not truncated to the final repeated render");
+#endif
 
   const std::string staticTemplate = directory.path("static.mustache");
   writeFile(staticTemplate, "static");
@@ -243,16 +261,21 @@ void testSuccessfulRendering(TestDirectory& directory)
   expect(
       deprecated.error.find("-r is deprecated and ignored") != std::string::npos, "deprecated -r omitted its warning");
 
+#ifdef MUSTACHE_HAVE_LIBYAML
   const std::string yamlTemplate = directory.path("yaml.mustache");
   const std::string yamlData = directory.path("data.yaml");
   writeFile(yamlTemplate, "{{value}}");
   writeFile(yamlData, "value: yaml\n");
   expectSuccess(
       invoke({"--template=" + yamlTemplate, "--data=" + yamlData}), "yaml", "YAML render through long options");
+#endif
 
+#ifdef MUSTACHE_HAVE_LIBJSON
+  const std::string valueTemplate = directory.path("json-value.mustache");
+  writeFile(valueTemplate, "{{value}}");
   const std::string uppercaseData = directory.path("uppercase.JSON");
   writeFile(uppercaseData, "{\"value\":\"uppercase\"}");
-  expectSuccess(invoke({"-t", yamlTemplate, "-d", uppercaseData}), "uppercase", "case-insensitive data extension");
+  expectSuccess(invoke({"-t", valueTemplate, "-d", uppercaseData}), "uppercase", "case-insensitive data extension");
 
   const std::string emptyTemplate = directory.path("empty.mustache");
   writeFile(emptyTemplate, std::string());
@@ -273,6 +296,7 @@ void testSuccessfulRendering(TestDirectory& directory)
   expectSuccess(invoke({"-t", binaryTemplate, "-d", dataPath, "-o", binaryOutput}), std::string(),
       "binary render to an output file");
   expect(readFile(binaryOutput) == binaryExpected, "output file did not preserve the embedded NUL");
+#endif
 
   FlushRejectingStreamBuffer flushBuffer;
   std::ostream flushFailedOutput(&flushBuffer);
@@ -311,13 +335,28 @@ void testArgumentFailures(const std::string& templatePath, const std::string& da
 void testFileAndParseFailures(TestDirectory& directory, const std::string& validTemplate, const std::string& validData)
 {
   const std::string missingTemplate = directory.path("missing.mustache");
-  const std::string missingData = directory.path("missing.json");
   const std::string missingPartial = directory.path("missing-partial.mustache");
   expectFailure(invoke({"-t", missingTemplate, "-d", validData}), "Cannot open template file", "missing template file");
+#ifdef MUSTACHE_HAVE_LIBJSON
+  const std::string missingData = directory.path("missing.json");
   expectFailure(invoke({"-t", validTemplate, "-d", missingData}), "Cannot open data file", "missing data file");
+#elif defined(MUSTACHE_HAVE_LIBYAML)
+  const std::string missingData = directory.path("missing.yaml");
+  expectFailure(invoke({"-t", validTemplate, "-d", missingData}), "Cannot open data file", "missing data file");
+#endif
   expectFailure(invoke({"-t", validTemplate, "-d", validData, "-l", "missing=" + missingPartial}),
       "Cannot open partial 'missing'", "missing partial file");
 
+#ifndef MUSTACHE_HAVE_LIBJSON
+  expectFailure(invoke({"-t", validTemplate, "-d", directory.path("unavailable.json")}),
+      "JSON support was not built into this mustachec", "disabled JSON adapter");
+#endif
+#ifndef MUSTACHE_HAVE_LIBYAML
+  expectFailure(invoke({"-t", validTemplate, "-d", directory.path("unavailable.yaml")}),
+      "YAML support was not built into this mustachec", "disabled YAML adapter");
+#endif
+
+#ifdef MUSTACHE_HAVE_LIBJSON
   const std::string emptyData = directory.path("empty.json");
   writeFile(emptyData, std::string());
   expectFailure(invoke({"-t", validTemplate, "-d", emptyData}), "Data file is empty", "empty data file");
@@ -325,32 +364,51 @@ void testFileAndParseFailures(TestDirectory& directory, const std::string& valid
   const std::string invalidJson = directory.path("invalid.json");
   writeFile(invalidJson, "{]");
   expectFailure(invoke({"-t", validTemplate, "-d", invalidJson}), "Invalid JSON data", "invalid JSON data");
+#endif
 
+#ifdef MUSTACHE_HAVE_LIBYAML
   const std::string invalidYaml = directory.path("invalid.yml");
   writeFile(invalidYaml, "value: [unterminated\n");
   expectFailure(invoke({"-t", validTemplate, "-d", invalidYaml}), "yaml", "invalid YAML data");
+#endif
 
   const std::string unknownData = directory.path("data.txt");
   writeFile(unknownData, "{}");
   expectFailure(invoke({"-t", validTemplate, "-d", unknownData}), "Unsupported data file type",
       "unsupported data file extension");
 
-  expectFailure(invoke({"-t", validTemplate, "-d", validData, "-o", directory.root()}), "Cannot open output file",
-      "unwritable output path");
+#if defined(MUSTACHE_HAVE_LIBJSON) || defined(MUSTACHE_HAVE_LIBYAML)
+  const Invocation unwritableOutput = invoke({"-t", validTemplate, "-d", validData, "-o", directory.root()});
+#else
+  const Invocation unwritableOutput = invoke({"-t", validTemplate, "-o", directory.root()});
+#endif
+  expectFailure(unwritableOutput, "Cannot open output file", "unwritable output path");
 }
 
 void testCompileAndRenderFailures(TestDirectory& directory, const std::string& validData)
 {
+#if !defined(MUSTACHE_HAVE_LIBJSON) && !defined(MUSTACHE_HAVE_LIBYAML)
+  static_cast<void>(validData);
+#endif
   const std::string invalidTemplate = directory.path("invalid.mustache");
   writeFile(invalidTemplate, "{{#open}}");
+#if defined(MUSTACHE_HAVE_LIBJSON) || defined(MUSTACHE_HAVE_LIBYAML)
   expectFailure(invoke({"-t", invalidTemplate, "-d", validData}), "Unclosed section", "template tokenization failure");
+#else
+  expectFailure(invoke({"-t", invalidTemplate}), "Unclosed section", "template tokenization failure");
+#endif
 
   const std::string recursiveTemplate = directory.path("recursive.mustache");
   const std::string recursivePartial = directory.path("recursive-partial.mustache");
   writeFile(recursiveTemplate, "{{>loop}}");
   writeFile(recursivePartial, "{{>loop}}");
+#if defined(MUSTACHE_HAVE_LIBJSON) || defined(MUSTACHE_HAVE_LIBYAML)
   expectFailure(invoke({"-t", recursiveTemplate, "-d", validData, "-l", "loop=" + recursivePartial}),
       "Render nesting limit exceeded", "recursive partial render failure");
+#else
+  expectFailure(invoke({"-t", recursiveTemplate, "-l", "loop=" + recursivePartial}), "Render nesting limit exceeded",
+      "recursive partial render failure");
+#endif
 }
 
 } // namespace
@@ -360,10 +418,22 @@ int main()
   try {
     TestDirectory directory;
     const std::string validTemplate = directory.path("base.mustache");
+#ifdef MUSTACHE_HAVE_LIBJSON
     const std::string validData = directory.path("base.json");
+#elif defined(MUSTACHE_HAVE_LIBYAML)
+    const std::string validData = directory.path("base.yaml");
+#else
+    const std::string validData = directory.path("base.json");
+#endif
     const std::string validPartial = directory.path("base-partial.mustache");
     writeFile(validTemplate, "{{value}}");
+#ifdef MUSTACHE_HAVE_LIBJSON
     writeFile(validData, "{\"value\":\"ok\"}");
+#elif defined(MUSTACHE_HAVE_LIBYAML)
+    writeFile(validData, "value: ok\n");
+#else
+    writeFile(validData, "{\"value\":\"unused\"}");
+#endif
     writeFile(validPartial, "partial");
 
     testHelpAndVersion();

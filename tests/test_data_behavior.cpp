@@ -106,6 +106,7 @@ void checkRejectionMessage(const char * label, const mustache::Exception& except
   }
 }
 
+#ifdef MUSTACHE_HAVE_LIBJSON
 void expectJSONRejected(const char * label, const char * input, const char * expectedMessage = NULL)
 {
   bool rejected = false;
@@ -136,7 +137,9 @@ void expectJSONRejected(const char * label, std::string_view input, const mustac
     ++failures;
   }
 }
+#endif
 
+#ifdef MUSTACHE_HAVE_LIBYAML
 void expectYAMLRejected(const char * label, std::string_view input,
     const mustache::Data::ParseLimits& limits = mustache::Data::ParseLimits(), const char * expectedMessage = NULL)
 {
@@ -152,7 +155,9 @@ void expectYAMLRejected(const char * label, std::string_view input,
     ++failures;
   }
 }
+#endif
 
+#if defined(MUSTACHE_HAVE_LIBJSON) || defined(MUSTACHE_HAVE_LIBYAML)
 mustache::Data::ParseLimits exactParseLimits(std::size_t inputBytes)
 {
   mustache::Data::ParseLimits limits;
@@ -163,7 +168,9 @@ mustache::Data::ParseLimits exactParseLimits(std::size_t inputBytes)
   limits.maxContainerEntries = 1;
   return limits;
 }
+#endif
 
+#ifdef MUSTACHE_HAVE_LIBJSON
 std::string nestedJSONArray(std::size_t arrays)
 {
   std::string input(arrays, '[');
@@ -171,6 +178,7 @@ std::string nestedJSONArray(std::size_t arrays)
   input.append(arrays, ']');
   return input;
 }
+#endif
 
 template <typename Callable> void expectDataException(const char * message, Callable&& callable)
 {
@@ -254,6 +262,7 @@ void testDirectData()
   });
 }
 
+#ifdef MUSTACHE_HAVE_LIBJSON
 void testJSONData()
 {
   const char json[] = "{"
@@ -329,7 +338,9 @@ void testJSONData()
   const std::string byteOrderMark("\xef\xbb\xbf{}", 5);
   expectJSONRejected("JSON byte-order mark", byteOrderMark, mustache::Data::ParseLimits(), "Invalid JSON data");
 }
+#endif
 
+#ifdef MUSTACHE_HAVE_LIBYAML
 void testYAMLData()
 {
   const char yaml[] = "nullValue: null\n"
@@ -355,6 +366,7 @@ void testYAMLData()
   expectEqual("YAML string", renderScalar(data.get(), "stringValue"), "false|Y|");
   expectEqual("YAML empty string", renderScalar(data.get(), "emptyValue"), "||N");
 }
+#endif
 
 void testParseLimits()
 {
@@ -365,189 +377,218 @@ void testParseLimits()
   expect(defaults.maxStringBytes == 64 * 1024 * 1024, "default data string-byte limit changed");
   expect(defaults.maxContainerEntries == 100000, "default data container-entry limit changed");
 
-  const std::string json = "{\"key\":\"value\"}";
-  mustache::Data::ParseLimits limits = exactParseLimits(json.size());
-  mustache::Data parsedJSON = mustache::Data::fromJSON(std::string_view(json), limits);
-  expect(parsedJSON.find("key") != NULL && parsedJSON.find("key")->stringValue() == "value",
-      "exact JSON parse limits rejected valid input");
+#ifdef MUSTACHE_HAVE_LIBJSON
+  {
+    const std::string json = "{\"key\":\"value\"}";
+    mustache::Data::ParseLimits limits = exactParseLimits(json.size());
+    mustache::Data parsedJSON = mustache::Data::fromJSON(std::string_view(json), limits);
+    expect(parsedJSON.find("key") != NULL && parsedJSON.find("key")->stringValue() == "value",
+        "exact JSON parse limits rejected valid input");
 
-  mustache::Data charJSON = mustache::Data::fromJSON(json.c_str(), exactParseLimits(json.size()));
-  std::unique_ptr<mustache::Data> pointerJSON(
-      mustache::Data::createFromJSON(json.c_str(), exactParseLimits(json.size())));
-  expect(charJSON.find("key") != NULL && pointerJSON->find("key") != NULL,
-      "limit-aware JSON compatibility overloads lost object data");
-  const char boundedJSON[] = {'{', '"', 'k', '"', ':', '1', '}', 'x'};
-  mustache::Data viewJSON = mustache::Data::fromJSON(std::string_view(boundedJSON, 7));
-  expect(viewJSON.find("k") != NULL && viewJSON.find("k")->integerValue() == 1,
-      "default-limit JSON string-view overload read beyond its bound");
+    mustache::Data charJSON = mustache::Data::fromJSON(json.c_str(), exactParseLimits(json.size()));
+    std::unique_ptr<mustache::Data> pointerJSON(
+        mustache::Data::createFromJSON(json.c_str(), exactParseLimits(json.size())));
+    expect(charJSON.find("key") != NULL && pointerJSON->find("key") != NULL,
+        "limit-aware JSON compatibility overloads lost object data");
+    const char boundedJSON[] = {'{', '"', 'k', '"', ':', '1', '}', 'x'};
+    mustache::Data viewJSON = mustache::Data::fromJSON(std::string_view(boundedJSON, 7));
+    expect(viewJSON.find("k") != NULL && viewJSON.find("k")->integerValue() == 1,
+        "default-limit JSON string-view overload read beyond its bound");
 
-  expectDataExceptionMessage("null limit-aware JSON input", "Missing JSON data", [&defaults]() {
-    static_cast<void>(mustache::Data::fromJSON(NULL, defaults));
+    expectDataExceptionMessage("null limit-aware JSON input", "Missing JSON data", [&defaults]() {
+      static_cast<void>(mustache::Data::fromJSON(NULL, defaults));
+    });
+    expectDataExceptionMessage("null limit-aware JSON factory input", "Missing JSON data", [&defaults]() {
+      std::unique_ptr<mustache::Data> value(mustache::Data::createFromJSON(NULL, defaults));
+    });
+
+    limits = exactParseLimits(json.size());
+    limits.maxInputBytes = json.size() - 1;
+    expectJSONRejected("JSON input-byte limit", json, limits, "JSON input byte limit exceeded");
+    limits = defaults;
+    limits.maxInputBytes = 0;
+    expectJSONRejected("zero JSON input-byte limit", "null", limits, "JSON input byte limit exceeded");
+    limits = exactParseLimits(json.size());
+    limits.maxNestingDepth = 1;
+    expectJSONRejected("JSON nesting limit", json, limits, "JSON nesting limit exceeded");
+    limits = exactParseLimits(json.size());
+    limits.maxNodes = 1;
+    expectJSONRejected("JSON node-count limit", json, limits, "JSON node count limit exceeded");
+    limits = exactParseLimits(json.size());
+    limits.maxStringBytes = 7;
+    expectJSONRejected("JSON string-byte limit", json, limits, "JSON string byte limit exceeded");
+    limits = exactParseLimits(json.size());
+    limits.maxContainerEntries = 0;
+    expectJSONRejected("JSON container-entry limit", json, limits, "JSON container entry limit exceeded");
+
+    limits = defaults;
+    limits.maxNodes = 0;
+    expectJSONRejected("zero JSON node-count limit", "null", limits, "JSON node count limit exceeded");
+
+    mustache::Data defaultDepthJSON = mustache::Data::fromJSON(nestedJSONArray(31));
+    expect(
+        defaultDepthJSON.type() == mustache::Data::TypeArray, "default JSON nesting limit rejected its exact boundary");
+    expectJSONRejected("default JSON nesting boundary", nestedJSONArray(32), defaults, "JSON nesting limit exceeded");
+
+    const std::string maximumDepthJSON = nestedJSONArray(255);
+    limits = defaults;
+    limits.maxNestingDepth = 1000;
+    limits.maxNodes = 1000;
+    limits.maxContainerEntries = 1000;
+    mustache::Data maximumDepthData = mustache::Data::fromJSON(maximumDepthJSON, limits);
+    expect(maximumDepthData.type() == mustache::Data::TypeArray,
+        "JSON implementation nesting ceiling rejected its exact limit");
+    expectJSONRejected(
+        "JSON implementation nesting ceiling", nestedJSONArray(256), limits, "JSON nesting limit exceeded");
+
+    const std::string escapedNulKeys = "{\"\\u0000AAAA\":0,\"a\\u0000b\":1}";
+    limits = defaults;
+    limits.maxStringBytes = 8;
+    mustache::Data nulKeys = mustache::Data::fromJSON(escapedNulKeys, limits);
+    const std::string leadingNulKey("\0AAAA", 5);
+    const std::string embeddedNulKey("a\0b", 3);
+    expect(nulKeys.objectItems().size() == 2 && nulKeys.find(leadingNulKey) != NULL &&
+            nulKeys.find(leadingNulKey)->integerValue() == 0 && nulKeys.find(embeddedNulKey) != NULL &&
+            nulKeys.find(embeddedNulKey)->integerValue() == 1,
+        "JSON escaped-NUL object keys were not preserved by length");
+    limits.maxStringBytes = 7;
+    expectJSONRejected(
+        "JSON NUL keys use the decoded string budget", escapedNulKeys, limits, "JSON string byte limit exceeded");
+    limits = defaults;
+    limits.maxStringBytes = 0;
+    expectJSONRejected(
+        "JSON NUL key obeys a zero string budget", "{\"\\u0000AAAA\":0}", limits, "JSON string byte limit exceeded");
+
+    const std::string escapedNulValue = "{\"key\":\"a\\u0000b\"}";
+    limits = exactParseLimits(escapedNulValue.size());
+    limits.maxStringBytes = 6;
+    mustache::Data nulValue = mustache::Data::fromJSON(escapedNulValue, limits);
+    const mustache::Data * nulString = nulValue.find("key");
+    expect(nulString != NULL && nulString->stringValue().size() == 3 && nulString->stringValue()[0] == 'a' &&
+            nulString->stringValue()[1] == '\0' && nulString->stringValue()[2] == 'b',
+        "JSON escaped NUL string value was not preserved by length");
+
+    const std::string escapedUnicode = "{\"\\u20ac\":\"\\ud83d\\ude00\"}";
+    limits = exactParseLimits(escapedUnicode.size());
+    limits.maxStringBytes = 7;
+    mustache::Data unicodeData = mustache::Data::fromJSON(escapedUnicode, limits);
+    expect(unicodeData.objectItems().size() == 1, "decoded JSON Unicode byte budget rejected its exact boundary");
+    limits.maxStringBytes = 6;
+    expectJSONRejected(
+        "decoded JSON Unicode string-byte limit", escapedUnicode, limits, "JSON string byte limit exceeded");
+
+    const std::string jsonWithNull("{\"key\":1}\0{}", 12);
+    expectJSONRejected("length-aware JSON embedded NUL", jsonWithNull, defaults, "JSON input contains NUL byte");
+  }
+#endif
+
+#ifdef MUSTACHE_HAVE_LIBYAML
+  {
+    const std::string yaml = "key: value\n";
+    mustache::Data::ParseLimits limits = exactParseLimits(yaml.size());
+    mustache::Data parsedYAML = mustache::Data::fromYAML(std::string_view(yaml), limits);
+    expect(parsedYAML.find("key") != NULL && parsedYAML.find("key")->stringValue() == "value",
+        "exact YAML parse limits rejected valid input");
+
+    mustache::Data charYAML = mustache::Data::fromYAML(yaml.c_str(), exactParseLimits(yaml.size()));
+    std::unique_ptr<mustache::Data> pointerYAML(
+        mustache::Data::createFromYAML(yaml.c_str(), exactParseLimits(yaml.size())));
+    expect(charYAML.find("key") != NULL && pointerYAML->find("key") != NULL,
+        "limit-aware YAML compatibility overloads lost object data");
+    const char boundedYAML[] = {'k', ':', ' ', 'v', '\n', 'x'};
+    mustache::Data viewYAML = mustache::Data::fromYAML(std::string_view(boundedYAML, 5));
+    expect(viewYAML.find("k") != NULL && viewYAML.find("k")->stringValue() == "v",
+        "default-limit YAML string-view overload read beyond its bound");
+
+    expectDataExceptionMessage("null limit-aware YAML input", "Missing YAML data", [&defaults]() {
+      static_cast<void>(mustache::Data::fromYAML(NULL, defaults));
+    });
+    expectDataExceptionMessage("null limit-aware YAML factory input", "Missing YAML data", [&defaults]() {
+      std::unique_ptr<mustache::Data> value(mustache::Data::createFromYAML(NULL, defaults));
+    });
+
+    limits = exactParseLimits(yaml.size());
+    limits.maxInputBytes = yaml.size() - 1;
+    expectYAMLRejected("YAML input-byte limit", yaml, limits, "YAML input byte limit exceeded");
+    limits = defaults;
+    limits.maxInputBytes = 0;
+    expectYAMLRejected("zero YAML input-byte limit", "null", limits, "YAML input byte limit exceeded");
+    limits = exactParseLimits(yaml.size());
+    limits.maxNestingDepth = 1;
+    expectYAMLRejected("YAML nesting limit", yaml, limits, "YAML nesting limit exceeded");
+    limits = exactParseLimits(yaml.size());
+    limits.maxNodes = 1;
+    expectYAMLRejected("YAML node-count limit", yaml, limits, "YAML node count limit exceeded");
+    limits = exactParseLimits(yaml.size());
+    limits.maxStringBytes = 7;
+    expectYAMLRejected("YAML string-byte limit", yaml, limits, "YAML string byte limit exceeded");
+    limits = exactParseLimits(yaml.size());
+    limits.maxContainerEntries = 0;
+    expectYAMLRejected("YAML container-entry limit", yaml, limits, "YAML container entry limit exceeded");
+    limits = defaults;
+    limits.maxNodes = 0;
+    expectYAMLRejected("zero YAML node-count limit", "null", limits, "YAML node count limit exceeded");
+
+    const std::string yamlWithNull("key: value\0next: value\n", 23);
+    expectYAMLRejected("length-aware YAML embedded NUL", yamlWithNull, defaults, "YAML input contains NUL byte");
+    expectYAMLRejected("multiple YAML documents", "---\nfirst: value\n---\nsecond: value\n", defaults,
+        "Multiple YAML documents are not supported");
+    expectYAMLRejected(
+        "trailing empty YAML document", "key: value\n---\n", defaults, "Multiple YAML documents are not supported");
+    expectYAMLRejected(
+        "malformed trailing YAML content", "key: value\n...\n[unclosed\n", defaults, "Invalid trailing YAML content");
+
+    mustache::Data endedYAML = mustache::Data::fromYAML("key: value\n...\n");
+    // YAML 1.1 keeps this directive characterization compatible with libyaml
+    // 0.2.2, which remains part of the supported Ubuntu 22.04 build matrix.
+    mustache::Data directedYAML = mustache::Data::fromYAML("%YAML 1.1\n---\nkey: value\n...\n");
+    expect(endedYAML.find("key") != NULL && directedYAML.find("key") != NULL,
+        "valid YAML document markers or directives were rejected");
+
+    const std::string deepYAML = std::string(1000, '[') + std::string(1000, ']');
+    expectYAMLRejected("YAML preflight nesting limit", deepYAML, defaults, "YAML nesting limit exceeded");
+
+    expectYAMLRejected("recursive YAML mapping alias", "root: &root\n  self: *root\n");
+    expectYAMLRejected("recursive YAML sequence alias", "&loop [*loop]\n");
+
+    const std::string aliases = "base: &base [one, two]\n"
+                                "copy: *base\n";
+    mustache::Data aliasData = mustache::Data::fromYAML(aliases);
+    expect(aliasData.find("base") != NULL && aliasData.find("copy") != NULL &&
+            aliasData.find("base")->arrayItems().size() == 2 && aliasData.find("copy")->arrayItems().size() == 2,
+        "non-recursive YAML aliases were not expanded");
+
+    limits = defaults;
+    limits.maxNodes = 6;
+    expectYAMLRejected("YAML alias node amplification", aliases, limits);
+    limits = defaults;
+    limits.maxContainerEntries = 5;
+    expectYAMLRejected("YAML alias container amplification", aliases, limits);
+    limits = defaults;
+    limits.maxStringBytes = 19;
+    expectYAMLRejected("YAML alias string amplification", aliases, limits);
+  }
+#endif
+}
+
+void testUnavailableParsers()
+{
+#ifndef MUSTACHE_HAVE_LIBJSON
+  expectDataExceptionMessage("disabled JSON parser", "JSON support is not available", []() {
+    static_cast<void>(mustache::Data::fromJSON("{}"));
   });
-  expectDataExceptionMessage("null limit-aware JSON factory input", "Missing JSON data", [&defaults]() {
-    std::unique_ptr<mustache::Data> value(mustache::Data::createFromJSON(NULL, defaults));
+  expectDataExceptionMessage("disabled JSON parser factory", "JSON support is not available", []() {
+    std::unique_ptr<mustache::Data> value(mustache::Data::createFromJSON("{}"));
   });
-
-  limits = exactParseLimits(json.size());
-  limits.maxInputBytes = json.size() - 1;
-  expectJSONRejected("JSON input-byte limit", json, limits, "JSON input byte limit exceeded");
-  limits = defaults;
-  limits.maxInputBytes = 0;
-  expectJSONRejected("zero JSON input-byte limit", "null", limits, "JSON input byte limit exceeded");
-  limits = exactParseLimits(json.size());
-  limits.maxNestingDepth = 1;
-  expectJSONRejected("JSON nesting limit", json, limits, "JSON nesting limit exceeded");
-  limits = exactParseLimits(json.size());
-  limits.maxNodes = 1;
-  expectJSONRejected("JSON node-count limit", json, limits, "JSON node count limit exceeded");
-  limits = exactParseLimits(json.size());
-  limits.maxStringBytes = 7;
-  expectJSONRejected("JSON string-byte limit", json, limits, "JSON string byte limit exceeded");
-  limits = exactParseLimits(json.size());
-  limits.maxContainerEntries = 0;
-  expectJSONRejected("JSON container-entry limit", json, limits, "JSON container entry limit exceeded");
-
-  limits = defaults;
-  limits.maxNodes = 0;
-  expectJSONRejected("zero JSON node-count limit", "null", limits, "JSON node count limit exceeded");
-
-  mustache::Data defaultDepthJSON = mustache::Data::fromJSON(nestedJSONArray(31));
-  expect(
-      defaultDepthJSON.type() == mustache::Data::TypeArray, "default JSON nesting limit rejected its exact boundary");
-  expectJSONRejected("default JSON nesting boundary", nestedJSONArray(32), defaults, "JSON nesting limit exceeded");
-
-  const std::string maximumDepthJSON = nestedJSONArray(255);
-  limits = defaults;
-  limits.maxNestingDepth = 1000;
-  limits.maxNodes = 1000;
-  limits.maxContainerEntries = 1000;
-  mustache::Data maximumDepthData = mustache::Data::fromJSON(maximumDepthJSON, limits);
-  expect(maximumDepthData.type() == mustache::Data::TypeArray,
-      "JSON implementation nesting ceiling rejected its exact limit");
-  expectJSONRejected(
-      "JSON implementation nesting ceiling", nestedJSONArray(256), limits, "JSON nesting limit exceeded");
-
-  const std::string escapedNulKeys = "{\"\\u0000AAAA\":0,\"a\\u0000b\":1}";
-  limits = defaults;
-  limits.maxStringBytes = 8;
-  mustache::Data nulKeys = mustache::Data::fromJSON(escapedNulKeys, limits);
-  const std::string leadingNulKey("\0AAAA", 5);
-  const std::string embeddedNulKey("a\0b", 3);
-  expect(nulKeys.objectItems().size() == 2 && nulKeys.find(leadingNulKey) != NULL &&
-          nulKeys.find(leadingNulKey)->integerValue() == 0 && nulKeys.find(embeddedNulKey) != NULL &&
-          nulKeys.find(embeddedNulKey)->integerValue() == 1,
-      "JSON escaped-NUL object keys were not preserved by length");
-  limits.maxStringBytes = 7;
-  expectJSONRejected(
-      "JSON NUL keys use the decoded string budget", escapedNulKeys, limits, "JSON string byte limit exceeded");
-  limits = defaults;
-  limits.maxStringBytes = 0;
-  expectJSONRejected(
-      "JSON NUL key obeys a zero string budget", "{\"\\u0000AAAA\":0}", limits, "JSON string byte limit exceeded");
-
-  const std::string escapedNulValue = "{\"key\":\"a\\u0000b\"}";
-  limits = exactParseLimits(escapedNulValue.size());
-  limits.maxStringBytes = 6;
-  mustache::Data nulValue = mustache::Data::fromJSON(escapedNulValue, limits);
-  const mustache::Data * nulString = nulValue.find("key");
-  expect(nulString != NULL && nulString->stringValue().size() == 3 && nulString->stringValue()[0] == 'a' &&
-          nulString->stringValue()[1] == '\0' && nulString->stringValue()[2] == 'b',
-      "JSON escaped NUL string value was not preserved by length");
-
-  const std::string escapedUnicode = "{\"\\u20ac\":\"\\ud83d\\ude00\"}";
-  limits = exactParseLimits(escapedUnicode.size());
-  limits.maxStringBytes = 7;
-  mustache::Data unicodeData = mustache::Data::fromJSON(escapedUnicode, limits);
-  expect(unicodeData.objectItems().size() == 1, "decoded JSON Unicode byte budget rejected its exact boundary");
-  limits.maxStringBytes = 6;
-  expectJSONRejected(
-      "decoded JSON Unicode string-byte limit", escapedUnicode, limits, "JSON string byte limit exceeded");
-
-  const std::string yaml = "key: value\n";
-  limits = exactParseLimits(yaml.size());
-  mustache::Data parsedYAML = mustache::Data::fromYAML(std::string_view(yaml), limits);
-  expect(parsedYAML.find("key") != NULL && parsedYAML.find("key")->stringValue() == "value",
-      "exact YAML parse limits rejected valid input");
-
-  mustache::Data charYAML = mustache::Data::fromYAML(yaml.c_str(), exactParseLimits(yaml.size()));
-  std::unique_ptr<mustache::Data> pointerYAML(
-      mustache::Data::createFromYAML(yaml.c_str(), exactParseLimits(yaml.size())));
-  expect(charYAML.find("key") != NULL && pointerYAML->find("key") != NULL,
-      "limit-aware YAML compatibility overloads lost object data");
-  const char boundedYAML[] = {'k', ':', ' ', 'v', '\n', 'x'};
-  mustache::Data viewYAML = mustache::Data::fromYAML(std::string_view(boundedYAML, 5));
-  expect(viewYAML.find("k") != NULL && viewYAML.find("k")->stringValue() == "v",
-      "default-limit YAML string-view overload read beyond its bound");
-
-  expectDataExceptionMessage("null limit-aware YAML input", "Missing YAML data", [&defaults]() {
-    static_cast<void>(mustache::Data::fromYAML(NULL, defaults));
+#endif
+#ifndef MUSTACHE_HAVE_LIBYAML
+  expectDataExceptionMessage("disabled YAML parser", "YAML support is not available", []() {
+    static_cast<void>(mustache::Data::fromYAML("key: value\n"));
   });
-  expectDataExceptionMessage("null limit-aware YAML factory input", "Missing YAML data", [&defaults]() {
-    std::unique_ptr<mustache::Data> value(mustache::Data::createFromYAML(NULL, defaults));
+  expectDataExceptionMessage("disabled YAML parser factory", "YAML support is not available", []() {
+    std::unique_ptr<mustache::Data> value(mustache::Data::createFromYAML("key: value\n"));
   });
-
-  limits = exactParseLimits(yaml.size());
-  limits.maxInputBytes = yaml.size() - 1;
-  expectYAMLRejected("YAML input-byte limit", yaml, limits, "YAML input byte limit exceeded");
-  limits = defaults;
-  limits.maxInputBytes = 0;
-  expectYAMLRejected("zero YAML input-byte limit", "null", limits, "YAML input byte limit exceeded");
-  limits = exactParseLimits(yaml.size());
-  limits.maxNestingDepth = 1;
-  expectYAMLRejected("YAML nesting limit", yaml, limits, "YAML nesting limit exceeded");
-  limits = exactParseLimits(yaml.size());
-  limits.maxNodes = 1;
-  expectYAMLRejected("YAML node-count limit", yaml, limits, "YAML node count limit exceeded");
-  limits = exactParseLimits(yaml.size());
-  limits.maxStringBytes = 7;
-  expectYAMLRejected("YAML string-byte limit", yaml, limits, "YAML string byte limit exceeded");
-  limits = exactParseLimits(yaml.size());
-  limits.maxContainerEntries = 0;
-  expectYAMLRejected("YAML container-entry limit", yaml, limits, "YAML container entry limit exceeded");
-  limits = defaults;
-  limits.maxNodes = 0;
-  expectYAMLRejected("zero YAML node-count limit", "null", limits, "YAML node count limit exceeded");
-
-  const std::string jsonWithNull("{\"key\":1}\0{}", 12);
-  expectJSONRejected("length-aware JSON embedded NUL", jsonWithNull, defaults, "JSON input contains NUL byte");
-  const std::string yamlWithNull("key: value\0next: value\n", 23);
-  expectYAMLRejected("length-aware YAML embedded NUL", yamlWithNull, defaults, "YAML input contains NUL byte");
-  expectYAMLRejected("multiple YAML documents", "---\nfirst: value\n---\nsecond: value\n", defaults,
-      "Multiple YAML documents are not supported");
-  expectYAMLRejected(
-      "trailing empty YAML document", "key: value\n---\n", defaults, "Multiple YAML documents are not supported");
-  expectYAMLRejected(
-      "malformed trailing YAML content", "key: value\n...\n[unclosed\n", defaults, "Invalid trailing YAML content");
-
-  mustache::Data endedYAML = mustache::Data::fromYAML("key: value\n...\n");
-  // YAML 1.1 keeps this directive characterization compatible with libyaml
-  // 0.2.2, which remains part of the supported Ubuntu 22.04 build matrix.
-  mustache::Data directedYAML = mustache::Data::fromYAML("%YAML 1.1\n---\nkey: value\n...\n");
-  expect(endedYAML.find("key") != NULL && directedYAML.find("key") != NULL,
-      "valid YAML document markers or directives were rejected");
-
-  const std::string deepYAML = std::string(1000, '[') + std::string(1000, ']');
-  expectYAMLRejected("YAML preflight nesting limit", deepYAML, defaults, "YAML nesting limit exceeded");
-
-  expectYAMLRejected("recursive YAML mapping alias", "root: &root\n  self: *root\n");
-  expectYAMLRejected("recursive YAML sequence alias", "&loop [*loop]\n");
-
-  const std::string aliases = "base: &base [one, two]\n"
-                              "copy: *base\n";
-  mustache::Data aliasData = mustache::Data::fromYAML(aliases);
-  expect(aliasData.find("base") != NULL && aliasData.find("copy") != NULL &&
-          aliasData.find("base")->arrayItems().size() == 2 && aliasData.find("copy")->arrayItems().size() == 2,
-      "non-recursive YAML aliases were not expanded");
-
-  limits = defaults;
-  limits.maxNodes = 6;
-  expectYAMLRejected("YAML alias node amplification", aliases, limits);
-  limits = defaults;
-  limits.maxContainerEntries = 5;
-  expectYAMLRejected("YAML alias container amplification", aliases, limits);
-  limits = defaults;
-  limits.maxStringBytes = 19;
-  expectYAMLRejected("YAML alias string amplification", aliases, limits);
+#endif
 }
 
 } // namespace
@@ -555,8 +596,13 @@ void testParseLimits()
 int main()
 {
   testDirectData();
+#ifdef MUSTACHE_HAVE_LIBJSON
   testJSONData();
+#endif
+#ifdef MUSTACHE_HAVE_LIBYAML
   testYAMLData();
+#endif
   testParseLimits();
+  testUnavailableParsers();
   return failures == 0 ? 0 : 1;
 }
