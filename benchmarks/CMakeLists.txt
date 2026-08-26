@@ -9,7 +9,14 @@ if(MUSTACHE_ENABLE_CISTA_BENCHMARK)
         "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(mustache_cista_archive_experiment
         PUBLIC mustache_static
-        PRIVATE cista::cista)
+        PRIVATE cista::cista ZLIB::ZLIB xxHash::xxhash)
+    if(MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3)
+        target_include_directories(mustache_cista_archive_experiment BEFORE PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/cista-xxh3")
+        target_compile_definitions(mustache_cista_archive_experiment
+            PRIVATE CISTA_XXH3=1
+            PUBLIC MUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1)
+    endif()
     # nixpkgs' Cista 0.16 package enables optional fmt integration without
     # propagating fmt to consumers. This experiment does not use that feature;
     # undefine it locally instead of mutating the imported target globally.

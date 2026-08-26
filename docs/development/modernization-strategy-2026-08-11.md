@@ -630,7 +630,7 @@ The result controls the serialization roadmap:
 In neither case should the legacy decoder be maintained indefinitely without a
 specific compatibility commitment.
 
-**Decision updated 2026-08-24:** the
+**Decision updated 2026-08-25:** the
 [PHP cache benchmark](ast-cache-benchmark-2026-08-22.md) selected cached source
 for current cross-request persistence. Legacy AST hits won for flat templates
 but lost for nested partial graphs in warm and fresh-process cases, missed the
@@ -640,9 +640,22 @@ later checked Cista direct-view prototype removed the graph reconstruction
 penalty and cleared the native latency threshold, but used 4.35 to 4.80 times
 the source bytes and has not been measured through PHP serialization or APCu.
 Those measurements used `WITH_STATIC_VERSION`, ordinary Cista bounds checks,
-and libmustache's semantic validator, but not Cista's `DEEP_CHECK` or
-`WITH_INTEGRITY` modes. They therefore establish feasibility, not the final
-security/performance result.
+and libmustache's semantic validator. A later four-mode native benchmark found
+that `DEEP_CHECK` cost less than 1% while Cista's FNV-1a-based
+`WITH_INTEGRITY` made validation plus rendering 2.35 to 2.67 times as
+expensive. An interleaved checksum follow-up measured FNV-1a at about 1.36
+GB/s, zlib CRC-32 at about 8.9 GB/s, and XXH3-64 at about 44 GB/s. One XXH3
+pass added only 4.2% to 5.2% to the deep-checked read-and-render path.
+A final direct comparison supplied Cista with modern xxHash 0.8.3 and used
+`WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY`. Against static versioning, deep
+checking, and an external XXH3 pass, medium and large read latency was
+effectively tied; the native path's writer was 2.6% to 5.5% slower. Runtime
+versioning added a fixed 19 allocations and 781 bytes per read in Cista 0.16,
+which mattered only for the microsecond-scale small cases. A matched
+compile-and-serialize comparison subsequently placed the selected Cista writer
+16% to 33% behind the legacy writer, with an absolute cost of about 25
+microseconds to 5.1 milliseconds. That is acceptable for the intended
+write-once, render-many lifecycle.
 
 Before crossing the PHP boundary, finish the libmustache experiment behind an
 optional, default-off `MUSTACHE_ENABLE_ARCHIVED_TEMPLATES` feature. Keep Cista
@@ -650,11 +663,11 @@ private and expose a libmustache-owned `ArchivedTemplateView` beside the normal
 owned `Node`/`CompiledTemplate` path. Both representations should use one
 renderer algorithm through internal node-view adapters; callers must not first
 reconstruct a `Node` tree merely to render a checked archive. Complete lambda
-and inline-partial semantics, enable `WITH_STATIC_VERSION | WITH_INTEGRITY |
-DEEP_CHECK` (or the equivalent upstream security modes), fuzz validation and
-rendering, and rerun the native benchmark before the one-fetch/one-render
-PHP/APCu experiment. The integrity checksum detects accidental corruption; it
-does not authenticate hostile cache contents.
+and inline-partial semantics, configure Cista with the pinned modern XXH3
+implementation, require `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` plus
+libmustache semantic validation, and fuzz validation and rendering before the
+one-fetch/one-render PHP/APCu experiment. XXH3 detects accidental corruption;
+it does not authenticate hostile cache contents.
 
 If this feature proceeds, vendor a reviewed, pinned Cista snapshot and its MIT
 license as a private implementation dependency. Record its provenance and

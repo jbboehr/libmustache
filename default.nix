@@ -6,6 +6,8 @@ in
     stdenv ? pkgs.stdenv,
     clang-tools ? pkgs.llvmPackages.clang-tools,
     cista ? pkgs.cista,
+    xxhash ? pkgs.xxhash,
+    zlib ? pkgs.zlib,
     gitignoreFilterWith ?
       (import (
         fetchTarball {
@@ -28,10 +30,11 @@ in
     fuzzSupport ? false,
     clangTidySupport ? false,
     cistaBenchmarkSupport ? false,
+    cistaBuiltinXxh3Support ? false,
   }:
     pkgs.callPackage ./nix/derivation.nix {
-      inherit stdenv clang-tools cista mustache_spec libmustacheSrc;
+      inherit stdenv clang-tools cista xxhash zlib mustache_spec libmustacheSrc;
       inherit checkSupport cmakeSupport staticOnlySupport debugSupport sanitizerSupport fuzzSupport clangTidySupport;
-      inherit cistaBenchmarkSupport;
+      inherit cistaBenchmarkSupport cistaBuiltinXxh3Support;
       inherit gitignoreFilterWith;
     }

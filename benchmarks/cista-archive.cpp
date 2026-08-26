@@ -1,6 +1,11 @@
 #include "cista-archive.hpp"
 
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3) && defined(CISTA_FNV1A)
+#undef CISTA_FNV1A
+#endif
 #include <cista/serialization.h>
+#include <xxhash.h>
+#include <zlib.h>
 
 #include <algorithm>
 #include <cstddef>
@@ -22,8 +27,16 @@ namespace archive_data = cista::offset;
 
 constexpr std::uint64_t archiveMagic = UINT64_C(0x4D55535443495354);
 constexpr std::uint32_t archiveVersion = 1;
-constexpr cista::mode archiveMode =
-    cista::mode::WITH_STATIC_VERSION | cista::mode::WITH_INTEGRITY | cista::mode::DEEP_CHECK;
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+constexpr cista::mode archiveVersionMode = cista::mode::WITH_VERSION;
+#else
+constexpr cista::mode archiveVersionMode = cista::mode::WITH_STATIC_VERSION;
+#endif
+constexpr cista::mode archiveModeNeither = archiveVersionMode;
+constexpr cista::mode archiveModeDeepCheck = archiveVersionMode | cista::mode::DEEP_CHECK;
+constexpr cista::mode archiveModeIntegrity = archiveVersionMode | cista::mode::WITH_INTEGRITY;
+constexpr cista::mode archiveModeDeepCheckAndIntegrity =
+    archiveVersionMode | cista::mode::WITH_INTEGRITY | cista::mode::DEEP_CHECK;
 constexpr std::size_t renderNestingCeiling = 256;
 constexpr std::uint32_t invalidIndex = std::numeric_limits<std::uint32_t>::max();
 
@@ -804,7 +817,7 @@ class ArchiveRenderer {
     std::size_t nodeVisits_;
 };
 
-const ArchiveGraph& readArchive(std::string_view bytes, const CistaArchiveLimits& limits)
+template <cista::mode Mode> const ArchiveGraph& readArchive(std::string_view bytes, const CistaArchiveLimits& limits)
 {
   if (bytes.empty()) {
     throw mustache::Exception("Empty Cista archive");
@@ -815,7 +828,7 @@ const ArchiveGraph& readArchive(std::string_view bytes, const CistaArchiveLimits
   if (reinterpret_cast<std::uintptr_t>(bytes.data()) % alignof(ArchiveGraph) != 0) {
     throw mustache::Exception("Unaligned Cista archive buffer");
   }
-  const ArchiveGraph * graph = cista::deserialize<ArchiveGraph, archiveMode>(bytes);
+  const ArchiveGraph * graph = cista::deserialize<ArchiveGraph, Mode>(bytes);
   if (graph == nullptr) {
     throw mustache::Exception("Invalid Cista archive root");
   }
@@ -823,16 +836,15 @@ const ArchiveGraph& readArchive(std::string_view bytes, const CistaArchiveLimits
   return *graph;
 }
 
-} // namespace
-
-std::vector<std::uint8_t> serializeCistaArchive(
+template <cista::mode Mode>
+std::vector<std::uint8_t> serializeCistaArchiveWithMode(
     const mustache::Node& root, const mustache::Node::Partials& partials, const CistaArchiveLimits& archiveLimits)
 {
   ArchiveGraph graph = ArchiveBuilder().build(root, partials);
   ArchiveValidator(graph, archiveLimits).validate();
-  std::vector<std::uint8_t> bytes = cista::serialize<archiveMode>(graph);
+  std::vector<std::uint8_t> bytes = cista::serialize<Mode>(graph);
   graph.serializedSize = bytes.size();
-  bytes = cista::serialize<archiveMode>(graph);
+  bytes = cista::serialize<Mode>(graph);
   if (bytes.size() != graph.serializedSize) {
     throw mustache::Exception("Cista archive size changed while framing");
   }
@@ -842,10 +854,131 @@ std::vector<std::uint8_t> serializeCistaArchive(
   return bytes;
 }
 
+template <cista::mode Mode>
+std::string renderCistaArchiveWithMode(std::string_view bytes, const mustache::Data& data,
+    const CistaArchiveLimits& archiveLimits, const mustache::RenderLimits& renderLimits)
+{
+  return ArchiveRenderer(readArchive<Mode>(bytes, archiveLimits), data, renderLimits).render();
+}
+
+} // namespace
+
+const char * cistaSecurityModeName(CistaSecurityMode mode) noexcept
+{
+  switch (mode) {
+    case CistaSecurityMode::Neither:
+      return "neither";
+    case CistaSecurityMode::DeepCheck:
+      return "deep_check";
+    case CistaSecurityMode::Integrity:
+      return "integrity";
+    case CistaSecurityMode::DeepCheckAndIntegrity:
+      return "deep_check_integrity";
+  }
+  return "unknown";
+}
+
+const char * cistaVersionModeName() noexcept
+{
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+  return "version";
+#else
+  return "static_version";
+#endif
+}
+
+const char * cistaIntegrityAlgorithmName() noexcept
+{
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+  return "cista_xxh3_64";
+#else
+  return "cista_fnv1a_64";
+#endif
+}
+
+const char * cistaChecksumAlgorithmName(CistaChecksumAlgorithm algorithm) noexcept
+{
+  switch (algorithm) {
+    case CistaChecksumAlgorithm::None:
+      return "none";
+    case CistaChecksumAlgorithm::Fnv1a64:
+      return "fnv1a_64";
+    case CistaChecksumAlgorithm::Crc32:
+      return "crc32";
+    case CistaChecksumAlgorithm::Xxh3_64:
+      return "xxh3_64";
+  }
+  return "unknown";
+}
+
+std::uint64_t checksumCistaArchive(std::string_view bytes, CistaChecksumAlgorithm algorithm)
+{
+  const char * data = bytes.empty() ? "" : bytes.data();
+  switch (algorithm) {
+    case CistaChecksumAlgorithm::None:
+      return 0;
+    case CistaChecksumAlgorithm::Fnv1a64: {
+      std::uint64_t hash = UINT64_C(14695981039346656037);
+      for (const unsigned char byte : bytes) {
+        hash = (hash ^ byte) * UINT64_C(1099511628211);
+      }
+      return hash;
+    }
+    case CistaChecksumAlgorithm::Crc32:
+      return static_cast<std::uint32_t>(
+          crc32_z(0, reinterpret_cast<const Bytef *>(data), static_cast<z_size_t>(bytes.size())));
+    case CistaChecksumAlgorithm::Xxh3_64:
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+      return cista::XXH3_64bits(data, bytes.size());
+#else
+      return XXH3_64bits(data, bytes.size());
+#endif
+  }
+  throw mustache::Exception("Unknown Cista checksum algorithm");
+}
+
+std::vector<std::uint8_t> serializeCistaArchive(
+    const mustache::Node& root, const mustache::Node::Partials& partials, const CistaArchiveLimits& archiveLimits)
+{
+  return serializeCistaArchive(root, partials, CistaSecurityMode::DeepCheckAndIntegrity, archiveLimits);
+}
+
+std::vector<std::uint8_t> serializeCistaArchive(const mustache::Node& root, const mustache::Node::Partials& partials,
+    CistaSecurityMode mode, const CistaArchiveLimits& archiveLimits)
+{
+  switch (mode) {
+    case CistaSecurityMode::Neither:
+      return serializeCistaArchiveWithMode<archiveModeNeither>(root, partials, archiveLimits);
+    case CistaSecurityMode::DeepCheck:
+      return serializeCistaArchiveWithMode<archiveModeDeepCheck>(root, partials, archiveLimits);
+    case CistaSecurityMode::Integrity:
+      return serializeCistaArchiveWithMode<archiveModeIntegrity>(root, partials, archiveLimits);
+    case CistaSecurityMode::DeepCheckAndIntegrity:
+      return serializeCistaArchiveWithMode<archiveModeDeepCheckAndIntegrity>(root, partials, archiveLimits);
+  }
+  throw mustache::Exception("Unknown Cista security mode");
+}
+
 std::string renderCistaArchive(std::string_view bytes, const mustache::Data& data,
     const CistaArchiveLimits& archiveLimits, const mustache::RenderLimits& renderLimits)
 {
-  return ArchiveRenderer(readArchive(bytes, archiveLimits), data, renderLimits).render();
+  return renderCistaArchive(bytes, data, CistaSecurityMode::DeepCheckAndIntegrity, archiveLimits, renderLimits);
+}
+
+std::string renderCistaArchive(std::string_view bytes, const mustache::Data& data, CistaSecurityMode mode,
+    const CistaArchiveLimits& archiveLimits, const mustache::RenderLimits& renderLimits)
+{
+  switch (mode) {
+    case CistaSecurityMode::Neither:
+      return renderCistaArchiveWithMode<archiveModeNeither>(bytes, data, archiveLimits, renderLimits);
+    case CistaSecurityMode::DeepCheck:
+      return renderCistaArchiveWithMode<archiveModeDeepCheck>(bytes, data, archiveLimits, renderLimits);
+    case CistaSecurityMode::Integrity:
+      return renderCistaArchiveWithMode<archiveModeIntegrity>(bytes, data, archiveLimits, renderLimits);
+    case CistaSecurityMode::DeepCheckAndIntegrity:
+      return renderCistaArchiveWithMode<archiveModeDeepCheckAndIntegrity>(bytes, data, archiveLimits, renderLimits);
+  }
+  throw mustache::Exception("Unknown Cista security mode");
 }
 
 } // namespace mustache_benchmark

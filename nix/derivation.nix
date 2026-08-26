@@ -10,6 +10,8 @@
   cmake ? null,
   clang-tools ? null,
   cista ? null,
+  xxhash ? null,
+  zlib ? null,
   nlohmann_json,
   libyaml,
   mustache_spec,
@@ -23,6 +25,7 @@
   fuzzSupport ? false,
   clangTidySupport ? false,
   cistaBenchmarkSupport ? false,
+  cistaBuiltinXxh3Support ? false,
 }:
 stdenv.mkDerivation (finalAttrs: {
   pname =
@@ -32,7 +35,8 @@ stdenv.mkDerivation (finalAttrs: {
     + lib.optionalString sanitizerSupport "-sanitized"
     + lib.optionalString fuzzSupport "-fuzz"
     + lib.optionalString clangTidySupport "-clang-tidy"
-    + lib.optionalString cistaBenchmarkSupport "-cista-benchmark";
+    + lib.optionalString cistaBenchmarkSupport "-cista-benchmark"
+    + lib.optionalString cistaBuiltinXxh3Support "-builtin-xxh3";
   version = "0.6.0";
 
   src =
@@ -64,7 +68,9 @@ stdenv.mkDerivation (finalAttrs: {
   separateDebugInfo = debugSupport;
   dontStrip = sanitizerSupport || fuzzSupport;
 
-  buildInputs = [nlohmann_json] ++ lib.optional cistaBenchmarkSupport cista;
+  buildInputs =
+    [nlohmann_json]
+    ++ lib.optionals cistaBenchmarkSupport [cista xxhash zlib];
   propagatedBuildInputs = [libyaml];
   nativeBuildInputs =
     lib.optional checkSupport mustache_spec
@@ -92,7 +98,7 @@ stdenv.mkDerivation (finalAttrs: {
     ++ lib.optionals staticOnlySupport ["--disable-shared" "--enable-static"]
     ++ lib.optional sanitizerSupport "--enable-sanitizers";
 
-  cmakeFlags =
+  cmakeFlags = assert !cistaBuiltinXxh3Support || cistaBenchmarkSupport;
     [
       (lib.cmakeBool "MUSTACHE_ENABLE_TESTS" checkSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_HARDENING" true)
@@ -102,6 +108,7 @@ stdenv.mkDerivation (finalAttrs: {
       (lib.cmakeBool "MUSTACHE_ENABLE_FUZZING" fuzzSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_CLANG_TIDY" clangTidySupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_CISTA_BENCHMARK" cistaBenchmarkSupport)
+      (lib.cmakeBool "MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3" cistaBuiltinXxh3Support)
       "-DCMAKE_BUILD_TYPE=${
         if debugSupport || sanitizerSupport
         then "Debug"

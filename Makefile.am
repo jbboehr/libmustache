@@ -13,6 +13,7 @@ EXTRA_DIST = \
 	benchmarks/ast-cache-vs-source.php \
 	benchmarks/cista-archive.cpp \
 	benchmarks/cista-archive.hpp \
+	benchmarks/cista-xxh3/xxh3.h \
 	benchmarks/test-cista-archive.cpp \
 	benchmarks/results/ast-cache-vs-source-2026-08-23-cpp-run1.csv \
 	benchmarks/results/ast-cache-vs-source-2026-08-23-cpp-run2.csv \
@@ -23,6 +24,21 @@ EXTRA_DIST = \
 	benchmarks/results/ast-cache-vs-source-2026-08-24-cista-run1.csv \
 	benchmarks/results/ast-cache-vs-source-2026-08-24-cista-run2.csv \
 	benchmarks/results/ast-cache-vs-source-2026-08-24-cista-run3.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-cista-security-run1.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-cista-security-run2.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-cista-security-run3.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-checksums-run1.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-checksums-run2.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-checksums-run3.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-selected-static-external-run1.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-selected-static-external-run2.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-selected-static-external-run3.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-selected-version-xxh3-run1.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-selected-version-xxh3-run2.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-selected-version-xxh3-run3.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-legacy-writer-comparison-run1.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-legacy-writer-comparison-run2.csv \
+	benchmarks/results/ast-cache-vs-source-2026-08-25-legacy-writer-comparison-run3.csv \
 	docs/development/abi-6-source-migration-2026-08-20.md \
 	docs/development/ast-cache-benchmark-2026-08-22.md \
 	CMakeLists.txt \

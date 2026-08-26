@@ -1,7 +1,8 @@
 # Cached AST decoding versus source reparsing
 
-Date: 2026-08-22; measurements refreshed after review on 2026-08-23 and with
-a Cista feasibility experiment on 2026-08-24
+Date: 2026-08-22; measurements refreshed after review on 2026-08-23, with a
+Cista feasibility experiment on 2026-08-24, and with security-mode and
+checksum matrices on 2026-08-25
 
 ## Decision
 
@@ -25,9 +26,32 @@ medium and large workloads. This clears the native portion of the predeclared
 20% threshold and removes the old partial-ownership penalty. It does not yet
 clear the PHP gate: PHP serialization and APCu fetch/store have not been
 measured, the payload is 4.35 to 4.80 times source, and the prototype does not
-support lambdas or inline-partial ownership. It also used
-`WITH_STATIC_VERSION` without Cista's `DEEP_CHECK` or `WITH_INTEGRITY`, so the
-published timings are not the final production-security configuration.
+support lambdas or inline-partial ownership.
+
+A 2026-08-25 security-mode matrix measured `DEEP_CHECK` and `WITH_INTEGRITY`
+independently and together. Deep checking changed medium and large
+validate-plus-render medians by less than 1%, but Cista's integrity verification
+made that path 2.35 to 2.67 times as expensive. The nixpkgs Cista build selects
+scalar FNV-1a, so this is not a general checksum cost. A follow-up interleaved
+matrix measured FNV-1a at about 1.36 GB/s, zlib CRC-32 at about 8.9 GB/s, and
+XXH3-64 at about 44 GB/s. Adding one XXH3 pass increased deep-checked
+validate-plus-render medians by only 4.2% to 5.2%.
+
+The final selected-mode comparison supplied Cista with the stable xxHash 0.8.3
+API and measured its native `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY`
+combination against static versioning, deep checking, and an external XXH3
+pass. Medium and large reads were effectively tied. The native writer was
+2.6% to 5.5% slower, while small reads paid a fixed cost below one microsecond.
+A subsequent matched comparison found that compiling and writing the selected
+Cista format was 16% to 33% slower than compiling and writing the legacy AST,
+or about 25 microseconds to 5.1 milliseconds per write on this noisy host. That
+is not a concern for the intended write-once, render-many lifecycle.
+
+Deep checking and libmustache semantic validation remain mandatory for an
+eventual archived-template format. The initial default should also enable
+Cista integrity with the pinned modern XXH3 implementation. None of these
+unkeyed checksums authenticates a hostile writer; the expected deployment does
+not currently require that property.
 
 Request-local compiled reuse remains useful when one request renders the same
 view repeatedly, but that is not the typical one-view/one-render PHP workload
@@ -76,7 +100,9 @@ The repository benchmark programs are:
 When `MUSTACHE_ENABLE_CISTA_BENCHMARK=ON`, the C++ program also builds a
 flattened Cista archive and validates and renders directly from its immutable
 offset-based view. [`benchmarks/cista-archive.cpp`](../../benchmarks/cista-archive.cpp)
-is deliberately benchmark-only and is not linked into libmustache.
+is deliberately benchmark-only and is not linked into libmustache. The opt-in
+benchmark also compares Cista's FNV-1a, zlib CRC-32, and XXH3-64 over the same
+deep-checked archive bytes.
 
 Each program generates deterministic small, medium, and large cases at about
 1 KiB, 32 KiB, and 256 KiB. Every size has two shapes:
@@ -111,6 +137,15 @@ measurement is a native peak-RSS result.
 - Cista feasibility runs: libmustache base
   `8065003173138a60c108e4878cd58a9f03a5d0d0` plus the Cista experiment in this
   change
+- Cista security-mode runs: the mode-matrix change based on `a9da77f`, with
+  three repeated optimized runs pinned to CPU 0
+- Checksum runs: nixpkgs Cista 0.16, zlib 1.3.2, and xxHash 0.8.3
+- Selected-mode runs: the same dependencies, with a private compatibility
+  header supplying Cista with xxHash 0.8.3; three alternating runs per mode,
+  at low priority without CPU affinity on a shared workstation
+- Legacy-writer comparison: the selected native mode, with legacy and Cista
+  writers interleaved sample by sample in each of three low-priority runs on
+  the same shared workstation
 - php-mustache `3b4aaf2d4a121666244f36142a38123ed1625a52`
 - PHP 8.3.33 NTS and php-mustache 0.9.3
 - APCu 5.1.28 with `apc.enable_cli=1`
@@ -154,6 +189,17 @@ nix develop --command taskset -c 0 \
   build/benchmark-cista/benchmarks/mustache_ast_cache_vs_source
 ```
 
+Enabling the benchmark selects Cista's native
+`WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` path with the supplied XXH3 by
+default. Pass `-DMUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3=OFF` only to reproduce
+the historical static-version/FNV-1a comparison.
+
+The 2026-08-25 checksum runs used `nice -n 10` without CPU affinity on a shared
+workstation. To reduce ordering bias, every sample rotates which security mode
+or checksum runs first. Three complete runs are aggregated by the median of
+their per-run medians. The near-constant throughput across sizes is useful
+comparative evidence, but absolute microsecond values remain local and noisy.
+
 For PHP, build php-mustache `develop` against this libmustache checkout, load
 the resulting `mustache.so` plus APCu, and run:
 
@@ -185,7 +231,22 @@ The raw machine-readable results are retained beside the programs:
   and [run 3](../../benchmarks/results/ast-cache-vs-source-2026-08-23-cpp-run3.csv); and
 - [Cista run 1](../../benchmarks/results/ast-cache-vs-source-2026-08-24-cista-run1.csv),
   [run 2](../../benchmarks/results/ast-cache-vs-source-2026-08-24-cista-run2.csv),
-  and [run 3](../../benchmarks/results/ast-cache-vs-source-2026-08-24-cista-run3.csv).
+  and [run 3](../../benchmarks/results/ast-cache-vs-source-2026-08-24-cista-run3.csv); and
+- [Cista security-mode run 1](../../benchmarks/results/ast-cache-vs-source-2026-08-25-cista-security-run1.csv),
+  [run 2](../../benchmarks/results/ast-cache-vs-source-2026-08-25-cista-security-run2.csv),
+  and [run 3](../../benchmarks/results/ast-cache-vs-source-2026-08-25-cista-security-run3.csv); and
+- [interleaved checksum run 1](../../benchmarks/results/ast-cache-vs-source-2026-08-25-checksums-run1.csv),
+  [run 2](../../benchmarks/results/ast-cache-vs-source-2026-08-25-checksums-run2.csv),
+  and [run 3](../../benchmarks/results/ast-cache-vs-source-2026-08-25-checksums-run3.csv); and
+- selected static-version plus external-XXH3 [run 1](../../benchmarks/results/ast-cache-vs-source-2026-08-25-selected-static-external-run1.csv),
+  [run 2](../../benchmarks/results/ast-cache-vs-source-2026-08-25-selected-static-external-run2.csv),
+  and [run 3](../../benchmarks/results/ast-cache-vs-source-2026-08-25-selected-static-external-run3.csv), alongside
+  native version plus built-in-XXH3 [run 1](../../benchmarks/results/ast-cache-vs-source-2026-08-25-selected-version-xxh3-run1.csv),
+  [run 2](../../benchmarks/results/ast-cache-vs-source-2026-08-25-selected-version-xxh3-run2.csv),
+  and [run 3](../../benchmarks/results/ast-cache-vs-source-2026-08-25-selected-version-xxh3-run3.csv); and
+- matched legacy-writer comparison [run 1](../../benchmarks/results/ast-cache-vs-source-2026-08-25-legacy-writer-comparison-run1.csv),
+  [run 2](../../benchmarks/results/ast-cache-vs-source-2026-08-25-legacy-writer-comparison-run2.csv),
+  and [run 3](../../benchmarks/results/ast-cache-vs-source-2026-08-25-legacy-writer-comparison-run3.csv).
 
 ## Payload size
 
@@ -277,16 +338,123 @@ next experiment; its size and writer cost are reasons not to adopt it yet. The
 nixpkgs Cista 0.16 package also has inconsistent CMake version metadata and an
 unpropagated optional `fmt` definition, both worked around by the opt-in build.
 
-The recorded measurements used `WITH_STATIC_VERSION`, Cista's ordinary bounds
-checks, and a libmustache-specific semantic validator. They did not enable
-`DEEP_CHECK` or `WITH_INTEGRITY`. Cista's
+The original 2026-08-24 measurements used `WITH_STATIC_VERSION`, Cista's
+ordinary bounds checks, and a libmustache-specific semantic validator. They did
+not enable `DEEP_CHECK` or `WITH_INTEGRITY`. Cista's
 [serialization reference](https://github.com/felixguendling/cista/wiki/Serialization-Reference)
-requires deep checking for untrusted input. The experiment now uses
-`WITH_STATIC_VERSION | WITH_INTEGRITY | DEEP_CHECK`, but the retained CSVs
-predate that change; rerun and re-evaluate the benchmark before treating its
-latency as a production result. The integrity checksum is useful corruption
-detection, not authentication; caches exposed to hostile writers still need a
-separate trust boundary.
+requires deep checking for untrusted input.
+
+The follow-up benchmark always retained `WITH_STATIC_VERSION` and varied the
+other two modes. The matrix below uses the later interleaved runs; times are
+median/p95 microseconds aggregated across three runs:
+
+| Workload | Neither | `DEEP_CHECK` | `WITH_INTEGRITY` | Both |
+| --- | ---: | ---: | ---: | ---: |
+| Medium flat | 65.68 / 66.27 | 65.72 / 66.27 | 174.38 / 175.56 | 174.36 / 175.64 |
+| Medium graph | 87.89 / 88.53 | 87.87 / 88.39 | 207.31 / 208.37 | 207.33 / 208.64 |
+| Large flat | 513.75 / 522.50 | 514.88 / 520.51 | 1,371.42 / 1,389.20 | 1,369.38 / 1,384.86 |
+| Large graph | 688.06 / 697.67 | 689.59 / 699.84 | 1,647.06 / 1,656.70 | 1,639.19 / 1,654.70 |
+
+Deep checking was indistinguishable from the baseline at this resolution and
+did not change the bytes. Integrity added eight bytes, but its full-buffer
+checksum dominated the read path. On the writer, integrity added two measured
+allocations and increased the prototype's compile-plus-serialize median by 57%
+to 61%; deep checking again had no measurable cost. The writer currently
+serializes twice to insert and verify its final encoded length, so this
+amplifies integrity's writer cost and should not be treated as the minimum cost
+of a final one-pass format.
+
+The large FNV-1a cost comes from the nixpkgs Cista target defining
+`CISTA_FNV1A=1`. Its byte-at-a-time recurrence creates a serial dependency
+chain and scans the complete archive. By contrast, this archive stores AST
+edges as integer indices in flat vectors. Cista's deep check validates its few
+offset containers, and every mode then runs libmustache's semantic graph
+validator. The incremental Cista deep-check cost is therefore small.
+
+The checksum-only follow-up computes each algorithm over exactly the same
+`WITH_STATIC_VERSION | DEEP_CHECK` archive. Throughput was stable across the
+medium and large sizes:
+
+| Workload | FNV-1a 64 | zlib CRC-32 | XXH3-64 |
+| --- | ---: | ---: | ---: |
+| Medium flat | 1.34 GB/s | 8.77 GB/s | 43.66 GB/s |
+| Medium graph | 1.35 GB/s | 8.83 GB/s | 43.91 GB/s |
+| Large flat | 1.37 GB/s | 8.94 GB/s | 44.09 GB/s |
+| Large graph | 1.37 GB/s | 8.95 GB/s | 44.27 GB/s |
+
+The end-to-end operation below computes and compares one checksum, then runs
+Cista deep checking, libmustache semantic validation, and rendering. Times are
+median microseconds:
+
+| Workload | No checksum | FNV-1a 64 | zlib CRC-32 | XXH3-64 |
+| --- | ---: | ---: | ---: | ---: |
+| Medium flat | 65.68 | 174.70 (+166.0%) | 82.37 (+25.4%) | 69.04 (+5.1%) |
+| Medium graph | 87.87 | 208.15 (+136.9%) | 106.16 (+20.8%) | 91.57 (+4.2%) |
+| Large flat | 514.23 | 1,379.30 (+168.2%) | 646.17 (+25.7%) | 540.93 (+5.2%) |
+| Large graph | 694.75 | 1,653.26 (+138.0%) | 838.66 (+20.7%) | 723.64 (+4.2%) |
+
+The corresponding one-checksum writer experiment added 34% to 36% for
+FNV-1a, 5.0% to 5.4% for CRC-32, and 1.0% to 1.2% for XXH3-64. This writer
+computes the external checksum once; Cista's built-in integrity writer remains
+more expensive because the prototype serializes twice and Cista hashes each
+pass.
+
+This first checksum follow-up established that any retained integrity check
+should use XXH3-64. A deployment that later treats cache contents as hostile
+would still need a separate trust boundary or keyed authentication rather than
+CRC, FNV, or XXH3. The next comparison tested whether Cista could own the
+version and XXH3 framing without changing realistic read latency.
+
+A final follow-up supplied Cista with the stable xxHash 0.8.3 API and compared
+two complete default paths using otherwise identical, single-buffer benchmark
+operations. The baseline used `WITH_STATIC_VERSION | DEEP_CHECK` followed by
+an external XXH3 checksum. The candidate used Cista's native
+`WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY`, with Cista configured to use that
+same modern XXH3 implementation. Times are median/p95 microseconds aggregated
+across three alternating runs:
+
+| Workload | Static + external read | Version + built-in read | Static + external writer | Version + built-in writer |
+| --- | ---: | ---: | ---: | ---: |
+| Small flat | 2.54 / 2.58 | 3.39 / 3.44 | 12.63 / 12.73 | 14.75 / 15.73 |
+| Small graph | 3.36 / 3.42 | 4.24 / 4.27 | 13.40 / 13.51 | 15.71 / 16.01 |
+| Medium flat | 68.46 / 69.33 | 68.85 / 70.89 | 335.52 / 337.05 | 353.29 / 356.16 |
+| Medium graph | 91.33 / 91.72 | 91.67 / 93.66 | 351.86 / 355.66 | 371.30 / 373.32 |
+| Large flat | 553.84 / 555.68 | 541.99 / 554.95 | 2,694.68 / 2,705.05 | 2,765.52 / 2,778.77 |
+| Large graph | 732.45 / 739.21 | 734.37 / 743.98 | 2,808.61 / 2,828.06 | 2,925.20 / 2,957.51 |
+
+For medium and large archives, the read paths were effectively tied: the
+candidate ranged from 2.1% faster to 0.6% slower amid shared-workstation noise.
+Its writer was 2.6% to 5.5% slower because this prototype serializes twice, so
+Cista computes both the runtime type hash and integrity hash twice. Small reads
+paid a fixed 0.85 to 0.88 microsecond cost. Runtime versioning also performed
+19 additional allocations totaling 781 bytes per read because Cista 0.16 builds
+a temporary recursive type-hash map.
+
+The native Cista path is still preferable as the initial default: it removes a
+custom checksum envelope while leaving realistic read latency unchanged. Use
+`WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` with the pinned modern XXH3
+implementation. Revisit caching the runtime type fingerprint only if the PHP
+APCu benchmark shows that the fixed small-template allocation cost matters.
+
+The final writer follow-up interleaved two end-to-end operations over the same
+source graph: tokenize and serialize every root/partial with the legacy format,
+or tokenize and serialize the complete Cista graph using the selected native
+mode. Times are median/p95 microseconds aggregated across three runs:
+
+| Workload | Compile + serialize legacy | Compile + serialize Cista | Cista median ratio |
+| --- | ---: | ---: | ---: |
+| Small flat | 18.62 / 19.81 | 24.69 / 26.49 | 1.33x |
+| Small graph | 22.92 / 24.17 | 29.71 / 31.15 | 1.30x |
+| Medium flat | 490.72 / 538.39 | 586.99 / 642.79 | 1.20x |
+| Medium graph | 329.79 / 575.38 | 425.72 / 666.07 | 1.29x |
+| Large flat | 2,842.67 / 4,049.05 | 3,599.31 / 4,729.52 | 1.27x |
+| Large graph | 4,418.31 / 4,646.42 | 5,116.78 / 5,463.09 | 1.16x |
+
+The host was under unrelated load and absolute timings varied substantially
+between runs. The interleaved ratios were more stable: Cista cost 16% to 33%
+more at median and remained within a few milliseconds even for the large
+graphs. This is comfortably below a level that would change a write-once,
+render-many design decision.
 
 ### Dependency and API direction
 
@@ -313,9 +481,13 @@ If the feasibility work continues, use this integration policy:
   compiler/platform assumptions in compatibility checks and PHP cache keys.
   Treat any Cista update as a deliberate format event backed by golden fixtures
   and rejection tests for incompatible bytes.
-- Require full lambda and inline-partial semantics, alignment and backing-store
-  lifetime tests, corruption fixtures, archive-validation/render fuzzing, and
-  the secured native rerun before exposing the experiment to php-mustache.
+- Require `DEEP_CHECK`, libmustache semantic validation, full lambda and
+  inline-partial semantics, alignment and backing-store lifetime tests,
+  corruption fixtures, archive-validation/render fuzzing, and a secured native
+  rerun before exposing the experiment to php-mustache. Use
+  `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` with the pinned modern XXH3
+  implementation by default; this detects accidental corruption but does not
+  authenticate hostile cache contents.
 
 ## PHP cache-hit result
 
@@ -410,10 +582,12 @@ Recommended follow-up:
    pinned Cista snapshot and license by default; consider a separately tested,
    default-off system-package override for packagers.
 4. Add full lambda and inline-partial semantics, explicit
-   compiler/architecture/schema compatibility, `WITH_INTEGRITY` and
-   `DEEP_CHECK`, golden corruption and compatibility fixtures, alignment and
-   lifetime tests, and fuzzing of validation plus rendering. Rerun the native
-   benchmark in that configuration.
+   compiler/architecture/schema compatibility, and the selected
+   `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` policy using pinned modern
+   XXH3. Add golden corruption and compatibility fixtures, alignment and
+   lifetime tests, and fuzzing of validation plus rendering. Treat integrity
+   as accidental-corruption detection rather than authentication, and measure
+   the complete policy through the PHP/APCu path.
 5. Only after the secured native path passes, prototype the libmustache-owned
    archived view behind an experimental php-mustache API and benchmark one APCu
    fetch plus one render against cached source. Include warm and fresh-process

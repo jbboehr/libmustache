@@ -200,6 +200,24 @@ constexpr std::size_t warmupCount = 10;
 
 volatile std::size_t resultSink = 0;
 
+#if defined(MUSTACHE_CISTA_BENCHMARK)
+constexpr std::array<mustache_benchmark::CistaSecurityMode, 4> cistaSecurityModes = {
+    mustache_benchmark::CistaSecurityMode::Neither,
+    mustache_benchmark::CistaSecurityMode::DeepCheck,
+    mustache_benchmark::CistaSecurityMode::Integrity,
+    mustache_benchmark::CistaSecurityMode::DeepCheckAndIntegrity,
+};
+constexpr std::size_t cistaDeepCheckModeIndex = 1;
+constexpr std::size_t cistaDeepCheckIntegrityModeIndex = 3;
+constexpr std::array<mustache_benchmark::CistaChecksumAlgorithm, 4> cistaChecksumAlgorithms = {
+    mustache_benchmark::CistaChecksumAlgorithm::None,
+    mustache_benchmark::CistaChecksumAlgorithm::Fnv1a64,
+    mustache_benchmark::CistaChecksumAlgorithm::Crc32,
+    mustache_benchmark::CistaChecksumAlgorithm::Xxh3_64,
+};
+constexpr std::size_t cistaXxh3AlgorithmIndex = 3;
+#endif
+
 struct Workload {
     const char * name;
     std::array<std::string, 4> sources;
@@ -208,7 +226,7 @@ struct Workload {
     std::size_t sourceBytes = 0;
     std::size_t astBytes = 0;
 #if defined(MUSTACHE_CISTA_BENCHMARK)
-    std::vector<std::uint8_t> cistaEncoded;
+    std::array<std::vector<std::uint8_t>, cistaSecurityModes.size()> cistaEncoded;
 #endif
 };
 
@@ -229,6 +247,8 @@ std::size_t percentileIndex(std::size_t size, double fraction)
 {
   return std::max<std::size_t>(1, static_cast<std::size_t>(std::ceil(static_cast<double>(size) * fraction))) - 1;
 }
+
+Result summarizeSamples(const std::vector<Sample>& samples);
 
 template <typename Operation> Result measure(Operation operation)
 {
@@ -254,6 +274,11 @@ template <typename Operation> Result measure(Operation operation)
     });
   }
 
+  return summarizeSamples(samples);
+}
+
+Result summarizeSamples(const std::vector<Sample>& samples)
+{
   std::vector<double> times;
   std::vector<std::uint64_t> allocations;
   std::vector<std::uint64_t> bytes;
@@ -277,8 +302,47 @@ template <typename Operation> Result measure(Operation operation)
   };
 }
 
+template <std::size_t Count, typename Operation> std::array<Result, Count> measureInterleaved(Operation operation)
+{
+  for (std::size_t i = 0; i < warmupCount; ++i) {
+    for (std::size_t offset = 0; offset < Count; ++offset) {
+      resultSink = resultSink ^ operation((i + offset) % Count);
+    }
+  }
+
+  std::array<std::vector<Sample>, Count> samples;
+  for (std::vector<Sample>& algorithmSamples : samples) {
+    algorithmSamples.reserve(sampleCount);
+  }
+  for (std::size_t i = 0; i < sampleCount; ++i) {
+    for (std::size_t offset = 0; offset < Count; ++offset) {
+      const std::size_t index = (i + offset) % Count;
+      allocation_counter::allocations = 0;
+      allocation_counter::bytes = 0;
+      const Clock::time_point start = Clock::now();
+      allocation_counter::enabled = true;
+      const std::size_t value = operation(index);
+      allocation_counter::enabled = false;
+      const Clock::time_point stop = Clock::now();
+      resultSink = resultSink ^ value;
+      samples[index].push_back({
+          static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start).count()),
+          allocation_counter::allocations,
+          allocation_counter::bytes,
+      });
+    }
+  }
+
+  std::array<Result, Count> results;
+  for (std::size_t index = 0; index < Count; ++index) {
+    results[index] = summarizeSamples(samples[index]);
+  }
+  return results;
+}
+
 #if defined(MUSTACHE_CISTA_BENCHMARK)
-std::vector<std::uint8_t> compileCistaGraph(mustache::Mustache& engine, const Workload& workload)
+std::vector<std::uint8_t> compileCistaGraph(
+    mustache::Mustache& engine, const Workload& workload, mustache_benchmark::CistaSecurityMode mode)
 {
   mustache::Node root;
   engine.tokenize(workload.sources[0], &root);
@@ -291,7 +355,18 @@ std::vector<std::uint8_t> compileCistaGraph(mustache::Mustache& engine, const Wo
       partials.emplace(names[index - 1], std::move(partial));
     }
   }
-  return mustache_benchmark::serializeCistaArchive(root, partials);
+  return mustache_benchmark::serializeCistaArchive(root, partials, mode);
+}
+
+std::size_t compileSerializeLegacyGraph(mustache::Mustache& engine, const Workload& workload)
+{
+  std::size_t encodedBytes = 0;
+  for (std::size_t index = 0; index < workload.sourceCount; ++index) {
+    mustache::Node parsed;
+    engine.tokenize(workload.sources[index], &parsed);
+    encodedBytes += parsed.serializeValue().size();
+  }
+  return encodedBytes;
 }
 #endif
 
@@ -358,7 +433,9 @@ Workload makeWorkload(const char * name, std::size_t targetBytes, bool nestedPar
     workload.astBytes += workload.encoded[i].size();
   }
 #if defined(MUSTACHE_CISTA_BENCHMARK)
-  workload.cistaEncoded = compileCistaGraph(engine, workload);
+  for (std::size_t index = 0; index < cistaSecurityModes.size(); ++index) {
+    workload.cistaEncoded[index] = compileCistaGraph(engine, workload, cistaSecurityModes[index]);
+  }
 #endif
   return workload;
 }
@@ -417,9 +494,14 @@ void verify(const Workload& workload)
     throw std::runtime_error(std::string("source and decoded rendering differ for ") + workload.name);
   }
 #if defined(MUSTACHE_CISTA_BENCHMARK)
-  const std::string cistaOutput = mustache_benchmark::renderCistaArchive(byteView(workload.cistaEncoded), data);
-  if (compiledOutput != cistaOutput) {
-    throw std::runtime_error(std::string("source and Cista rendering differ for ") + workload.name);
+  for (std::size_t index = 0; index < cistaSecurityModes.size(); ++index) {
+    const mustache_benchmark::CistaSecurityMode mode = cistaSecurityModes[index];
+    const std::string cistaOutput =
+        mustache_benchmark::renderCistaArchive(byteView(workload.cistaEncoded[index]), data, mode);
+    if (compiledOutput != cistaOutput) {
+      throw std::runtime_error(std::string("source and Cista rendering differ for ") + workload.name + " in " +
+          mustache_benchmark::cistaSecurityModeName(mode) + " mode");
+    }
   }
 #endif
   for (std::size_t i = 0; i < workload.sourceCount; ++i) {
@@ -433,8 +515,8 @@ void verify(const Workload& workload)
 void printResult(const Workload& workload, const char * operation, const Result& result)
 {
 #if defined(MUSTACHE_CISTA_BENCHMARK)
-  std::printf("%s,%zu,%zu,%zu,%s,%.3f,%.3f,%llu,%llu\n", workload.name, workload.sourceBytes, workload.astBytes,
-      workload.cistaEncoded.size(), operation, result.medianMicroseconds, result.p95Microseconds,
+  std::printf("%s,%zu,%zu,not_applicable,not_applicable,0,%s,%.3f,%.3f,%llu,%llu\n", workload.name,
+      workload.sourceBytes, workload.astBytes, operation, result.medianMicroseconds, result.p95Microseconds,
       static_cast<unsigned long long>(result.medianAllocations), static_cast<unsigned long long>(result.medianBytes));
 #else
   std::printf("%s,%zu,%zu,%s,%.3f,%.3f,%llu,%llu\n", workload.name, workload.sourceBytes, workload.astBytes, operation,
@@ -442,6 +524,47 @@ void printResult(const Workload& workload, const char * operation, const Result&
       static_cast<unsigned long long>(result.medianBytes));
 #endif
 }
+
+#if defined(MUSTACHE_CISTA_BENCHMARK)
+void printCistaResult(const Workload& workload, std::size_t modeIndex, const char * operation, const Result& result)
+{
+  const mustache_benchmark::CistaSecurityMode mode = cistaSecurityModes[modeIndex];
+  const char * checksum = mode == mustache_benchmark::CistaSecurityMode::Integrity ||
+          mode == mustache_benchmark::CistaSecurityMode::DeepCheckAndIntegrity
+      ? mustache_benchmark::cistaIntegrityAlgorithmName()
+      : "none";
+  std::printf("%s,%zu,%zu,%s,%s,%zu,%s,%.3f,%.3f,%llu,%llu\n", workload.name, workload.sourceBytes, workload.astBytes,
+      mustache_benchmark::cistaSecurityModeName(mode), checksum, workload.cistaEncoded[modeIndex].size(), operation,
+      result.medianMicroseconds, result.p95Microseconds, static_cast<unsigned long long>(result.medianAllocations),
+      static_cast<unsigned long long>(result.medianBytes));
+}
+
+void printChecksumResult(
+    const Workload& workload, std::size_t algorithmIndex, const char * operation, const Result& result)
+{
+  const mustache_benchmark::CistaChecksumAlgorithm algorithm = cistaChecksumAlgorithms[algorithmIndex];
+  std::printf("%s,%zu,%zu,deep_check,%s,%zu,%s,%.3f,%.3f,%llu,%llu\n", workload.name, workload.sourceBytes,
+      workload.astBytes, mustache_benchmark::cistaChecksumAlgorithmName(algorithm),
+      workload.cistaEncoded[cistaDeepCheckModeIndex].size(), operation, result.medianMicroseconds,
+      result.p95Microseconds, static_cast<unsigned long long>(result.medianAllocations),
+      static_cast<unsigned long long>(result.medianBytes));
+}
+
+void printSelectedDefaultResult(
+    const Workload& workload, const char * operation, std::size_t cistaBytes, const Result& result)
+{
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+  const char * mode = "version_deep_check_integrity";
+  const char * checksum = "cista_xxh3_64";
+#else
+  const char * mode = "static_version_deep_check_external_integrity";
+  const char * checksum = "xxh3_64";
+#endif
+  std::printf("%s,%zu,%zu,%s,%s,%zu,%s,%.3f,%.3f,%llu,%llu\n", workload.name, workload.sourceBytes, workload.astBytes,
+      mode, checksum, cistaBytes, operation, result.medianMicroseconds, result.p95Microseconds,
+      static_cast<unsigned long long>(result.medianAllocations), static_cast<unsigned long long>(result.medianBytes));
+}
+#endif
 
 } // namespace
 
@@ -458,7 +581,8 @@ int main()
     };
 
 #if defined(MUSTACHE_CISTA_BENCHMARK)
-    std::puts("size,source_bytes,ast_bytes,cista_bytes,operation,median_us,p95_us,allocations,allocated_bytes");
+    std::puts(
+        "size,source_bytes,ast_bytes,cista_mode,checksum,cista_bytes,operation,median_us,p95_us,allocations,allocated_bytes");
 #else
     std::puts("size,source_bytes,ast_bytes,operation,median_us,p95_us,allocations,allocated_bytes");
 #endif
@@ -489,10 +613,56 @@ int main()
       printResult(workload, "decode_ast_graph", decode);
 
 #if defined(MUSTACHE_CISTA_BENCHMARK)
-      const Result compileAndSerializeCista = measure([&engine, &workload]() -> std::size_t {
-        return compileCistaGraph(engine, workload).size();
-      });
-      printResult(workload, "compile_serialize_cista_graph", compileAndSerializeCista);
+      const std::array<Result, cistaSecurityModes.size()> compileAndSerializeCista =
+          measureInterleaved<cistaSecurityModes.size()>([&engine, &workload](std::size_t modeIndex) -> std::size_t {
+            const mustache_benchmark::CistaSecurityMode mode = cistaSecurityModes[modeIndex];
+            return compileCistaGraph(engine, workload, mode).size();
+          });
+      for (std::size_t modeIndex = 0; modeIndex < cistaSecurityModes.size(); ++modeIndex) {
+        printCistaResult(workload, modeIndex, "compile_serialize_cista_graph", compileAndSerializeCista[modeIndex]);
+      }
+
+      const std::array<Result, cistaChecksumAlgorithms.size()> compileSerializeAndChecksum =
+          measureInterleaved<cistaChecksumAlgorithms.size()>(
+              [&engine, &workload](std::size_t algorithmIndex) -> std::size_t {
+                const std::vector<std::uint8_t> archive =
+                    compileCistaGraph(engine, workload, mustache_benchmark::CistaSecurityMode::DeepCheck);
+                const std::uint64_t checksum = mustache_benchmark::checksumCistaArchive(
+                    byteView(archive), cistaChecksumAlgorithms[algorithmIndex]);
+                return archive.size() ^ static_cast<std::size_t>(checksum);
+              });
+      for (std::size_t algorithmIndex = 0; algorithmIndex < cistaChecksumAlgorithms.size(); ++algorithmIndex) {
+        printChecksumResult(workload, algorithmIndex, "compile_serialize_checksum_cista_graph",
+            compileSerializeAndChecksum[algorithmIndex]);
+      }
+
+      if (compileSerializeLegacyGraph(engine, workload) != workload.astBytes) {
+        throw std::runtime_error(std::string("legacy writer size changed for ") + workload.name);
+      }
+      const std::array<Result, 2> selectedWriterComparison =
+          measureInterleaved<2>([&engine, &workload](std::size_t writerIndex) -> std::size_t {
+            if (writerIndex == 0) {
+              return compileSerializeLegacyGraph(engine, workload);
+            }
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+            return compileCistaGraph(engine, workload, mustache_benchmark::CistaSecurityMode::DeepCheckAndIntegrity)
+                .size();
+#else
+            const std::vector<std::uint8_t> archive =
+                compileCistaGraph(engine, workload, mustache_benchmark::CistaSecurityMode::DeepCheck);
+            const std::uint64_t checksum = mustache_benchmark::checksumCistaArchive(
+                byteView(archive), mustache_benchmark::CistaChecksumAlgorithm::Xxh3_64);
+            return archive.size() ^ static_cast<std::size_t>(checksum);
+#endif
+          });
+      printResult(workload, "compile_serialize_legacy_graph", selectedWriterComparison[0]);
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+      const std::size_t selectedDefaultWriterBytes = workload.cistaEncoded[cistaDeepCheckIntegrityModeIndex].size();
+#else
+      const std::size_t selectedDefaultWriterBytes = workload.cistaEncoded[cistaDeepCheckModeIndex].size();
+#endif
+      printSelectedDefaultResult(
+          workload, "selected_compile_serialize_cista_graph", selectedDefaultWriterBytes, selectedWriterComparison[1]);
 #endif
 
       const mustache::Data data = makeData();
@@ -536,10 +706,85 @@ int main()
       printResult(workload, "decode_render_ast_graph", decodeAndRender);
 
 #if defined(MUSTACHE_CISTA_BENCHMARK)
-      const Result validateAndRenderCista = measure([&workload, &data]() -> std::size_t {
-        return mustache_benchmark::renderCistaArchive(byteView(workload.cistaEncoded), data).size();
+      const std::array<Result, cistaSecurityModes.size()> validateAndRenderCista =
+          measureInterleaved<cistaSecurityModes.size()>([&workload, &data](std::size_t modeIndex) -> std::size_t {
+            const mustache_benchmark::CistaSecurityMode mode = cistaSecurityModes[modeIndex];
+            return mustache_benchmark::renderCistaArchive(byteView(workload.cistaEncoded[modeIndex]), data, mode)
+                .size();
+          });
+      for (std::size_t modeIndex = 0; modeIndex < cistaSecurityModes.size(); ++modeIndex) {
+        printCistaResult(workload, modeIndex, "validate_render_cista_graph", validateAndRenderCista[modeIndex]);
+      }
+
+      const std::vector<std::uint8_t>& checksumArchive = workload.cistaEncoded[cistaDeepCheckModeIndex];
+      std::array<std::uint64_t, cistaChecksumAlgorithms.size()> expectedChecksums;
+      for (std::size_t algorithmIndex = 0; algorithmIndex < cistaChecksumAlgorithms.size(); ++algorithmIndex) {
+        expectedChecksums[algorithmIndex] = mustache_benchmark::checksumCistaArchive(
+            byteView(checksumArchive), cistaChecksumAlgorithms[algorithmIndex]);
+      }
+
+      const std::array<Result, cistaChecksumAlgorithms.size()> checksumOnly =
+          measureInterleaved<cistaChecksumAlgorithms.size()>(
+              [&checksumArchive](std::size_t algorithmIndex) -> std::size_t {
+                return static_cast<std::size_t>(mustache_benchmark::checksumCistaArchive(
+                    byteView(checksumArchive), cistaChecksumAlgorithms[algorithmIndex]));
+              });
+      for (std::size_t algorithmIndex = 0; algorithmIndex < cistaChecksumAlgorithms.size(); ++algorithmIndex) {
+        if (cistaChecksumAlgorithms[algorithmIndex] == mustache_benchmark::CistaChecksumAlgorithm::None) {
+          continue;
+        }
+        printChecksumResult(workload, algorithmIndex, "checksum_cista_graph", checksumOnly[algorithmIndex]);
+      }
+
+      const std::array<Result, cistaChecksumAlgorithms.size()> checksumValidateAndRender =
+          measureInterleaved<cistaChecksumAlgorithms.size()>(
+              [&checksumArchive, &data, &expectedChecksums](std::size_t algorithmIndex) -> std::size_t {
+                const std::uint64_t checksum = mustache_benchmark::checksumCistaArchive(
+                    byteView(checksumArchive), cistaChecksumAlgorithms[algorithmIndex]);
+                if (checksum != expectedChecksums[algorithmIndex]) {
+                  throw std::runtime_error("Cista archive checksum changed during benchmark");
+                }
+                const std::size_t outputSize = mustache_benchmark::renderCistaArchive(
+                    byteView(checksumArchive), data, mustache_benchmark::CistaSecurityMode::DeepCheck)
+                                                   .size();
+                return outputSize ^ static_cast<std::size_t>(checksum);
+              });
+      for (std::size_t algorithmIndex = 0; algorithmIndex < cistaChecksumAlgorithms.size(); ++algorithmIndex) {
+        printChecksumResult(workload, algorithmIndex, "checksum_validate_render_cista_graph",
+            checksumValidateAndRender[algorithmIndex]);
+      }
+
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+      const std::vector<std::uint8_t>& selectedDefaultArchive = workload.cistaEncoded[cistaDeepCheckIntegrityModeIndex];
+#else
+      const std::vector<std::uint8_t>& selectedDefaultArchive = workload.cistaEncoded[cistaDeepCheckModeIndex];
+      const std::uint64_t selectedDefaultChecksum = mustache_benchmark::checksumCistaArchive(
+          byteView(selectedDefaultArchive), cistaChecksumAlgorithms[cistaXxh3AlgorithmIndex]);
+#endif
+      const Result selectedDefaultReader = measure([&selectedDefaultArchive, &data
+#if !defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+                                                       ,
+                                                       &selectedDefaultChecksum
+#endif
+      ]() -> std::size_t {
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+        return mustache_benchmark::renderCistaArchive(
+            byteView(selectedDefaultArchive), data, mustache_benchmark::CistaSecurityMode::DeepCheckAndIntegrity)
+            .size();
+#else
+        const std::uint64_t checksum = mustache_benchmark::checksumCistaArchive(
+            byteView(selectedDefaultArchive), mustache_benchmark::CistaChecksumAlgorithm::Xxh3_64);
+        if (checksum != selectedDefaultChecksum) {
+          throw std::runtime_error("Cista archive checksum changed during selected-default benchmark");
+        }
+        const std::size_t outputSize = mustache_benchmark::renderCistaArchive(
+            byteView(selectedDefaultArchive), data, mustache_benchmark::CistaSecurityMode::DeepCheck)
+                                           .size();
+        return outputSize ^ static_cast<std::size_t>(checksum);
+#endif
       });
-      printResult(workload, "validate_render_cista_graph", validateAndRenderCista);
+      printSelectedDefaultResult(
+          workload, "selected_validate_render_cista_graph", selectedDefaultArchive.size(), selectedDefaultReader);
 #endif
     }
   } catch (const std::exception& exception) {

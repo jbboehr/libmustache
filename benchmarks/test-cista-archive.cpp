@@ -1,6 +1,7 @@
 #include "cista-archive.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <memory>
@@ -104,6 +105,75 @@ int main()
     const std::string_view bytes(reinterpret_cast<const char *>(archive.data()), archive.size());
     const std::string actual = mustache_benchmark::renderCistaArchive(bytes, data);
     expect(actual == expected, "Cista archive rendering differs from Node rendering");
+
+    const std::array<mustache_benchmark::CistaSecurityMode, 4> securityModes = {
+        mustache_benchmark::CistaSecurityMode::Neither,
+        mustache_benchmark::CistaSecurityMode::DeepCheck,
+        mustache_benchmark::CistaSecurityMode::Integrity,
+        mustache_benchmark::CistaSecurityMode::DeepCheckAndIntegrity,
+    };
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+    expect(std::string_view(mustache_benchmark::cistaVersionModeName()) == "version",
+        "Cista XXH3 benchmark did not select runtime versioning");
+    expect(std::string_view(mustache_benchmark::cistaIntegrityAlgorithmName()) == "cista_xxh3_64",
+        "Cista XXH3 benchmark did not select built-in XXH3 integrity");
+#else
+    expect(std::string_view(mustache_benchmark::cistaVersionModeName()) == "static_version",
+        "Cista baseline benchmark did not select static versioning");
+    expect(std::string_view(mustache_benchmark::cistaIntegrityAlgorithmName()) == "cista_fnv1a_64",
+        "Cista baseline benchmark did not select built-in FNV-1a integrity");
+#endif
+    std::array<std::vector<std::uint8_t>, securityModes.size()> modeArchives;
+    for (std::size_t index = 0; index < securityModes.size(); ++index) {
+      const mustache_benchmark::CistaSecurityMode mode = securityModes[index];
+      modeArchives[index] = mustache_benchmark::serializeCistaArchive(root, partials, mode);
+      const std::string modeOutput = mustache_benchmark::renderCistaArchive(
+          std::string_view(reinterpret_cast<const char *>(modeArchives[index].data()), modeArchives[index].size()),
+          data, mode);
+      expect(modeOutput == expected, "Cista security mode changed rendered output");
+    }
+    expect(modeArchives[0] == modeArchives[1], "deep checking unexpectedly changed serialized bytes");
+    expect(modeArchives[2] == modeArchives[3], "deep checking changed integrity-protected bytes");
+    expect(modeArchives[2].size() > modeArchives[0].size(), "integrity mode did not add archive framing");
+
+    const std::array<mustache_benchmark::CistaChecksumAlgorithm, 3> checksumAlgorithms = {
+        mustache_benchmark::CistaChecksumAlgorithm::Fnv1a64,
+        mustache_benchmark::CistaChecksumAlgorithm::Crc32,
+        mustache_benchmark::CistaChecksumAlgorithm::Xxh3_64,
+    };
+    expect(std::string_view(mustache_benchmark::cistaChecksumAlgorithmName(
+               mustache_benchmark::CistaChecksumAlgorithm::None)) == "none",
+        "disabled checksum policy is not identified as none");
+    expect(mustache_benchmark::checksumCistaArchive(
+               "archive payload", mustache_benchmark::CistaChecksumAlgorithm::None) == 0,
+        "disabled checksum policy unexpectedly hashed the archive");
+    expect(mustache_benchmark::checksumCistaArchive("", checksumAlgorithms[0]) == UINT64_C(0xCBF29CE484222325),
+        "FNV-1a checksum does not match the standard empty-input vector");
+    expect(mustache_benchmark::checksumCistaArchive("123456789", checksumAlgorithms[1]) == UINT32_C(0xCBF43926),
+        "CRC-32 checksum does not match the standard check value");
+    expect(mustache_benchmark::checksumCistaArchive("", checksumAlgorithms[2]) == UINT64_C(0x2D06800538D394C2),
+        "XXH3 checksum does not match the standard empty-input vector");
+    for (const mustache_benchmark::CistaChecksumAlgorithm algorithm : checksumAlgorithms) {
+      expect(mustache_benchmark::checksumCistaArchive("archive payload", algorithm) !=
+              mustache_benchmark::checksumCistaArchive("archive payloae", algorithm),
+          "checksum did not detect a one-byte payload change");
+    }
+    expectOperationRejected(
+        []() {
+          (void)mustache_benchmark::checksumCistaArchive(
+              "archive payload", static_cast<mustache_benchmark::CistaChecksumAlgorithm>(255));
+        },
+        "unknown checksum algorithm");
+
+    std::vector<std::uint8_t> integrityCorruption = modeArchives[2];
+    integrityCorruption.back() ^= std::uint8_t{0xFF};
+    expectOperationRejected(
+        [&integrityCorruption, &data]() {
+          (void)mustache_benchmark::renderCistaArchive(
+              std::string_view(reinterpret_cast<const char *>(integrityCorruption.data()), integrityCorruption.size()),
+              data, mustache_benchmark::CistaSecurityMode::Integrity);
+        },
+        "integrity-protected corruption");
 
     mustache::Node invalidType;
     invalidType.type = static_cast<mustache::Node::Type>(65537);

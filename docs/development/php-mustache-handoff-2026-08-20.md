@@ -306,22 +306,36 @@ retain checked legacy reads for a documented migration window. If decoding
 wins materially, design one canonical versioned format, write only that format,
 read the old format during a bounded window, and version PHP cache keys.
 
-**Result, updated 2026-08-24:** the
+**Result, updated 2026-08-25:** the
 [completed legacy-format benchmark](ast-cache-benchmark-2026-08-22.md) selected
 source for current cross-request caches. Warm and fresh-process legacy partial
 graphs both favored source, and serialization-plus-APCu-store cost strengthened
 that decision. A later checked Cista direct-view prototype removed the graph
 ownership penalty and was 73% to 81% faster than source compile plus render on
 the medium and large native workloads. Its payload was 4.35 to 4.80 times
-source, and PHP serialization and APCu have not been measured. The prototype
-also used `WITH_STATIC_VERSION` without Cista's `DEEP_CHECK` or
-`WITH_INTEGRITY`, so its timing is not yet the production security result.
+source, and PHP serialization and APCu have not been measured. The initial
+prototype timing used `WITH_STATIC_VERSION` alone. A later native mode matrix
+found `DEEP_CHECK` effectively free, while Cista's FNV-1a-based
+`WITH_INTEGRITY` made validation plus rendering 2.35 to 2.67 times as
+expensive. A checksum follow-up measured zlib CRC-32 about 6.5 times and
+XXH3-64 about 32 times as fast as FNV-1a; one XXH3 pass added 4.2% to 5.2% to
+the deep-checked read-and-render path.
+A final direct comparison supplied Cista with modern xxHash 0.8.3 and used
+`WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY`. Medium and large reads were
+effectively tied with static versioning plus an external XXH3 pass; the native
+writer was 2.6% to 5.5% slower. Cista 0.16 runtime versioning added a fixed 19
+allocations and 781 bytes per read, a visible cost only for the smallest cases.
+A matched native writer comparison found the selected Cista format 16% to 33%
+slower than legacy compile plus serialization, or about 25 microseconds to 5.1
+milliseconds per write. That is acceptable for a write-once, render-many cache.
 
 The next slice belongs in libmustache: implement the optional, default-off
 archived-template view with the same complete semantics as owned nodes, keep
-Cista private, enable the version, integrity, and deep-check modes, fuzz the
-archive boundary, and rerun the native benchmark. Only after that gate passes
-should php-mustache add a one-fetch/one-render APCu experiment. That experiment
+Cista private, require versioning, deep checking, and libmustache semantic
+validation, configure Cista with the pinned modern XXH3 implementation, and
+use `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` by default before fuzzing the
+archive boundary. Only after that gate passes should php-mustache add a
+one-fetch/one-render APCu experiment. That experiment
 must measure the actual Zend-string lifetime, alignment or aligned-copy cost,
 PHP serialization, APCu copying, payload size, peak memory, and writer cost;
 request-local reuse is not a substitute. Keep checked legacy reads through

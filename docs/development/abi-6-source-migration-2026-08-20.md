@@ -260,9 +260,11 @@ decoding with cached-source reparsing, including warm and fresh-process cases,
 PHP serialization, and APCu fetch/store overhead. It selected source for current
 cross-request caches and rejected the legacy AST as the basis of a replacement
 format. A later Cista direct-view feasibility result cleared the native latency
-threshold, but its recorded runs omitted the final deep-check/integrity modes,
-used substantially more cache space, and have not crossed the PHP/APCu boundary.
-It remains an optional experiment, not a release decision. Therefore:
+threshold. Follow-up runs found deep checking cheap, FNV-1a integrity expensive,
+and selected modern XXH3-backed `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` as
+the native default. The archive still used substantially more cache space and
+has not crossed the PHP/APCu boundary. It remains an optional experiment, not a
+release decision. Therefore:
 
 - retain checked reads of existing ABI 5 data throughout libmustache 0.6.x and
   php-mustache 0.x;

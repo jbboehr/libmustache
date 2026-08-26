@@ -116,9 +116,12 @@
           libmustache-cista-benchmark = makePackage {
             cmakeSupport = true;
             cista = pkgs.cista;
+            xxhash = pkgs.xxhash;
+            zlib = pkgs.zlib;
             debugSupport = true;
             sanitizerSupport = true;
             cistaBenchmarkSupport = true;
+            cistaBuiltinXxh3Support = true;
           };
           pre-commit = pre-commit-check;
         };
@@ -135,7 +138,9 @@
 
         devShells.default = pkgs.mkShell {
           inputsFrom = [packages.libmustache packages.libmustache-cmake];
-          packages = pre-commit-check.enabledPackages ++ [pkgs.cista pkgs.llvmPackages.clang-tools];
+          packages =
+            pre-commit-check.enabledPackages
+            ++ [pkgs.cista pkgs.llvmPackages.clang-tools pkgs.xxhash pkgs.zlib];
           shellHook = pre-commit-check.shellHook;
         };
 

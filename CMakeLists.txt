@@ -36,6 +36,14 @@ option(MUSTACHE_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehavior
 option(MUSTACHE_ENABLE_FUZZING "Build the Clang libFuzzer targets and smoke tests" OFF)
 option(MUSTACHE_ENABLE_CLANG_TIDY "Run clang-tidy on production targets" OFF)
 option(MUSTACHE_ENABLE_CISTA_BENCHMARK "Build the experimental Cista archive benchmark" OFF)
+option(MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3
+    "Use Cista runtime versioning and built-in integrity with the supplied XXH3"
+    ${MUSTACHE_ENABLE_CISTA_BENCHMARK})
+
+if(MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3 AND NOT MUSTACHE_ENABLE_CISTA_BENCHMARK)
+    message(FATAL_ERROR
+        "MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3 requires MUSTACHE_ENABLE_CISTA_BENCHMARK")
+endif()
 
 if(MUSTACHE_ENABLE_CLANG_TIDY)
     find_program(MUSTACHE_CLANG_TIDY_EXECUTABLE NAMES clang-tidy REQUIRED)
@@ -89,6 +97,8 @@ if(MUSTACHE_ENABLE_CISTA_BENCHMARK)
     # nixpkgs packages Cista 0.16 with CMake metadata reporting version 0.7,
     # so requesting the package version would reject the available dependency.
     find_package(cista CONFIG REQUIRED)
+    find_package(ZLIB REQUIRED)
+    find_package(xxHash CONFIG REQUIRED)
 endif()
 
 if(MSVC)
