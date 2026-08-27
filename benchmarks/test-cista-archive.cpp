@@ -526,16 +526,38 @@ int main()
     expectRejected(
         lambdaBytes, lambdaData, mustache_benchmark::CistaArchiveLimits(), lambdaLimits, "lambda template byte limit");
 
-    mustache::Node inlinePartialRoot;
-    engine.tokenize("root", &inlinePartialRoot);
-    std::unique_ptr<mustache::Node> ownedInlinePartial = std::make_unique<mustache::Node>();
-    engine.tokenize("inline", ownedInlinePartial.get());
-    inlinePartialRoot.partials.emplace("inline", std::move(ownedInlinePartial));
-    expectOperationRejected(
-        [&inlinePartialRoot]() {
-          (void)mustache_benchmark::serializeCistaArchive(inlinePartialRoot);
-        },
-        "inline partial ownership");
+    const auto parsedPartial = [&engine](std::string_view source) {
+      std::unique_ptr<mustache::Node> partial = std::make_unique<mustache::Node>();
+      engine.tokenize(source, partial.get());
+      return partial;
+    };
+    mustache::Node ownedPartialRoot;
+    engine.tokenize("{{>card}}|{{>fallback}}|{{>nested}}|{{>leaf}}|{{>missing}}", &ownedPartialRoot);
+    ownedPartialRoot.partials.emplace("card", parsedPartial("root-card"));
+    ownedPartialRoot.partials.emplace("fallback", parsedPartial("root-fallback"));
+    ownedPartialRoot.partials.emplace("inner", parsedPartial("root-inner"));
+    ownedPartialRoot.partials.emplace(
+        "leaf", std::make_unique<mustache::Node>(mustache::Node::TypeOutput, "root-leaf"));
+    ownedPartialRoot.partials.emplace("missing", std::unique_ptr<mustache::Node>());
+    ownedPartialRoot.partials.emplace("nested", parsedPartial("{{>inner}}"));
+
+    const std::vector<std::uint8_t> rootPartialArchive = mustache_benchmark::serializeCistaArchive(ownedPartialRoot);
+    expect(mustache_benchmark::renderCistaArchive(
+               std::string_view(reinterpret_cast<const char *>(rootPartialArchive.data()), rootPartialArchive.size()),
+               data) == "root-card|root-fallback|root-inner|root-leaf|",
+        "Cista archive did not render root-owned fallback partials");
+
+    mustache::Node::Partials overridingPartials;
+    overridingPartials.emplace("card", std::make_unique<mustache::Node>(mustache::Node::TypeOutput, "external-card"));
+    overridingPartials.emplace("fallback", std::unique_ptr<mustache::Node>());
+    overridingPartials.emplace("inner", parsedPartial("external-inner"));
+    const std::vector<std::uint8_t> overridingPartialArchive =
+        mustache_benchmark::serializeCistaArchive(ownedPartialRoot, overridingPartials);
+    expect(mustache_benchmark::renderCistaArchive(
+               std::string_view(
+                   reinterpret_cast<const char *>(overridingPartialArchive.data()), overridingPartialArchive.size()),
+               data) == "external-card|root-fallback|external-inner|root-leaf|",
+        "Cista archive partial precedence differs from the owned renderer");
 
     mustache::Node containerRoot;
     engine.tokenize("root", &containerRoot);

@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -141,25 +142,23 @@ class ArchiveBuilder {
   public:
     ArchiveGraph build(const mustache::Node& root, const mustache::Node::Partials& partials)
     {
+      const EffectivePartials effectivePartials = collectEffectivePartials(root.partials, partials);
       countNode(root, 0);
-      for (const mustache::Node::PartialPair& partial : partials) {
-        if (partial.second == nullptr) {
-          throw mustache::Exception("Invalid null Cista archive partial");
-        }
+      for (const EffectivePartial& partial : effectivePartials) {
         addStringBytes(partial.first.size());
         countNode(*partial.second, 0);
       }
       if (nodeCount_ > std::numeric_limits<std::uint32_t>::max() ||
           stringBytes_ > std::numeric_limits<std::uint32_t>::max() ||
-          partials.size() > std::numeric_limits<std::uint32_t>::max()) {
+          effectivePartials.size() > std::numeric_limits<std::uint32_t>::max()) {
         throw mustache::Exception("Cista archive exceeds format limit");
       }
       graph_.nodes.reserve(static_cast<std::uint32_t>(nodeCount_));
-      graph_.partials.reserve(static_cast<std::uint32_t>(partials.size()));
+      graph_.partials.reserve(static_cast<std::uint32_t>(effectivePartials.size()));
       graph_.strings.reserve(static_cast<std::uint32_t>(stringBytes_));
 
       graph_.root = appendNode(root);
-      for (const mustache::Node::PartialPair& partial : partials) {
+      for (const EffectivePartial& partial : effectivePartials) {
         ArchivePartial archived{};
         archived.name = appendString(partial.first);
         archived.root = appendNode(*partial.second);
@@ -169,6 +168,28 @@ class ArchiveBuilder {
     }
 
   private:
+    using EffectivePartials = std::map<std::string_view, const mustache::Node *>;
+    using EffectivePartial = EffectivePartials::value_type;
+
+    static EffectivePartials collectEffectivePartials(
+        const mustache::Node::Partials& fallback, const mustache::Node::Partials& overriding)
+    {
+      EffectivePartials effective;
+      for (const mustache::Node::PartialPair& partial : fallback) {
+        if (partial.second != nullptr) {
+          effective.emplace(partial.first, partial.second.get());
+        }
+      }
+      // A null external entry does not mask the root-owned fallback in
+      // OwnedPartialSource, so only non-null overrides enter the archive.
+      for (const mustache::Node::PartialPair& partial : overriding) {
+        if (partial.second != nullptr) {
+          effective.insert_or_assign(partial.first, partial.second.get());
+        }
+      }
+      return effective;
+    }
+
     void addStringBytes(std::size_t bytes)
     {
       if (stringBytes_ > std::numeric_limits<std::uint32_t>::max() ||
@@ -217,9 +238,6 @@ class ArchiveBuilder {
     {
       if (graph_.nodes.size() == std::numeric_limits<std::uint32_t>::max()) {
         throw mustache::Exception("Cista archive node count exceeds format limit");
-      }
-      if (!source.partials.empty()) {
-        throw mustache::Exception("Cista archive experiment does not support inline partial ownership");
       }
       if (source.child != nullptr) {
         throw mustache::Exception("Cista archive experiment does not support container nodes");
@@ -307,7 +325,7 @@ class ArchiveValidator {
         }
         previousName = name;
         hasPreviousName = true;
-        validateRoot(partial.root);
+        validatePartial(partial.root);
       }
       if (nodes_ != graph_.nodes.size()) {
         throw mustache::Exception("Unreachable Cista archive node");
@@ -330,6 +348,17 @@ class ArchiveValidator {
       }
       if (graph_.nodes[index].nextSibling != invalidIndex) {
         throw mustache::Exception("Invalid Cista archive root sibling");
+      }
+      validateNode(index, 0, false);
+    }
+
+    void validatePartial(std::uint32_t index)
+    {
+      if (index >= graph_.nodes.size()) {
+        throw mustache::Exception("Invalid Cista archive partial root");
+      }
+      if (graph_.nodes[index].nextSibling != invalidIndex) {
+        throw mustache::Exception("Invalid Cista archive partial root sibling");
       }
       validateNode(index, 0, false);
     }
