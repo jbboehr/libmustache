@@ -1,4 +1,5 @@
 #include "cista-archive.hpp"
+#include "render_engine.hpp"
 
 #include <algorithm>
 #include <array>
@@ -13,12 +14,203 @@
 
 namespace {
 
+class CursorContractNodeView {
+  public:
+    class ChildCursor {
+      public:
+        ChildCursor() noexcept :
+            partCursorRequests_(nullptr),
+            partValues_(nullptr),
+            valid_(false)
+        {}
+
+        explicit operator bool() const noexcept
+        {
+          return valid_;
+        }
+
+        CursorContractNodeView value() const noexcept
+        {
+          return CursorContractNodeView(Kind::Variable, partCursorRequests_, partValues_);
+        }
+
+        void advance() noexcept
+        {
+          valid_ = false;
+        }
+
+      private:
+        friend class CursorContractNodeView;
+
+        ChildCursor(std::size_t * partCursorRequests, std::size_t * partValues) noexcept :
+            partCursorRequests_(partCursorRequests),
+            partValues_(partValues),
+            valid_(true)
+        {}
+
+        std::size_t * partCursorRequests_;
+        std::size_t * partValues_;
+        bool valid_;
+    };
+
+    class DataPartCursor {
+      public:
+        DataPartCursor() noexcept :
+            values_(nullptr),
+            index_(3)
+        {}
+
+        explicit operator bool() const noexcept
+        {
+          return values_ != nullptr && index_ < 3;
+        }
+
+        mustache::detail::RenderString value() const noexcept
+        {
+          static constexpr std::array<std::string_view, 3> parts = {"a", "b", "c"};
+          ++*values_;
+          return mustache::detail::RenderString::fromView(parts[index_]);
+        }
+
+        void advance() noexcept
+        {
+          ++index_;
+        }
+
+      private:
+        friend class CursorContractNodeView;
+
+        explicit DataPartCursor(std::size_t * values) noexcept :
+            values_(values),
+            index_(0)
+        {}
+
+        std::size_t * values_;
+        std::size_t index_;
+    };
+
+    CursorContractNodeView() noexcept :
+        kind_(Kind::Null),
+        partCursorRequests_(nullptr),
+        partValues_(nullptr)
+    {}
+
+    static CursorContractNodeView root(std::size_t * partCursorRequests, std::size_t * partValues) noexcept
+    {
+      return CursorContractNodeView(Kind::Root, partCursorRequests, partValues);
+    }
+
+    explicit operator bool() const noexcept
+    {
+      return kind_ != Kind::Null;
+    }
+
+    mustache::Node::Type type() const noexcept
+    {
+      return kind_ == Kind::Root ? mustache::Node::TypeRoot : mustache::Node::TypeVariable;
+    }
+
+    int flags() const noexcept
+    {
+      return kind_ == Kind::Variable ? mustache::Node::FlagEscape : mustache::Node::FlagNone;
+    }
+
+    mustache::detail::RenderString data() const noexcept
+    {
+      return kind_ == Kind::Variable ? mustache::detail::RenderString::fromView("a.b.c")
+                                     : mustache::detail::RenderString();
+    }
+
+    DataPartCursor dataParts() const noexcept
+    {
+      if (kind_ != Kind::Variable) {
+        return DataPartCursor();
+      }
+      ++*partCursorRequests_;
+      return DataPartCursor(partValues_);
+    }
+
+    ChildCursor children() const noexcept
+    {
+      return kind_ == Kind::Root ? ChildCursor(partCursorRequests_, partValues_) : ChildCursor();
+    }
+
+    CursorContractNodeView containerChild() const noexcept
+    {
+      return CursorContractNodeView();
+    }
+
+    mustache::detail::RenderString startSequence() const noexcept
+    {
+      return mustache::detail::RenderString();
+    }
+
+    mustache::detail::RenderString stopSequence() const noexcept
+    {
+      return mustache::detail::RenderString();
+    }
+
+  private:
+    enum class Kind {
+      Null,
+      Root,
+      Variable
+    };
+
+    CursorContractNodeView(Kind kind, std::size_t * partCursorRequests, std::size_t * partValues) noexcept :
+        kind_(kind),
+        partCursorRequests_(partCursorRequests),
+        partValues_(partValues)
+    {}
+
+    Kind kind_;
+    std::size_t * partCursorRequests_;
+    std::size_t * partValues_;
+};
+
+class EmptyPartialSource {
+  public:
+    template <typename Callback> bool withPartial(mustache::detail::RenderString, Callback&&) const noexcept
+    {
+      return false;
+    }
+};
+
 class FixedLambda final : public mustache::Lambda {
   public:
+    explicit FixedLambda(std::string value = "lambda") :
+        value_(std::move(value))
+    {}
+
     std::string invoke() override
     {
-      return "lambda";
+      return value_;
     }
+
+  private:
+    std::string value_;
+};
+
+class RenderingSectionLambda final : public mustache::Lambda {
+  public:
+    explicit RenderingSectionLambda(std::string * observed) :
+        observed_(observed)
+    {}
+
+    std::string invoke() override
+    {
+      return std::string();
+    }
+
+    std::string invoke(std::string_view text, mustache::LambdaRenderContext context) override
+    {
+      observed_->assign(text.data(), text.size());
+      mustache::Node name(mustache::Node::TypeVariable, "name", mustache::Node::FlagEscape);
+      return context.render(name);
+    }
+
+  private:
+    std::string * observed_;
 };
 
 void expect(bool condition, const char * message)
@@ -26,6 +218,29 @@ void expect(bool condition, const char * message)
   if (!condition) {
     throw std::runtime_error(message);
   }
+}
+
+void testDataPartCursorContract()
+{
+  mustache::Data levelC = mustache::Data::object();
+  levelC.set("c", mustache::Data::string("cursor"));
+  mustache::Data levelB = mustache::Data::object();
+  levelB.set("b", std::move(levelC));
+  mustache::Data data = mustache::Data::object();
+  data.set("a", std::move(levelB));
+
+  std::size_t cursorRequests = 0;
+  std::size_t partValues = 0;
+  std::string output;
+  mustache::Renderer renderer;
+  renderer.init(nullptr, &data, nullptr, &output);
+  EmptyPartialSource partialSource;
+  mustache::detail::RenderEngine<EmptyPartialSource> engine(renderer, partialSource);
+  engine.renderRoot(CursorContractNodeView::root(&cursorRequests, &partValues));
+
+  expect(output == "cursor", "data-part cursor adapter did not render a three-component lookup");
+  expect(cursorRequests == 1, "shared lookup requested the data-part cursor more than once");
+  expect(partValues == 3, "shared lookup did not consume dotted-name components exactly once");
 }
 
 mustache::Data makeData()
@@ -86,6 +301,8 @@ template <typename Operation> void expectOperationRejected(Operation&& operation
 int main()
 {
   try {
+    testDataPartCursorContract();
+
     mustache::Mustache engine;
     mustache::Node root;
     engine.tokenize("{{#products}}\n  {{> card}}\n{{/products}}\n", &root);
@@ -221,11 +438,17 @@ int main()
 
     mustache::Node semanticRoot;
     engine.tokenize(
-        "{{#values}}[{{.}}]{{/values}}|{{integer}}|{{floating}}|{{> missing}}|{{=<% %>=}}<%integer%>", &semanticRoot);
+        "{{a.b.c}}|{{#values}}[{{.}}]{{/values}}|{{integer}}|{{floating}}|{{> missing}}|{{=<% %>=}}<%integer%>",
+        &semanticRoot);
     mustache::Data values = mustache::Data::array();
     values.push_back(mustache::Data::string("first"));
     values.push_back(mustache::Data::integer(2));
     mustache::Data semanticData = mustache::Data::object();
+    mustache::Data nestedC = mustache::Data::object();
+    nestedC.set("c", mustache::Data::string("deep"));
+    mustache::Data nestedB = mustache::Data::object();
+    nestedB.set("b", std::move(nestedC));
+    semanticData.set("a", std::move(nestedB));
     semanticData.set("values", std::move(values));
     semanticData.set("integer", mustache::Data::integer(-7));
     semanticData.set("floating", mustache::Data::floating(1.5));
@@ -234,9 +457,39 @@ int main()
     const std::vector<std::uint8_t> semanticArchive = mustache_benchmark::serializeCistaArchive(semanticRoot);
     const std::string actualSemantics = mustache_benchmark::renderCistaArchive(
         std::string_view(reinterpret_cast<const char *>(semanticArchive.data()), semanticArchive.size()), semanticData);
-    expect(expectedSemantics == "[first][2]|-7|1.5||-7", "ordinary renderer semantic fixture changed unexpectedly");
+    expect(
+        expectedSemantics == "deep|[first][2]|-7|1.5||-7", "ordinary renderer semantic fixture changed unexpectedly");
     expect(actualSemantics == expectedSemantics,
-        "Cista archive changed current-context, numeric, delimiter, or missing-partial semantics");
+        "Cista archive changed dotted-name, current-context, numeric, delimiter, or missing-partial semantics");
+
+    mustache::Mustache delimiterEngine;
+    delimiterEngine.setStartSequence("<%");
+    delimiterEngine.setStopSequence("%>");
+    mustache::Node sectionLambdaRoot;
+    delimiterEngine.tokenize("<%#section%>original <%name%><%/section%>", &sectionLambdaRoot);
+    const std::vector<std::uint8_t> sectionLambdaArchive = mustache_benchmark::serializeCistaArchive(sectionLambdaRoot);
+    const std::string_view sectionLambdaBytes(
+        reinterpret_cast<const char *>(sectionLambdaArchive.data()), sectionLambdaArchive.size());
+    std::string expectedSection;
+    mustache::Data ownedSectionLambdaData = mustache::Data::object();
+    ownedSectionLambdaData.set("name", mustache::Data::string("<safe>"));
+    ownedSectionLambdaData.set(
+        "section", mustache::Data::lambda(std::make_unique<RenderingSectionLambda>(&expectedSection)));
+    std::string expectedSectionOutput;
+    delimiterEngine.render(&sectionLambdaRoot, &ownedSectionLambdaData, nullptr, &expectedSectionOutput);
+
+    std::string actualSection;
+    mustache::Data archiveSectionLambdaData = mustache::Data::object();
+    archiveSectionLambdaData.set("name", mustache::Data::string("<safe>"));
+    archiveSectionLambdaData.set(
+        "section", mustache::Data::lambda(std::make_unique<RenderingSectionLambda>(&actualSection)));
+    const std::string actualSectionOutput =
+        mustache_benchmark::renderCistaArchive(sectionLambdaBytes, archiveSectionLambdaData);
+    expect(expectedSectionOutput == "&lt;safe&gt;", "ordinary section-lambda rendering changed unexpectedly");
+    expect(actualSectionOutput == expectedSectionOutput,
+        "Cista archive section-lambda callback rendering differs from Node rendering");
+    expect(expectedSection == "original <%name%>", "ordinary section lambda received unexpected source text");
+    expect(actualSection == expectedSection, "Cista archive section-lambda source differs from Node rendering");
 
     mustache::Node lambdaRoot;
     engine.tokenize("{{call}}", &lambdaRoot);
@@ -248,7 +501,30 @@ int main()
         "lambda fixture archive could not render ordinary data");
     mustache::Data lambdaData = mustache::Data::object();
     lambdaData.set("call", mustache::Data::lambda(std::make_unique<FixedLambda>()));
-    expectRejected(lambdaBytes, lambdaData, "lambda render");
+    expect(mustache_benchmark::renderCistaArchive(lambdaBytes, lambdaData) == "lambda",
+        "Cista archive variable-lambda rendering differs from Node rendering");
+
+    mustache::Node lambdaPartialRoot;
+    engine.tokenize("{{call}}", &lambdaPartialRoot);
+    mustache::Node::Partials lambdaPartials;
+    std::unique_ptr<mustache::Node> lambdaPartial = std::make_unique<mustache::Node>();
+    engine.tokenize("[{{name}}]", lambdaPartial.get());
+    lambdaPartials.emplace("card", std::move(lambdaPartial));
+    const std::vector<std::uint8_t> lambdaPartialArchive =
+        mustache_benchmark::serializeCistaArchive(lambdaPartialRoot, lambdaPartials);
+    mustache::Data lambdaPartialData = mustache::Data::object();
+    lambdaPartialData.set("name", mustache::Data::string("archive"));
+    lambdaPartialData.set("call", mustache::Data::lambda(std::make_unique<FixedLambda>("{{>card}}")));
+    expect(
+        mustache_benchmark::renderCistaArchive(
+            std::string_view(reinterpret_cast<const char *>(lambdaPartialArchive.data()), lambdaPartialArchive.size()),
+            lambdaPartialData) == "[archive]",
+        "lambda-generated owned nodes did not resolve archived partials");
+
+    mustache::RenderLimits lambdaLimits;
+    lambdaLimits.maxLambdaTemplateBytes = 0;
+    expectRejected(
+        lambdaBytes, lambdaData, mustache_benchmark::CistaArchiveLimits(), lambdaLimits, "lambda template byte limit");
 
     mustache::Node inlinePartialRoot;
     engine.tokenize("root", &inlinePartialRoot);

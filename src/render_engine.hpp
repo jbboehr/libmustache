@@ -171,6 +171,78 @@ class RenderString {
 /*! Read-only adapter for the existing owned Node representation. */
 class OwnedNodeView {
   public:
+    class DataPartCursor {
+      public:
+        DataPartCursor() noexcept :
+            parts_(NULL),
+            index_(0)
+        {}
+
+        explicit operator bool() const noexcept
+        {
+          return parts_ != NULL && index_ < parts_->size();
+        }
+
+        RenderString value() const noexcept
+        {
+          assert(static_cast<bool>(*this));
+          return RenderString::fromOwned(&(*parts_)[index_]);
+        }
+
+        void advance() noexcept
+        {
+          assert(static_cast<bool>(*this));
+          ++index_;
+        }
+
+      private:
+        friend class OwnedNodeView;
+
+        explicit DataPartCursor(const std::vector<std::string> * parts) noexcept :
+            parts_(parts),
+            index_(0)
+        {}
+
+        const std::vector<std::string> * parts_;
+        std::size_t index_;
+    };
+
+    class ChildCursor {
+      public:
+        ChildCursor() noexcept :
+            children_(NULL),
+            index_(0)
+        {}
+
+        explicit operator bool() const noexcept
+        {
+          return children_ != NULL && index_ < children_->size();
+        }
+
+        OwnedNodeView value() const noexcept
+        {
+          assert(static_cast<bool>(*this));
+          return OwnedNodeView::fromNode((*children_)[index_].get());
+        }
+
+        void advance() noexcept
+        {
+          assert(static_cast<bool>(*this));
+          ++index_;
+        }
+
+      private:
+        friend class OwnedNodeView;
+
+        explicit ChildCursor(const Node::Children * children) noexcept :
+            children_(children),
+            index_(0)
+        {}
+
+        const Node::Children * children_;
+        std::size_t index_;
+    };
+
     OwnedNodeView() noexcept :
         node_(NULL)
     {}
@@ -203,30 +275,16 @@ class OwnedNodeView {
       return RenderString::fromOwned(node_->data.has_value() ? &*node_->data : NULL);
     }
 
-    std::size_t dataPartCount() const noexcept
+    DataPartCursor dataParts() const noexcept
     {
       assert(node_ != NULL);
-      return node_->dataParts.size();
+      return DataPartCursor(&node_->dataParts);
     }
 
-    RenderString dataPart(std::size_t index) const noexcept
+    ChildCursor children() const noexcept
     {
       assert(node_ != NULL);
-      assert(index < node_->dataParts.size());
-      return RenderString::fromOwned(&node_->dataParts[index]);
-    }
-
-    std::size_t childCount() const noexcept
-    {
-      assert(node_ != NULL);
-      return node_->children.size();
-    }
-
-    OwnedNodeView child(std::size_t index) const noexcept
-    {
-      assert(node_ != NULL);
-      assert(index < node_->children.size());
-      return OwnedNodeView(node_->children[index].get());
+      return ChildCursor(&node_->children);
     }
 
     OwnedNodeView containerChild() const noexcept
@@ -331,6 +389,50 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
     void renderOwnedNode(const Node * node, std::size_t depth) override
     {
       renderNode(OwnedNodeView::fromNode(node), depth);
+    }
+
+    template <typename NodeView> void renderRoot(NodeView root)
+    {
+      if (renderer_._rendering) {
+        throw Exception("Renderer is already rendering");
+      }
+      if (!root) {
+        throw Exception("Empty tree");
+      }
+      if (renderer_._data == NULL) {
+        throw Exception("Empty data");
+      }
+      if (renderer_._output == NULL) {
+        throw Exception("Missing output buffer");
+      }
+      if (renderer_._output->size() > renderer_._limits.maxOutputBytes) {
+        throw Exception("Render output byte limit exceeded");
+      }
+
+      renderer_._rendering = true;
+      renderer_._outputBytes = renderer_._output->size();
+      renderer_._nodeVisits = 0;
+      renderer_._lambdaTemplateBytes = 0;
+      renderer_._indentationStack.clear();
+      renderer_._activeDepth = 0;
+      renderer_._lambdaCallbackDepth = 0;
+      renderer_._stack.clear();
+      const auto renderGuard = onRenderScopeExit([this]() {
+        renderer_._stack.clear();
+        renderer_._indentationStack.clear();
+        renderer_._activeDepth = 0;
+        renderer_._lambdaCallbackDepth = 0;
+        renderer_._rendering = false;
+      });
+
+      if (renderer_._output->empty() && renderer_._output->capacity() == 0) {
+        const std::size_t reserveBytes =
+            std::min(static_cast<std::size_t>(Renderer::outputBufferLength), renderer_._limits.maxOutputBytes);
+        renderer_._output->reserve(reserveBytes);
+      }
+
+      renderer_._stack.push_back(renderer_._data);
+      renderNode(root, 0);
     }
 
     template <typename NodeView>
@@ -471,16 +573,14 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
       return data->find(materialized);
     }
 
-    template <typename NodeView> RenderString validatePartialIndentationAt(NodeView parent, std::size_t index)
+    template <typename NodeView> RenderString validatePartialIndentation(NodeView child, NodeView nextChild)
     {
-      const NodeView child = parent.child(index);
       if (!child || (child.flags() & Node::FlagPartialIndent) == 0) {
         return RenderString();
       }
       const RenderString data = child.data();
       if (child.type() != Node::TypeOutput || child.flags() != (Node::FlagLambdaOnly | Node::FlagPartialIndent) ||
-          !data || !isPartialIndentation(data.value()) || index + 1 >= parent.childCount() ||
-          !parent.child(index + 1) || parent.child(index + 1).type() != Node::TypePartial) {
+          !data || !isPartialIndentation(data.value()) || !nextChild || nextChild.type() != Node::TypePartial) {
         throw Exception("Invalid standalone partial indentation metadata");
       }
       return data;
@@ -488,13 +588,16 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
 
     template <typename NodeView> void renderChildren(NodeView node, std::size_t depth)
     {
-      for (std::size_t index = 0; index < node.childCount(); ++index) {
-        const NodeView child = node.child(index);
-        const RenderString partialIndentation = validatePartialIndentationAt(node, index);
+      auto children = node.children();
+      while (children) {
+        const NodeView child = children.value();
+        children.advance();
+        const NodeView nextChild = children ? children.value() : NodeView();
+        const RenderString partialIndentation = validatePartialIndentation(child, nextChild);
         if (partialIndentation) {
           renderNode(child, depth + 1, RenderString(), true);
-          renderNode(node.child(index + 1), depth + 1, partialIndentation);
-          ++index;
+          renderNode(nextChild, depth + 1, partialIndentation);
+          children.advance();
           continue;
         }
         renderNode(child, depth + 1);
@@ -565,9 +668,13 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
       }
 
       if (appendChildren) {
-        for (std::size_t index = 0; index < node.childCount(); ++index) {
-          validatePartialIndentationAt(node, index);
-          appendLambdaNodeTemplate(node.child(index), start, stop, output, depth + 1);
+        auto children = node.children();
+        while (children) {
+          const NodeView child = children.value();
+          children.advance();
+          const NodeView nextChild = children ? children.value() : NodeView();
+          validatePartialIndentation(child, nextChild);
+          appendLambdaNodeTemplate(child, start, stop, output, depth + 1);
         }
       }
     }
@@ -576,9 +683,12 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
     std::string lambdaSectionText(NodeView node, std::string_view start, std::string_view stop, std::size_t depth)
     {
       std::string output;
-      for (std::size_t index = 0; index < node.childCount(); ++index) {
-        validatePartialIndentationAt(node, index);
-        const NodeView child = node.child(index);
+      auto children = node.children();
+      while (children) {
+        const NodeView child = children.value();
+        children.advance();
+        const NodeView nextChild = children ? children.value() : NodeView();
+        validatePartialIndentation(child, nextChild);
         if (!child) {
           throw Exception("Invalid null child node");
         }
@@ -614,7 +724,8 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
         return NULL;
       }
 
-      const RenderString initial = node.dataPartCount() == 0 ? name : node.dataPart(0);
+      auto dataParts = node.dataParts();
+      const RenderString initial = dataParts ? dataParts.value() : name;
       const Data * reference = NULL;
       for (std::vector<const Data *>::const_reverse_iterator position = renderer_._stack.rbegin();
           position != renderer_._stack.rend(); ++position) {
@@ -624,15 +735,17 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
         }
       }
 
-      if (reference != NULL && node.dataPartCount() > 1) {
-        for (std::size_t index = 1; index < node.dataPartCount(); ++index) {
-          if (reference->type() != Data::TypeMap) {
-            return NULL;
-          }
-          reference = findInMap(reference, node.dataPart(index));
-          if (reference == NULL) {
-            break;
-          }
+      if (dataParts) {
+        dataParts.advance();
+      }
+      while (reference != NULL && dataParts) {
+        if (reference->type() != Data::TypeMap) {
+          return NULL;
+        }
+        reference = findInMap(reference, dataParts.value());
+        dataParts.advance();
+        if (reference == NULL) {
+          break;
         }
       }
       return reference;

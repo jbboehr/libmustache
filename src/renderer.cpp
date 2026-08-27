@@ -1,7 +1,6 @@
 
 #include "renderer.hpp"
 
-#include <algorithm>
 #include <utility>
 
 #include "render_engine.hpp"
@@ -166,45 +165,9 @@ void Renderer::setPartialResolver(PartialResolver resolver)
 
 void Renderer::render()
 {
-  if (_rendering) {
-    throw Exception("Renderer is already rendering");
-  }
-  if (_node == NULL) {
-    throw Exception("Empty tree");
-  } else if (_data == NULL) {
-    throw Exception("Empty data");
-  } else if (_output == NULL) {
-    throw Exception("Missing output buffer");
-  } else if (_output->size() > _limits.maxOutputBytes) {
-    throw Exception("Render output byte limit exceeded");
-  }
-
-  _rendering = true;
-  _outputBytes = _output->size();
-  _nodeVisits = 0;
-  _lambdaTemplateBytes = 0;
-  _indentationStack.clear();
-  _activeDepth = 0;
-  _lambdaCallbackDepth = 0;
-  _stack.clear();
   detail::OwnedPartialSource partialSource(&_partialResolver, _partials, _node);
   detail::RenderEngine<detail::OwnedPartialSource> engine(*this, partialSource);
-  const auto renderGuard = onScopeExit([this]() {
-    _stack.clear();
-    _indentationStack.clear();
-    _activeDepth = 0;
-    _lambdaCallbackDepth = 0;
-    _rendering = false;
-  });
-
-  if (_output->empty() && _output->capacity() == 0) {
-    const std::size_t reserveBytes =
-        std::min(static_cast<std::size_t>(Renderer::outputBufferLength), _limits.maxOutputBytes);
-    _output->reserve(reserveBytes);
-  }
-
-  _stack.push_back(_data);
-  engine.renderOwnedNode(_node, 0);
+  engine.renderRoot(detail::OwnedNodeView::fromNode(_node));
 }
 
 void Renderer::renderForLambda(const Node * node, std::string * output)

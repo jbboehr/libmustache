@@ -1,5 +1,7 @@
 #include "cista-archive.hpp"
 
+#include "render_engine.hpp"
+
 #if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3) && defined(CISTA_FNV1A)
 #undef CISTA_FNV1A
 #endif
@@ -37,7 +39,7 @@ constexpr cista::mode archiveModeDeepCheck = archiveVersionMode | cista::mode::D
 constexpr cista::mode archiveModeIntegrity = archiveVersionMode | cista::mode::WITH_INTEGRITY;
 constexpr cista::mode archiveModeDeepCheckAndIntegrity =
     archiveVersionMode | cista::mode::WITH_INTEGRITY | cista::mode::DEEP_CHECK;
-constexpr std::size_t renderNestingCeiling = 256;
+constexpr std::size_t renderNestingCeiling = mustache::detail::renderNestingCeiling;
 constexpr std::uint32_t invalidIndex = std::numeric_limits<std::uint32_t>::max();
 
 enum Presence : std::uint8_t {
@@ -459,362 +461,211 @@ class ArchiveValidator {
     std::size_t dataParts_;
 };
 
-class ArchiveRenderer {
+class ArchiveChildCursor;
+class ArchiveDataPartCursor;
+
+/*! Zero-copy view of one validated archive node for the shared renderer. */
+class ArchiveNodeView {
   public:
-    ArchiveRenderer(const ArchiveGraph& graph, const mustache::Data& data, const mustache::RenderLimits& limits) :
-        graph_(graph),
-        data_(data),
-        limits_(limits),
-        outputBytes_(0),
-        nodeVisits_(0)
+    ArchiveNodeView() noexcept :
+        graph_(nullptr),
+        index_(invalidIndex)
     {}
 
-    std::string render()
+    static ArchiveNodeView fromNode(const ArchiveGraph * graph, std::uint32_t index) noexcept
     {
-      output_.reserve(std::min<std::size_t>(mustache::Renderer::outputBufferLength, limits_.maxOutputBytes));
-      stack_.push_back(&data_);
-      renderNode(graph_.root, 0, nullptr, false);
-      return std::move(output_);
+      return ArchiveNodeView(graph, index);
+    }
+
+    explicit operator bool() const noexcept
+    {
+      return graph_ != nullptr && index_ != invalidIndex;
+    }
+
+    mustache::Node::Type type() const noexcept
+    {
+      return static_cast<mustache::Node::Type>(node().type);
+    }
+
+    int flags() const noexcept
+    {
+      return static_cast<int>(node().flags);
+    }
+
+    mustache::detail::RenderString data() const noexcept
+    {
+      return string(node().data, HasData);
+    }
+
+    ArchiveDataPartCursor dataParts() const noexcept;
+
+    ArchiveChildCursor children() const noexcept;
+
+    ArchiveNodeView containerChild() const noexcept
+    {
+      return ArchiveNodeView();
+    }
+
+    mustache::detail::RenderString startSequence() const noexcept
+    {
+      return string(node().startSequence, HasStartSequence);
+    }
+
+    mustache::detail::RenderString stopSequence() const noexcept
+    {
+      return string(node().stopSequence, HasStopSequence);
     }
 
   private:
-    struct IndentationFrame {
-        std::vector<std::string_view> components;
-        bool atLineStart = true;
-    };
+    friend class ArchiveChildCursor;
+    friend class ArchiveDataPartCursor;
 
-    const mustache::Data * findInMap(const mustache::Data& data, std::string_view key) const
+    ArchiveNodeView(const ArchiveGraph * graph, std::uint32_t index) noexcept :
+        graph_(graph),
+        index_(index)
+    {}
+
+    const ArchiveNode& node() const noexcept
     {
-      if (data.type() != mustache::Data::TypeMap) {
-        return nullptr;
-      }
-      return data.find(std::string(key));
+      assert(static_cast<bool>(*this));
+      assert(index_ < graph_->nodes.size());
+      return graph_->nodes[index_];
     }
 
-    const mustache::Data * lookup(const ArchiveNode& node)
+    mustache::detail::RenderString string(const ArchiveSlice& slice, std::uint8_t presence) const noexcept
     {
-      const mustache::Data * data = stack_.back();
-      const std::string_view name = archiveSliceView(graph_, node.data);
-      if (name == ".") {
-        return data;
-      }
-      if (const mustache::Data * found = findInMap(*data, name)) {
-        return found;
-      }
-
-      const std::size_t firstDelimiter = name.find('.');
-      const std::string_view initial = name.substr(0, firstDelimiter);
-      const mustache::Data * reference = nullptr;
-      for (std::vector<const mustache::Data *>::const_reverse_iterator position = stack_.rbegin();
-          position != stack_.rend(); ++position) {
-        if (*position != nullptr && (reference = findInMap(**position, initial)) != nullptr) {
-          break;
-        }
-      }
-      std::size_t offset = firstDelimiter;
-      while (reference != nullptr && offset != std::string_view::npos) {
-        const std::size_t start = offset + 1;
-        offset = name.find('.', start);
-        reference = findInMap(*reference, name.substr(start, offset - start));
-      }
-      return reference;
+      return (node().presence & presence) == 0
+          ? mustache::detail::RenderString()
+          : mustache::detail::RenderString::fromView(archiveSliceView(*graph_, slice));
     }
 
-    void consumeNodeVisit(std::size_t depth)
+    const ArchiveGraph * graph_;
+    std::uint32_t index_;
+};
+
+/*! Single-pass cursor over dotted components borrowed from an archive string. */
+class ArchiveDataPartCursor {
+  public:
+    ArchiveDataPartCursor() noexcept :
+        value_(),
+        start_(0),
+        stop_(std::string_view::npos),
+        valid_(false)
+    {}
+
+    explicit operator bool() const noexcept
     {
-      if (depth >= limits_.maxNestingDepth || depth >= renderNestingCeiling) {
-        throw mustache::Exception("Render nesting limit exceeded");
-      }
-      if (nodeVisits_ >= limits_.maxNodeVisits) {
-        throw mustache::Exception("Render node visit limit exceeded");
-      }
-      ++nodeVisits_;
+      return valid_;
     }
 
-    void append(std::string_view value)
+    mustache::detail::RenderString value() const noexcept
     {
-      if (outputBytes_ > limits_.maxOutputBytes || value.size() > limits_.maxOutputBytes - outputBytes_ ||
-          output_.size() > output_.max_size() || value.size() > output_.max_size() - output_.size()) {
-        throw mustache::Exception("Render output byte limit exceeded");
-      }
-      outputBytes_ += value.size();
-      if (!value.empty()) {
-        output_.append(value.data(), value.size());
-      }
+      assert(valid_);
+      const std::size_t length = stop_ == std::string_view::npos ? value_.size() - start_ : stop_ - start_;
+      return mustache::detail::RenderString::fromView(value_.substr(start_, length));
     }
 
-    void appendEscaped(std::string_view value)
+    void advance() noexcept
     {
-      for (const char character : value) {
-        switch (character) {
-          case '&':
-            append("&amp;");
-            break;
-          case '"':
-            append("&quot;");
-            break;
-          case '\'':
-            append("&#039;");
-            break;
-          case '<':
-            append("&lt;");
-            break;
-          case '>':
-            append("&gt;");
-            break;
-          default:
-            append(std::string_view(&character, 1));
-            break;
-        }
-      }
-    }
-
-    void appendIndentation(const IndentationFrame& frame)
-    {
-      for (const std::string_view component : frame.components) {
-        append(component);
-      }
-    }
-
-    void appendTemplateOutput(std::string_view value)
-    {
-      if (indentationStack_.empty()) {
-        append(value);
+      assert(valid_);
+      if (stop_ == std::string_view::npos) {
+        valid_ = false;
         return;
       }
-      IndentationFrame& frame = indentationStack_.back();
-      std::size_t offset = 0;
-      while (offset < value.size()) {
-        if (frame.atLineStart) {
-          appendIndentation(frame);
-          frame.atLineStart = false;
-        }
-        const std::size_t newline = value.find('\n', offset);
-        if (newline == std::string_view::npos) {
-          append(value.substr(offset));
-          return;
-        }
-        append(value.substr(offset, newline - offset + 1));
-        frame.atLineStart = true;
-        offset = newline + 1;
-      }
+      start_ = stop_ + 1;
+      stop_ = value_.find('.', start_);
     }
 
-    void consumeTemplateSource(std::string_view value)
+  private:
+    friend class ArchiveNodeView;
+
+    explicit ArchiveDataPartCursor(std::string_view value) noexcept :
+        value_(value),
+        start_(0),
+        stop_(value.find('.')),
+        valid_(stop_ != std::string_view::npos)
+    {}
+
+    std::string_view value_;
+    std::size_t start_;
+    std::size_t stop_;
+    bool valid_;
+};
+
+/*! Linear cursor over an archive node's sibling-linked child list. */
+class ArchiveChildCursor {
+  public:
+    ArchiveChildCursor() noexcept :
+        graph_(nullptr),
+        index_(invalidIndex)
+    {}
+
+    explicit operator bool() const noexcept
     {
-      if (indentationStack_.empty()) {
-        return;
-      }
-      IndentationFrame& frame = indentationStack_.back();
-      if (value.empty()) {
-        frame.atLineStart = false;
-        return;
-      }
-      for (const char character : value) {
-        frame.atLineStart = character == '\n';
-      }
+      return graph_ != nullptr && index_ != invalidIndex;
     }
 
-    void beginTemplateTag()
+    ArchiveNodeView value() const noexcept
     {
-      if (!indentationStack_.empty() && indentationStack_.back().atLineStart) {
-        appendIndentation(indentationStack_.back());
-        indentationStack_.back().atLineStart = false;
-      }
+      assert(static_cast<bool>(*this));
+      return ArchiveNodeView::fromNode(graph_, index_);
     }
 
-    void renderChildren(const ArchiveNode& node, std::size_t depth)
+    void advance() noexcept
     {
-      std::uint32_t childIndex = node.firstChild;
-      while (childIndex != invalidIndex) {
-        const ArchiveNode& child = graph_.nodes[childIndex];
-        const std::uint32_t nextSibling = child.nextSibling;
-        if ((child.flags & mustache::Node::FlagPartialIndent) != 0) {
-          renderNode(childIndex, depth + 1, nullptr, true);
-          const std::string_view indentation = archiveSliceView(graph_, child.data);
-          renderNode(nextSibling, depth + 1, &indentation, false);
-          childIndex = graph_.nodes[nextSibling].nextSibling;
-        } else {
-          renderNode(childIndex, depth + 1, nullptr, false);
-          childIndex = nextSibling;
-        }
-      }
+      assert(static_cast<bool>(*this));
+      index_ = graph_->nodes[index_].nextSibling;
     }
 
-    void renderWithContext(const ArchiveNode& node, const mustache::Data& context, std::size_t depth)
-    {
-      stack_.push_back(&context);
-      try {
-        renderChildren(node, depth);
-      } catch (...) {
-        stack_.pop_back();
-        throw;
-      }
-      stack_.pop_back();
-    }
+  private:
+    friend class ArchiveNodeView;
 
-    const ArchivePartial * findPartial(std::string_view name) const
+    ArchiveChildCursor(const ArchiveGraph * graph, std::uint32_t index) noexcept :
+        graph_(graph),
+        index_(index)
+    {}
+
+    const ArchiveGraph * graph_;
+    std::uint32_t index_;
+};
+
+ArchiveChildCursor ArchiveNodeView::children() const noexcept
+{
+  return ArchiveChildCursor(graph_, node().firstChild);
+}
+
+ArchiveDataPartCursor ArchiveNodeView::dataParts() const noexcept
+{
+  if ((type() & mustache::Node::TypeHasDot) == 0) {
+    return ArchiveDataPartCursor();
+  }
+  return ArchiveDataPartCursor(archiveSliceView(*graph_, node().data));
+}
+
+/*! Partial lookup policy over the archive's sorted partial index. */
+class ArchivePartialSource {
+  public:
+    explicit ArchivePartialSource(const ArchiveGraph& graph) noexcept :
+        graph_(graph)
+    {}
+
+    template <typename Callback> bool withPartial(mustache::detail::RenderString name, Callback&& callback) const
     {
-      const auto position = std::lower_bound(graph_.partials.begin(), graph_.partials.end(), name,
-          [this](const ArchivePartial& partial, std::string_view expected) {
-            return archiveSliceView(graph_, partial.name) < expected;
+      assert(name);
+      const std::string_view expected = name.value();
+      const auto position = std::lower_bound(graph_.partials.begin(), graph_.partials.end(), expected,
+          [this](const ArchivePartial& partial, std::string_view value) {
+            return archiveSliceView(graph_, partial.name) < value;
           });
-      if (position != graph_.partials.end() && archiveSliceView(graph_, position->name) == name) {
-        return &*position;
+      if (position == graph_.partials.end() || archiveSliceView(graph_, position->name) != expected) {
+        return false;
       }
-      return nullptr;
+      std::forward<Callback>(callback)(ArchiveNodeView::fromNode(&graph_, position->root));
+      return true;
     }
 
-    void renderNode(std::uint32_t index, std::size_t depth, const std::string_view * partialIndentation,
-        bool partialIndentationMetadata)
-    {
-      consumeNodeVisit(depth);
-      const ArchiveNode& node = graph_.nodes[index];
-      if ((node.flags & mustache::Node::FlagPartialIndent) != 0 && !partialIndentationMetadata) {
-        throw mustache::Exception("Invalid Cista archive partial indentation metadata");
-      }
-
-      const mustache::Node::Type type = static_cast<mustache::Node::Type>(node.type);
-      const mustache::Data * value = nullptr;
-      bool valueIsEmpty = true;
-      if ((type & mustache::Node::TypeHasData) != 0) {
-        value = lookup(node);
-        valueIsEmpty = value == nullptr || value->isEmpty();
-      }
-
-      switch (type) {
-        case mustache::Node::TypeNone:
-          return;
-        case mustache::Node::TypeComment:
-        case mustache::Node::TypeStop:
-        case mustache::Node::TypeInlinePartial:
-          beginTemplateTag();
-          return;
-        case mustache::Node::TypeRoot:
-          renderChildren(node, depth);
-          return;
-        case mustache::Node::TypeOutput:
-          if ((node.presence & HasData) != 0) {
-            if ((node.flags & mustache::Node::FlagLambdaOnly) != 0) {
-              consumeTemplateSource(archiveSliceView(graph_, node.data));
-            } else {
-              appendTemplateOutput(archiveSliceView(graph_, node.data));
-            }
-          }
-          return;
-        case mustache::Node::TypeTag:
-        case mustache::Node::TypeVariable:
-          beginTemplateTag();
-          if (!valueIsEmpty) {
-            renderValue(node, *value);
-          }
-          return;
-        case mustache::Node::TypeNegate:
-          beginTemplateTag();
-          if (valueIsEmpty) {
-            renderChildren(node, depth);
-          }
-          return;
-        case mustache::Node::TypeSection:
-          beginTemplateTag();
-          if (!valueIsEmpty) {
-            renderSection(node, *value, depth);
-          }
-          return;
-        case mustache::Node::TypePartial: {
-          beginTemplateTag();
-          const ArchivePartial * partial = findPartial(archiveSliceView(graph_, node.data));
-          if (partial == nullptr) {
-            return;
-          }
-          IndentationFrame frame;
-          if (partialIndentation != nullptr) {
-            if (!indentationStack_.empty()) {
-              frame.components = indentationStack_.back().components;
-            }
-            if (!partialIndentation->empty()) {
-              frame.components.push_back(*partialIndentation);
-            }
-          }
-          indentationStack_.push_back(std::move(frame));
-          try {
-            renderNode(partial->root, depth + 1, nullptr, false);
-          } catch (...) {
-            indentationStack_.pop_back();
-            throw;
-          }
-          indentationStack_.pop_back();
-          return;
-        }
-        default:
-          throw mustache::Exception("Unsupported Cista archive node type");
-      }
-    }
-
-    void renderValue(const ArchiveNode& node, const mustache::Data& value)
-    {
-      std::string rendered;
-      std::string_view view;
-      switch (value.type()) {
-        case mustache::Data::TypeString:
-          view = value.stringValue();
-          break;
-        case mustache::Data::TypeBoolean:
-        case mustache::Data::TypeInteger:
-        case mustache::Data::TypeDouble:
-          rendered = value.toString();
-          view = rendered;
-          break;
-        case mustache::Data::TypeLambda:
-          throw mustache::Exception("Cista archive experiment does not support lambdas");
-        case mustache::Data::TypeNone:
-        case mustache::Data::TypeList:
-        case mustache::Data::TypeMap:
-        case mustache::Data::TypeArray:
-          return;
-      }
-      if ((node.flags & mustache::Node::FlagEscape) != 0) {
-        appendEscaped(view);
-      } else {
-        append(view);
-      }
-    }
-
-    void renderSection(const ArchiveNode& node, const mustache::Data& value, std::size_t depth)
-    {
-      switch (value.type()) {
-        case mustache::Data::TypeString:
-        case mustache::Data::TypeBoolean:
-        case mustache::Data::TypeInteger:
-        case mustache::Data::TypeDouble:
-        case mustache::Data::TypeMap:
-          renderWithContext(node, value, depth);
-          return;
-        case mustache::Data::TypeList:
-          for (const mustache::Data& child : value.listItems()) {
-            renderWithContext(node, child, depth);
-          }
-          return;
-        case mustache::Data::TypeArray:
-          for (const mustache::Data& child : value.arrayItems()) {
-            renderWithContext(node, child, depth);
-          }
-          return;
-        case mustache::Data::TypeLambda:
-          throw mustache::Exception("Cista archive experiment does not support lambdas");
-        case mustache::Data::TypeNone:
-          return;
-      }
-    }
-
+  private:
     const ArchiveGraph& graph_;
-    const mustache::Data& data_;
-    const mustache::RenderLimits& limits_;
-    std::string output_;
-    std::vector<const mustache::Data *> stack_;
-    std::vector<IndentationFrame> indentationStack_;
-    std::size_t outputBytes_;
-    std::size_t nodeVisits_;
 };
 
 template <cista::mode Mode> const ArchiveGraph& readArchive(std::string_view bytes, const CistaArchiveLimits& limits)
@@ -858,7 +709,14 @@ template <cista::mode Mode>
 std::string renderCistaArchiveWithMode(std::string_view bytes, const mustache::Data& data,
     const CistaArchiveLimits& archiveLimits, const mustache::RenderLimits& renderLimits)
 {
-  return ArchiveRenderer(readArchive<Mode>(bytes, archiveLimits), data, renderLimits).render();
+  const ArchiveGraph& graph = readArchive<Mode>(bytes, archiveLimits);
+  std::string output;
+  mustache::Renderer renderer;
+  renderer.init(nullptr, &data, nullptr, &output, renderLimits);
+  ArchivePartialSource partialSource(graph);
+  mustache::detail::RenderEngine<ArchivePartialSource> engine(renderer, partialSource);
+  engine.renderRoot(ArchiveNodeView::fromNode(&graph, graph.root));
+  return output;
 }
 
 } // namespace
