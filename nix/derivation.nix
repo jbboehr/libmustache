@@ -24,6 +24,9 @@
   sanitizerSupport ? false,
   fuzzSupport ? false,
   clangTidySupport ? false,
+  archivedTemplateSupport ? false,
+  useSystemCista ? false,
+  useSystemXxhash ? false,
   cistaBenchmarkSupport ? false,
   cistaBuiltinXxh3Support ? false,
 }:
@@ -35,6 +38,9 @@ stdenv.mkDerivation (finalAttrs: {
     + lib.optionalString sanitizerSupport "-sanitized"
     + lib.optionalString fuzzSupport "-fuzz"
     + lib.optionalString clangTidySupport "-clang-tidy"
+    + lib.optionalString archivedTemplateSupport "-archived-templates"
+    + lib.optionalString useSystemCista "-system-cista"
+    + lib.optionalString useSystemXxhash "-system-xxhash"
     + lib.optionalString cistaBenchmarkSupport "-cista-benchmark"
     + lib.optionalString cistaBuiltinXxh3Support "-builtin-xxh3";
   version = "0.6.0";
@@ -68,9 +74,16 @@ stdenv.mkDerivation (finalAttrs: {
   separateDebugInfo = debugSupport;
   dontStrip = sanitizerSupport || fuzzSupport;
 
-  buildInputs =
+  buildInputs = assert !cistaBenchmarkSupport || cmakeSupport;
+  assert !useSystemCista || archivedTemplateSupport || (cmakeSupport && cistaBenchmarkSupport);
+  assert !useSystemCista || cista != null;
+  assert !useSystemXxhash || archivedTemplateSupport || (cmakeSupport && cistaBenchmarkSupport);
+  assert !useSystemXxhash || xxhash != null;
+  assert !(archivedTemplateSupport || cistaBenchmarkSupport) || zlib != null;
     lib.optional (nlohmann_json != null) nlohmann_json
-    ++ lib.optionals cistaBenchmarkSupport [cista xxhash zlib];
+    ++ lib.optional (useSystemCista && (archivedTemplateSupport || cistaBenchmarkSupport)) cista
+    ++ lib.optional (useSystemXxhash && (archivedTemplateSupport || cistaBenchmarkSupport)) xxhash
+    ++ lib.optional (archivedTemplateSupport || cistaBenchmarkSupport) zlib;
   propagatedBuildInputs = lib.optional (libyaml != null) libyaml;
   nativeBuildInputs =
     lib.optional checkSupport mustache_spec
@@ -97,6 +110,9 @@ stdenv.mkDerivation (finalAttrs: {
     ++ lib.optional checkSupport "--enable-warnings-as-errors"
     ++ lib.optionals staticOnlySupport ["--disable-shared" "--enable-static"]
     ++ lib.optional sanitizerSupport "--enable-sanitizers"
+    ++ lib.optional archivedTemplateSupport "--enable-archived-templates"
+    ++ lib.optional useSystemCista "--with-system-cista"
+    ++ lib.optional useSystemXxhash "--with-system-xxhash"
     ++ lib.optional (nlohmann_json == null) "--without-json"
     ++ lib.optional (libyaml == null) "--without-yaml";
 
@@ -109,6 +125,9 @@ stdenv.mkDerivation (finalAttrs: {
       (lib.cmakeBool "MUSTACHE_ENABLE_SANITIZERS" sanitizerSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_FUZZING" fuzzSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_CLANG_TIDY" clangTidySupport)
+      (lib.cmakeBool "MUSTACHE_ENABLE_ARCHIVED_TEMPLATES" archivedTemplateSupport)
+      (lib.cmakeBool "MUSTACHE_USE_SYSTEM_CISTA" useSystemCista)
+      (lib.cmakeBool "MUSTACHE_USE_SYSTEM_XXHASH" useSystemXxhash)
       (lib.cmakeBool "MUSTACHE_ENABLE_CISTA_BENCHMARK" cistaBenchmarkSupport)
       (lib.cmakeBool "MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3" cistaBuiltinXxh3Support)
       "-DMUSTACHE_ENABLE_JSON=${
@@ -128,6 +147,16 @@ stdenv.mkDerivation (finalAttrs: {
       }"
     ]
     ++ lib.optional checkSupport "-DMUSTACHE_SPEC_DIR=${mustache_spec}/share/mustache-spec/specs";
+
+  postBuild =
+    lib.optionalString (
+      cmakeSupport && archivedTemplateSupport && !cistaBenchmarkSupport
+    ) ''
+      if test -e benchmarks/mustache_ast_cache_vs_source; then
+        echo "archive-only CMake build unexpectedly included the AST benchmark" >&2
+        exit 1
+      fi
+    '';
 
   postInstall = lib.optionalString stdenv.hostPlatform.isLinux ''
     patchelf --add-rpath "$lib/lib" "$out/bin/mustachec"
@@ -243,10 +272,20 @@ stdenv.mkDerivation (finalAttrs: {
       runHook postInstallCheck
     '';
 
-  # Explicitly disabled adapters must ignore caller/config-site overrides.
-  # Poison these variables so the no-YAML checks enforce that contract.
+  # Explicitly disabled adapters and the bundled Autotools Cista selection
+  # must ignore caller/config-site overrides. Poison these variables so checks
+  # enforce that contract.
   YAML_CFLAGS = lib.optionalString (libyaml == null) "-I/definitely-missing-libmustache-yaml-headers";
   YAML_LIBS = lib.optionalString (libyaml == null) "-lmustache-disabled-yaml-must-not-link";
+  CISTA_CFLAGS =
+    lib.optionalString (!cmakeSupport && archivedTemplateSupport && !useSystemCista)
+    "-include /definitely-missing-libmustache-system-cista-header";
+  XXHASH_CFLAGS =
+    lib.optionalString (!cmakeSupport && archivedTemplateSupport && !useSystemXxhash)
+    "-I/definitely-missing-libmustache-system-xxhash-headers";
+  XXHASH_LIBS =
+    lib.optionalString (!cmakeSupport && archivedTemplateSupport && !useSystemXxhash)
+    "-lmustache-vendored-xxhash-must-not-link";
 
   meta = {
     description = "C++ implementation of Mustache templates";

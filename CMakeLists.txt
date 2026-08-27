@@ -35,6 +35,12 @@ option(MUSTACHE_WARNINGS_AS_ERRORS "Treat project compiler warnings as errors" O
 option(MUSTACHE_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(MUSTACHE_ENABLE_FUZZING "Build the Clang libFuzzer targets and smoke tests" OFF)
 option(MUSTACHE_ENABLE_CLANG_TIDY "Run clang-tidy on production targets" OFF)
+option(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES
+    "Build the experimental archived-template implementation" OFF)
+option(MUSTACHE_USE_SYSTEM_CISTA
+    "Use a system Cista package instead of the bundled private snapshot" OFF)
+option(MUSTACHE_USE_SYSTEM_XXHASH
+    "Use a system xxHash package instead of the bundled private snapshot" OFF)
 option(MUSTACHE_ENABLE_CISTA_BENCHMARK "Build the experimental Cista archive benchmark" OFF)
 set(MUSTACHE_ENABLE_JSON AUTO CACHE STRING
     "Build JSON support: AUTO, ON, or OFF")
@@ -49,6 +55,23 @@ option(MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3
 if(MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3 AND NOT MUSTACHE_ENABLE_CISTA_BENCHMARK)
     message(FATAL_ERROR
         "MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3 requires MUSTACHE_ENABLE_CISTA_BENCHMARK")
+endif()
+
+set(MUSTACHE_NEED_CISTA OFF)
+if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
+    set(MUSTACHE_NEED_CISTA ON)
+endif()
+
+if(MUSTACHE_USE_SYSTEM_CISTA AND NOT MUSTACHE_NEED_CISTA)
+    message(FATAL_ERROR
+        "MUSTACHE_USE_SYSTEM_CISTA requires MUSTACHE_ENABLE_ARCHIVED_TEMPLATES "
+        "or MUSTACHE_ENABLE_CISTA_BENCHMARK")
+endif()
+
+if(MUSTACHE_USE_SYSTEM_XXHASH AND NOT MUSTACHE_NEED_CISTA)
+    message(FATAL_ERROR
+        "MUSTACHE_USE_SYSTEM_XXHASH requires MUSTACHE_ENABLE_ARCHIVED_TEMPLATES "
+        "or MUSTACHE_ENABLE_CISTA_BENCHMARK")
 endif()
 
 foreach(MUSTACHE_OPTION IN ITEMS MUSTACHE_ENABLE_JSON MUSTACHE_ENABLE_YAML)
@@ -120,12 +143,51 @@ if(NOT MUSTACHE_ENABLE_JSON STREQUAL "OFF")
 endif()
 message(STATUS "JSON support: ${MUSTACHE_HAVE_LIBJSON}")
 
-if(MUSTACHE_ENABLE_CISTA_BENCHMARK)
-    # nixpkgs packages Cista 0.16 with CMake metadata reporting version 0.7,
-    # so requesting the package version would reject the available dependency.
-    find_package(cista CONFIG REQUIRED)
+if(MUSTACHE_NEED_CISTA)
     find_package(ZLIB REQUIRED)
-    find_package(xxHash CONFIG REQUIRED)
+
+    if(MUSTACHE_USE_SYSTEM_XXHASH)
+        find_package(xxHash 0.8 CONFIG REQUIRED)
+        set(MUSTACHE_XXHASH_TARGET xxHash::xxhash)
+    else()
+        set(MUSTACHE_VENDORED_XXHASH_HEADER
+            "${CMAKE_CURRENT_SOURCE_DIR}/vendor/xxhash/xxhash.h")
+        if(NOT EXISTS "${MUSTACHE_VENDORED_XXHASH_HEADER}")
+            message(FATAL_ERROR
+                "Bundled xxHash header is missing: ${MUSTACHE_VENDORED_XXHASH_HEADER}")
+        endif()
+        add_library(mustache_xxhash_headers INTERFACE)
+        target_include_directories(mustache_xxhash_headers SYSTEM INTERFACE
+            "${CMAKE_CURRENT_SOURCE_DIR}/vendor/xxhash")
+        # Keep one private implementation in the archive translation unit.
+        # XXH_INLINE_ALL makes Cista 0.16 runtime type hashes unstable under
+        # optimized GCC builds, while the implementation mode is deterministic.
+        target_compile_definitions(mustache_xxhash_headers INTERFACE
+            XXH_IMPLEMENTATION=1
+            XXH_STATIC_LINKING_ONLY=1
+            XXH_NAMESPACE=MUSTACHE_CISTA_XXH_)
+        set(MUSTACHE_XXHASH_TARGET mustache_xxhash_headers)
+    endif()
+
+    if(MUSTACHE_USE_SYSTEM_CISTA)
+        # nixpkgs packages Cista 0.16 with CMake metadata reporting version
+        # 0.7, so requesting the package version would reject the available
+        # dependency.
+        find_package(cista CONFIG REQUIRED)
+        set(MUSTACHE_CISTA_TARGET cista::cista)
+    else()
+        set(MUSTACHE_VENDORED_CISTA_HEADER
+            "${CMAKE_CURRENT_SOURCE_DIR}/vendor/cista/cista.h")
+        if(NOT EXISTS "${MUSTACHE_VENDORED_CISTA_HEADER}")
+            message(FATAL_ERROR
+                "Bundled Cista header is missing: ${MUSTACHE_VENDORED_CISTA_HEADER}")
+        endif()
+        add_library(mustache_cista_headers INTERFACE)
+        target_include_directories(mustache_cista_headers SYSTEM INTERFACE
+            "${CMAKE_CURRENT_SOURCE_DIR}/vendor/cista")
+        target_compile_features(mustache_cista_headers INTERFACE cxx_std_17)
+        set(MUSTACHE_CISTA_TARGET mustache_cista_headers)
+    endif()
 endif()
 
 set(MUSTACHE_HAVE_LIBYAML OFF)
@@ -234,7 +296,7 @@ function(mustache_enable_clang_tidy target)
 endfunction()
 
 add_subdirectory(src)
-if(MUSTACHE_ENABLE_CISTA_BENCHMARK)
+if(MUSTACHE_NEED_CISTA)
     add_subdirectory(benchmarks)
 else()
     add_subdirectory(benchmarks EXCLUDE_FROM_ALL)

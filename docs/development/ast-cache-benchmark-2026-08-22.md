@@ -182,7 +182,9 @@ nix develop --command cmake -S . -B build/benchmark-cista \
   -DMUSTACHE_BUILD_CLI=OFF \
   -DMUSTACHE_ENABLE_TESTS=ON \
   -DMUSTACHE_ENABLE_ASSERTIONS=OFF \
-  -DMUSTACHE_ENABLE_CISTA_BENCHMARK=ON
+  -DMUSTACHE_ENABLE_CISTA_BENCHMARK=ON \
+  -DMUSTACHE_USE_SYSTEM_CISTA=ON \
+  -DMUSTACHE_USE_SYSTEM_XXHASH=ON
 nix develop --command cmake --build build/benchmark-cista -j4
 nix develop --command ctest --test-dir build/benchmark-cista --output-on-failure
 nix develop --command taskset -c 0 \
@@ -191,8 +193,11 @@ nix develop --command taskset -c 0 \
 
 Enabling the benchmark selects Cista's native
 `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` path with the supplied XXH3 by
-default. Pass `-DMUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3=OFF` only to reproduce
-the historical static-version/FNV-1a comparison.
+default. Omit either system override to use the corresponding pinned private
+snapshot in `vendor/cista` or `vendor/xxhash`; the explicit system overrides
+above reproduce the recorded nixpkgs environment. Pass
+`-DMUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3=OFF` only to reproduce the historical
+static-version/FNV-1a comparison.
 
 The 2026-08-25 checksum runs used `nice -n 10` without CPU affinity on a shared
 workstation. To reduce ordering bias, every sample rotates which security mode
@@ -462,15 +467,20 @@ If the feasibility work continues, use this integration policy:
 
 - Keep archived templates optional and default off initially, under
   `MUSTACHE_ENABLE_ARCHIVED_TEMPLATES`.
-- Vendor a reviewed and pinned Cista snapshot as a private implementation
-  dependency, together with its
+- Vendor reviewed and pinned Cista and xxHash snapshots as private
+  implementation dependencies, together with their
   [MIT license](https://github.com/felixguendling/cista/blob/master/LICENSE),
+  [BSD 2-Clause license](https://github.com/Cyan4973/xxHash/blob/dev/LICENSE),
   provenance, and update instructions. Cista officially supports a
   [single-header integration](https://github.com/felixguendling/cista/wiki/Installation-and-Usage),
   so this does not require a submodule or configure-time network access.
-- Optionally provide a default-off `MUSTACHE_USE_SYSTEM_CISTA` override for
-  packagers. Test both paths and fail configuration clearly when the requested
-  system version or features are unavailable.
+- Provide independent, default-off `MUSTACHE_USE_SYSTEM_CISTA` and
+  `MUSTACHE_USE_SYSTEM_XXHASH` overrides for packagers. Both build systems test
+  all four bundled/system combinations and fail configuration clearly when a
+  requested system version or feature is unavailable. Standard CMake package
+  search variables and Autotools `CISTA_CFLAGS`/`XXHASH_CFLAGS`/`XXHASH_LIBS`
+  overrides support non-standard dependency prefixes without adding another
+  project-specific path option.
 - Do not expose `cista::*` in installed headers. Expose a libmustache-owned
   `ArchivedTemplateView` alongside the ordinary owned `Node`/`CompiledTemplate`
   path, and route both through a shared renderer algorithm using internal view

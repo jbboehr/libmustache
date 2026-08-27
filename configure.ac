@@ -287,6 +287,77 @@ AM_CONDITIONAL([MUSTACHE_SPEC_TEST_ENABLED],
     [test "x$mustache_spec_enabled" = "xyes" &&
      test "x$mustache_yaml_enabled" = "xyes"])
 
+AC_ARG_ENABLE([archived-templates],
+    [AS_HELP_STRING([--enable-archived-templates],
+        [build the experimental archived-template implementation @<:@default=no@:>@])],
+    [], [enable_archived_templates=no])
+AS_CASE([$enable_archived_templates],
+    [yes|no], [],
+    [AC_MSG_ERROR([--enable-archived-templates accepts only yes or no])])
+
+AC_ARG_WITH([system-cista],
+    [AS_HELP_STRING([--with-system-cista],
+        [use a system Cista package instead of the bundled private snapshot @<:@default=no@:>@])],
+    [], [with_system_cista=no])
+AS_CASE([$with_system_cista],
+    [yes|no], [],
+    [AC_MSG_ERROR([--with-system-cista accepts only yes or no])])
+AS_IF([test "x$with_system_cista" = "xyes" &&
+        test "x$enable_archived_templates" != "xyes"], [
+    AC_MSG_ERROR([--with-system-cista requires --enable-archived-templates])
+])
+
+AC_ARG_WITH([system-xxhash],
+    [AS_HELP_STRING([--with-system-xxhash],
+        [use a system xxHash package instead of the bundled private snapshot @<:@default=no@:>@])],
+    [], [with_system_xxhash=no])
+AS_CASE([$with_system_xxhash],
+    [yes|no], [],
+    [AC_MSG_ERROR([--with-system-xxhash accepts only yes or no])])
+AS_IF([test "x$with_system_xxhash" = "xyes" &&
+        test "x$enable_archived_templates" != "xyes"], [
+    AC_MSG_ERROR([--with-system-xxhash requires --enable-archived-templates])
+])
+
+AC_ARG_VAR([CISTA_CFLAGS],
+    [C++ preprocessor flags for a system Cista installation])
+AS_IF([test "x$enable_archived_templates" = "xyes"], [
+    PKG_CHECK_MODULES([ZLIB], [zlib])
+
+    AS_IF([test "x$with_system_xxhash" = "xyes"], [
+        PKG_CHECK_MODULES([XXHASH], [libxxhash >= 0.8.0])
+    ], [
+        AS_IF([test ! -f "$srcdir/vendor/xxhash/xxhash.h"], [
+            AC_MSG_ERROR([bundled xxHash header is missing: $srcdir/vendor/xxhash/xxhash.h])
+        ])
+    ])
+
+    AS_IF([test "x$with_system_cista" = "xyes"], [
+        mustache_save_CPPFLAGS=$CPPFLAGS
+        CPPFLAGS="$CPPFLAGS $CISTA_CFLAGS"
+        AC_CHECK_HEADER([cista/serialization.h], [], [
+            AC_MSG_ERROR([a system Cista installation is required for --with-system-cista])
+        ])
+        CPPFLAGS=$mustache_save_CPPFLAGS
+    ], [
+        AS_IF([test ! -f "$srcdir/vendor/cista/cista.h"], [
+            AC_MSG_ERROR([bundled Cista header is missing: $srcdir/vendor/cista/cista.h])
+        ])
+    ])
+])
+AM_CONDITIONAL([MUSTACHE_ARCHIVED_TEMPLATES_ENABLED],
+    [test "x$enable_archived_templates" = "xyes"])
+AM_CONDITIONAL([MUSTACHE_SYSTEM_CISTA],
+    [test "x$with_system_cista" = "xyes"])
+AM_CONDITIONAL([MUSTACHE_SYSTEM_XXHASH],
+    [test "x$with_system_xxhash" = "xyes"])
+AC_MSG_CHECKING([whether archived-template support is enabled])
+AC_MSG_RESULT([$enable_archived_templates])
+AC_MSG_CHECKING([whether archived-template support uses system Cista])
+AC_MSG_RESULT([$with_system_cista])
+AC_MSG_CHECKING([whether archived-template support uses system xxHash])
+AC_MSG_RESULT([$with_system_xxhash])
+
 AC_CHECK_HEADERS([cstdlib dirent.h exception fstream iostream list map memory sstream stack stdexcept string utility vector yaml.h])
 AC_TYPE_INT32_T
 AC_TYPE_LONG_LONG_INT

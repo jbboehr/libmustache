@@ -31,12 +31,15 @@ in
     sanitizerSupport ? false,
     fuzzSupport ? false,
     clangTidySupport ? false,
+    archivedTemplateSupport ? false,
+    useSystemCista ? false,
+    useSystemXxhash ? false,
     cistaBenchmarkSupport ? false,
     cistaBuiltinXxh3Support ? false,
   }:
     pkgs.callPackage ./nix/derivation.nix {
       inherit stdenv clang-tools cista nlohmann_json libyaml xxhash zlib mustache_spec libmustacheSrc;
       inherit checkSupport cmakeSupport staticOnlySupport debugSupport sanitizerSupport fuzzSupport clangTidySupport;
-      inherit cistaBenchmarkSupport cistaBuiltinXxh3Support;
+      inherit archivedTemplateSupport useSystemCista useSystemXxhash cistaBenchmarkSupport cistaBuiltinXxh3Support;
       inherit gitignoreFilterWith;
     }

@@ -671,16 +671,18 @@ libmustache semantic validation, and fuzz validation and rendering before the
 one-fetch/one-render PHP/APCu experiment. XXH3 detects accidental corruption;
 it does not authenticate hostile cache contents.
 
-If this feature proceeds, vendor a reviewed, pinned Cista snapshot and its MIT
-license as a private implementation dependency. Record its provenance and
-update procedure, and avoid a submodule or configure-time `FetchContent`.
-Packagers may receive a default-off `MUSTACHE_USE_SYSTEM_CISTA` override, but
-the vendored and system configurations must both be tested. No `cista::*` type
-may appear in installed public headers. The archive header and PHP cache key
-must identify the libmustache archive schema, Cista snapshot, pointer width,
-endianness, and other compiler/platform assumptions. Cista updates and schema
-changes require explicit compatibility review and golden-fixture tests rather
-than silently changing existing cache bytes.
+The implementation vendors reviewed, pinned Cista and xxHash snapshots with
+their licenses as private implementation dependencies. Their provenance and
+update procedures are recorded, without a submodule or configure-time
+download. Packagers have independent, default-off system-dependency overrides;
+CMake and Autotools test all four bundled/system combinations. Standard CMake
+package search variables and Autotools compiler/linker flag overrides cover
+non-standard prefixes. No `cista::*` type may appear in installed public
+headers. The archive header and PHP cache key must identify the libmustache
+archive schema, Cista snapshot, pointer width, endianness, and other
+compiler/platform assumptions. Cista updates and schema changes require
+explicit compatibility review and golden-fixture tests rather than silently
+changing existing cache bytes.
 
 The next end-to-end performance slice is the real one-fetch/one-render PHP/APCu
 path after those native gates pass. Do not adopt a replacement format unless

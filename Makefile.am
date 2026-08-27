@@ -60,6 +60,12 @@ EXTRA_DIST = \
 	tests/cmake-find-quiet/CMakeLists.txt \
 	tests/cmake-subproject/CMakeLists.txt \
 	tests/cmake-subproject/main.cpp \
+	vendor/cista/LICENSE \
+	vendor/cista/README.md \
+	vendor/cista/cista.h \
+	vendor/xxhash/LICENSE \
+	vendor/xxhash/README.md \
+	vendor/xxhash/xxhash.h \
 	vcpkg.json
 
 .PHONY: check-version render-standard render-complex render-deep

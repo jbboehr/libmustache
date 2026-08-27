@@ -5,7 +5,11 @@
 #if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3) && defined(CISTA_FNV1A)
 #undef CISTA_FNV1A
 #endif
+#if defined(MUSTACHE_USE_VENDORED_CISTA)
+#include <cista.h>
+#else
 #include <cista/serialization.h>
+#endif
 #include <xxhash.h>
 #include <zlib.h>
 

@@ -66,7 +66,7 @@ if(NOT MSVC)
         -Wno-mismatched-new-delete)
 endif()
 
-if(MUSTACHE_ENABLE_CISTA_BENCHMARK)
+if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
     add_executable(test_cista_archive
         "${CMAKE_CURRENT_SOURCE_DIR}/../benchmarks/test-cista-archive.cpp")
     target_link_libraries(test_cista_archive PRIVATE
@@ -132,7 +132,7 @@ add_test(NAME tokenizer_safety COMMAND test_tokenizer_safety)
 add_test(NAME compiled_template COMMAND test_compiled_template)
 add_test(NAME renderer_safety COMMAND test_renderer_safety)
 add_test(NAME allocation_failure COMMAND test_allocation_failure)
-if(MUSTACHE_ENABLE_CISTA_BENCHMARK)
+if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
     add_test(NAME cista_archive COMMAND test_cista_archive)
 endif()
 if(MUSTACHE_BUILD_CLI)

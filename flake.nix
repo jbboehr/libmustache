@@ -71,6 +71,7 @@
             alejandra.enable = true;
             clang-format = {
               enable = true;
+              excludes = ["^vendor/"];
               types_or = pkgs.lib.mkForce ["c" "c++"];
             };
             shellcheck.enable = true;
@@ -138,8 +139,74 @@
             zlib = pkgs.zlib;
             debugSupport = true;
             sanitizerSupport = true;
+            archivedTemplateSupport = true;
+            useSystemCista = true;
+            useSystemXxhash = true;
             cistaBenchmarkSupport = true;
             cistaBuiltinXxh3Support = true;
+          };
+          libmustache-cista-benchmark-vendored = makePackage {
+            cmakeSupport = true;
+            cista = null;
+            xxhash = null;
+            zlib = pkgs.zlib;
+            cistaBenchmarkSupport = true;
+            cistaBuiltinXxh3Support = true;
+          };
+          libmustache-archived-vendored-cmake = makePackage {
+            cmakeSupport = true;
+            cista = null;
+            xxhash = null;
+            zlib = pkgs.zlib;
+            archivedTemplateSupport = true;
+          };
+          libmustache-archived-vendored-autotools = makePackage {
+            cmakeSupport = false;
+            cista = null;
+            xxhash = null;
+            zlib = pkgs.zlib;
+            archivedTemplateSupport = true;
+          };
+          libmustache-archived-system-autotools = makePackage {
+            cmakeSupport = false;
+            cista = pkgs.cista;
+            xxhash = pkgs.xxhash;
+            zlib = pkgs.zlib;
+            archivedTemplateSupport = true;
+            useSystemCista = true;
+            useSystemXxhash = true;
+          };
+          libmustache-archived-system-cista-vendored-xxhash-cmake = makePackage {
+            cmakeSupport = true;
+            cista = pkgs.cista;
+            xxhash = null;
+            zlib = pkgs.zlib;
+            archivedTemplateSupport = true;
+            useSystemCista = true;
+          };
+          libmustache-archived-vendored-cista-system-xxhash-cmake = makePackage {
+            cmakeSupport = true;
+            cista = null;
+            xxhash = pkgs.xxhash;
+            zlib = pkgs.zlib;
+            archivedTemplateSupport = true;
+            useSystemXxhash = true;
+          };
+          libmustache-archived-system-cista-vendored-xxhash-autotools = makePackage {
+            cmakeSupport = false;
+            cista = pkgs.cista;
+            xxhash = null;
+            zlib = pkgs.zlib;
+            archivedTemplateSupport = true;
+            useSystemCista = true;
+          };
+          libmustache-archived-vendored-cista-system-xxhash-autotools = makePackage {
+            cmakeSupport = false;
+            cista = null;
+            xxhash = pkgs.xxhash;
+            zlib = pkgs.zlib;
+            archivedTemplateSupport = true;
+            useSystemXxhash = true;
           };
           pre-commit = pre-commit-check;
         };
