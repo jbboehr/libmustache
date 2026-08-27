@@ -9,6 +9,9 @@ set(MUSTACHE_SOURCES
     tokenizer.cpp
     utils.cpp
 )
+set(MUSTACHE_PRIVATE_HEADERS
+    render_engine.hpp
+)
 if(MUSTACHE_HAVE_LIBJSON)
     list(APPEND MUSTACHE_SOURCES json_parser.cpp)
     set_property(SOURCE json_parser.cpp APPEND PROPERTY COMPILE_OPTIONS
@@ -57,7 +60,7 @@ function(mustache_configure_library target)
     mustache_apply_build_options(${target})
 endfunction()
 
-add_library(mustache SHARED ${MUSTACHE_SOURCES} ${MUSTACHE_PUBLIC_HEADERS})
+add_library(mustache SHARED ${MUSTACHE_SOURCES} ${MUSTACHE_PRIVATE_HEADERS} ${MUSTACHE_PUBLIC_HEADERS})
 add_library(mustache::mustache ALIAS mustache)
 mustache_configure_library(mustache)
 target_compile_definitions(mustache PRIVATE MUSTACHE_BUILDING_LIBRARY)
@@ -66,7 +69,7 @@ set_target_properties(mustache PROPERTIES
     SOVERSION "${MUSTACHE_ABI_VERSION}"
 )
 
-add_library(mustache_static STATIC ${MUSTACHE_SOURCES} ${MUSTACHE_PUBLIC_HEADERS})
+add_library(mustache_static STATIC ${MUSTACHE_SOURCES} ${MUSTACHE_PRIVATE_HEADERS} ${MUSTACHE_PUBLIC_HEADERS})
 add_library(mustache::mustache_static ALIAS mustache_static)
 mustache_configure_library(mustache_static)
 mustache_enable_clang_tidy(mustache_static)

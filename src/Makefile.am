@@ -45,6 +45,7 @@ libmustache_la_SOURCES = \
 	mustache_export.hpp \
 	node.cpp \
 	node.hpp \
+	render_engine.hpp \
 	renderer.cpp \
 	renderer.hpp \
 	stack.hpp \

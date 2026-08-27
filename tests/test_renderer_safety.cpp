@@ -1,8 +1,10 @@
 #include "mustache_config.h"
 
 #include <cstdio>
+#include <exception>
 #include <memory>
 #include <string>
+#include <thread>
 #include <type_traits>
 #include <utility>
 
@@ -163,6 +165,60 @@ class ScopedRenderingLambda : public mustache::Lambda {
   private:
     mustache::LambdaRenderContext * retained;
     std::string * observed;
+};
+
+class WorkerThreadScopedLambda : public mustache::Lambda {
+  public:
+    std::string invoke() override
+    {
+      return std::string();
+    }
+
+    std::string invoke(std::string_view, mustache::LambdaRenderContext context) override
+    {
+      mustache::Node name(mustache::Node::TypeVariable, "name");
+      std::string rendered;
+      std::exception_ptr failure;
+      std::thread worker([&]() {
+        try {
+          context.render(name, rendered);
+        } catch (...) {
+          failure = std::current_exception();
+        }
+      });
+      worker.join();
+      if (failure) {
+        std::rethrow_exception(failure);
+      }
+      return rendered;
+    }
+};
+
+class WorkerThreadLegacyLambda : public mustache::Lambda {
+  public:
+    std::string invoke() override
+    {
+      return std::string();
+    }
+
+    std::string invoke(std::string *, mustache::Renderer * renderer) override
+    {
+      mustache::Node name(mustache::Node::TypeVariable, "name");
+      std::string rendered;
+      std::exception_ptr failure;
+      std::thread worker([&]() {
+        try {
+          renderer->renderForLambda(&name, &rendered);
+        } catch (...) {
+          failure = std::current_exception();
+        }
+      });
+      worker.join();
+      if (failure) {
+        std::rethrow_exception(failure);
+      }
+      return rendered;
+    }
 };
 
 class ThrowingScopedLambda : public mustache::Lambda {
@@ -371,6 +427,29 @@ void testDepthAndWorkLimits()
       "default nesting limit rejected a parser-bounded partial chain");
 }
 
+void testOwnedPartialSourcePrecedence()
+{
+  mustache::Node root;
+  root.type = mustache::Node::TypeRoot;
+  root.children.push_back(std::make_unique<mustache::Node>(mustache::Node::TypePartial, "card"));
+  root.children.push_back(std::make_unique<mustache::Node>(mustache::Node::TypeOutput, "|"));
+  root.children.push_back(std::make_unique<mustache::Node>(mustache::Node::TypePartial, "fallback"));
+  root.partials.emplace("card", std::make_unique<mustache::Node>(mustache::Node::TypeOutput, "root-card"));
+  root.partials.emplace("fallback", std::make_unique<mustache::Node>(mustache::Node::TypeOutput, "root-fallback"));
+
+  mustache::Node::Partials external;
+  external.emplace("card", std::make_unique<mustache::Node>(mustache::Node::TypeOutput, "external-card"));
+  external.emplace("fallback", std::unique_ptr<mustache::Node>());
+
+  const mustache::Data data = mustache::Data::null();
+  std::string output;
+  mustache::Renderer renderer;
+  renderer.init(&root, &data, &external, &output);
+  renderer.render();
+  expect(output == "external-card|root-fallback",
+      "owned partial sources did not prefer external values and fall back from null entries");
+}
+
 void testPartialIndentationOutputAccounting()
 {
   const mustache::CompiledTemplate source = mustache::compile(" {{>lines}}\n");
@@ -511,6 +590,31 @@ void testScopedLambdaContext()
   expect(!outerRetained.active() && !innerRetained.active(), "nested lambda contexts survived their callback frames");
 }
 
+void testSerializedWorkerThreadLambdaRendering()
+{
+  const mustache::CompiledTemplate scoped = mustache::compile("{{#scoped}}{{/scoped}}");
+  mustache::Data scopedData = mustache::Data::object({{"name", mustache::Data::string("scoped-worker")},
+      {"scoped", mustache::Data::lambda(std::make_unique<WorkerThreadScopedLambda>())}});
+  try {
+    expect(mustache::render(scoped, scopedData) == "scoped-worker",
+        "scoped lambda worker-thread rendering produced the wrong output");
+  } catch (const mustache::Exception& exception) {
+    std::fprintf(stderr, "scoped lambda worker-thread rendering failed: %s\n", exception.what());
+    ++failures;
+  }
+
+  const mustache::CompiledTemplate legacy = mustache::compile("{{#legacy}}{{/legacy}}");
+  mustache::Data legacyData = mustache::Data::object({{"name", mustache::Data::string("legacy-worker")},
+      {"legacy", mustache::Data::lambda(std::make_unique<WorkerThreadLegacyLambda>())}});
+  try {
+    expect(mustache::render(legacy, legacyData) == "legacy-worker",
+        "legacy lambda worker-thread rendering produced the wrong output");
+  } catch (const mustache::Exception& exception) {
+    std::fprintf(stderr, "legacy lambda worker-thread rendering failed: %s\n", exception.what());
+    ++failures;
+  }
+}
+
 void testFailureStateAndCallbackWindow()
 {
   mustache::Renderer * retained = NULL;
@@ -594,10 +698,12 @@ int main()
   testContainerCurrentContext();
   testLimitDefaultsAndOutputAccounting();
   testDepthAndWorkLimits();
+  testOwnedPartialSourcePrecedence();
   testPartialIndentationOutputAccounting();
   testLambdaTemplateBudget();
   testLambdaNodeAccounting();
   testScopedLambdaContext();
+  testSerializedWorkerThreadLambdaRendering();
   testFailureStateAndCallbackWindow();
   return failures == 0 ? 0 : 1;
 }
