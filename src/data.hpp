@@ -87,6 +87,11 @@ class Data {
     static MUSTACHE_API Data null();
     static MUSTACHE_API Data boolean(bool value);
     static MUSTACHE_API Data integer(std::int64_t value);
+    /*! Construct a finite floating-point value.
+     *
+     * Direct floating-point values render with a locale-independent shortest
+     * decimal spelling that round-trips to the same value.
+     */
     static MUSTACHE_API Data floating(double value);
     static MUSTACHE_API Data string(std::string value);
     static MUSTACHE_API Data list(List values = List());

@@ -1,16 +1,13 @@
 #include "data.hpp"
-
 #ifdef MUSTACHE_HAVE_LIBYAML
 #include "yaml.h"
 #endif
 
 #include <algorithm>
+#include <array>
+#include <charconv>
 #include <cmath>
-#include <iomanip>
 #include <limits>
-#include <locale>
-#include <sstream>
-#include <type_traits>
 #include <unordered_set>
 #include <utility>
 #include <variant>
@@ -99,6 +96,19 @@ const char * typeDescription(Data::Type type)
       return "floating-point";
   }
   return "unknown";
+}
+
+std::string formatFloating(double value)
+{
+  std::array<char, 64> buffer{};
+  const std::to_chars_result result = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
+  if (result.ec == std::errc::value_too_large) {
+    throw Exception("Floating-point formatting buffer is too small");
+  }
+  if (result.ec != std::errc()) {
+    throw Exception("Failed to format floating-point data");
+  }
+  return std::string(buffer.data(), result.ptr);
 }
 
 } // namespace
@@ -359,10 +369,7 @@ std::string Data::toString() const
       if (!storage_->scalarSpelling.empty()) {
         return storage_->scalarSpelling;
       }
-      std::ostringstream stream;
-      stream.imbue(std::locale::classic());
-      stream << std::setprecision(std::numeric_limits<double>::max_digits10) << floatingValue();
-      return stream.str();
+      return formatFloating(floatingValue());
     }
     case TypeList:
     case TypeMap:

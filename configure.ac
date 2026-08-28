@@ -88,6 +88,24 @@ AC_DEFINE([HAVE_CXX17], [1], [Define if the compiler supports C++17])
 AC_DEFINE([HAVE_CXX11], [1],
     [Deprecated compatibility alias; C++17 support includes C++11])
 
+AC_CACHE_CHECK([whether the C++17 standard library provides floating-point std::to_chars],
+    [mustache_cv_cxx17_floating_to_chars], [
+    AC_LINK_IFELSE([
+        AC_LANG_PROGRAM([[
+            #include <charconv>
+            #include <system_error>
+        ]], [[
+            char buffer[64];
+            const auto result = std::to_chars(buffer, buffer + sizeof(buffer), 1.25);
+            return result.ec == std::errc{} ? 0 : 1;
+        ]])
+    ], [mustache_cv_cxx17_floating_to_chars=yes],
+       [mustache_cv_cxx17_floating_to_chars=no])
+])
+AS_IF([test "x$mustache_cv_cxx17_floating_to_chars" != "xyes"], [
+    AC_MSG_ERROR([a C++17 standard library with floating-point std::to_chars is required])
+])
+
 AC_CACHE_CHECK([whether $CXX supports private C++ symbol visibility],
     [mustache_cv_cxx_visibility_hidden], [
     mustache_save_CXXFLAGS=$CXXFLAGS

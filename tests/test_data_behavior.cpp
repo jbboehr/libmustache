@@ -1,6 +1,9 @@
 #include "mustache_config.h"
 
+#include <cfenv>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <string>
@@ -215,12 +218,34 @@ void testDirectData()
   mustache::Data falseValue = mustache::Data::boolean(false);
   mustache::Data trueValue = mustache::Data::boolean(true);
   mustache::Data integerValue = mustache::Data::integer(42);
-  mustache::Data decimalValue = mustache::Data::floating(1.5);
+  mustache::Data decimalValue = mustache::Data::floating(1.1);
+  mustache::Data shortScientificValue = mustache::Data::floating(1e-4);
+  mustache::Data largeIntegerValue = mustache::Data::floating(9524898751059138560.0);
+  mustache::Data preciseDecimalValue = mustache::Data::floating(1.0000000000000002);
+  mustache::Data negativeZeroValue = mustache::Data::floating(-0.0);
+  const std::uint64_t shortestBoundaryBits = UINT64_C(0x0060000000000000);
+  double shortestBoundary = 0.0;
+  static_assert(sizeof(shortestBoundary) == sizeof(shortestBoundaryBits), "double must be 64 bits");
+  std::memcpy(&shortestBoundary, &shortestBoundaryBits, sizeof(shortestBoundary));
+  mustache::Data shortestBoundaryValue = mustache::Data::floating(shortestBoundary);
   expectEqual("direct false", renderScalar(&falseValue, ""), "||N");
   expectEqual("direct true", renderScalar(&trueValue, ""), "true|Y|");
   expectEqual("direct integer", renderScalar(&integerValue, ""), "42|Y|");
-  expectEqual("direct decimal", renderScalar(&decimalValue, ""), "1.5|Y|");
-  expectEqual("direct unescaped decimal", renderUnescaped(&decimalValue, ""), "1.5");
+  expectEqual("direct decimal", renderScalar(&decimalValue, ""), "1.1|Y|");
+  expectEqual("direct unescaped decimal", renderUnescaped(&decimalValue, ""), "1.1");
+  expectEqual("direct short scientific decimal", renderUnescaped(&shortScientificValue, ""), "1e-04");
+  expectEqual("direct large integral decimal", renderUnescaped(&largeIntegerValue, ""), "9524898751059138560");
+  expectEqual("direct precise decimal", renderUnescaped(&preciseDecimalValue, ""), "1.0000000000000002");
+  expectEqual("direct negative zero", renderUnescaped(&negativeZeroValue, ""), "-0");
+  expectEqual(
+      "direct shortest boundary decimal", renderUnescaped(&shortestBoundaryValue, ""), "7.120236347223045e-307");
+
+  const int originalRoundingMode = std::fegetround();
+  if (originalRoundingMode != -1 && std::fesetround(FE_UPWARD) == 0) {
+    mustache::Data roundingSensitiveValue = mustache::Data::floating(1e-100);
+    expectEqual("direct decimal ignores rounding mode", renderUnescaped(&roundingSensitiveValue, ""), "1e-100");
+    expect(std::fesetround(originalRoundingMode) == 0, "failed to restore floating-point rounding mode");
+  }
 
   expectDirectString("direct empty string", "", "||N");
   expectDirectString("direct zero string", "0", "0|Y|");

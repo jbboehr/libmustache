@@ -12,7 +12,7 @@ as an ordinary C++ library.
 
 ## Requirements
 
-- A C++17 compiler
+- A C++17 compiler and standard library with floating-point `std::to_chars`
 - nlohmann/json 3.10.5 or newer for JSON input (optional; build only)
 - libyaml for YAML input (optional)
 - zlib for experimental archived templates (optional)

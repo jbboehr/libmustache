@@ -12,11 +12,36 @@ set(MUSTACHE_VERSION_MINOR "${PROJECT_VERSION_MINOR}")
 set(MUSTACHE_VERSION_PATCH "${PROJECT_VERSION_PATCH}")
 set(MUSTACHE_CXX_STANDARD 17)
 
-# Keep pkg-config consumers on the compiler-specific spelling selected by
-# CMake (for example, -std=c++1z on GCC 7). Some compilers express a language
-# mode with more than one option, while others need no option at all.
+# Keep pkg-config consumers on the compiler-specific C++17 spelling selected
+# by CMake. Some compilers express a language mode with more than one option,
+# while others need no option at all.
 string(JOIN " " MUSTACHE_CXX_STANDARD_FLAG
     ${CMAKE_CXX17_STANDARD_COMPILE_OPTION})
+
+include(CheckCXXSourceCompiles)
+function(mustache_check_floating_to_chars result_variable)
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_EXTENSIONS OFF)
+    check_cxx_source_compiles([=[
+        #include <charconv>
+        #include <system_error>
+
+        int main()
+        {
+            char buffer[64];
+            const auto result = std::to_chars(buffer, buffer + sizeof(buffer), 1.25);
+            return result.ec == std::errc{} ? 0 : 1;
+        }
+    ]=] MUSTACHE_FLOATING_TO_CHARS_PROBE_RESULT)
+    set(${result_variable} "${MUSTACHE_FLOATING_TO_CHARS_PROBE_RESULT}" PARENT_SCOPE)
+endfunction()
+
+mustache_check_floating_to_chars(MUSTACHE_HAVE_FLOATING_TO_CHARS)
+if(NOT MUSTACHE_HAVE_FLOATING_TO_CHARS)
+    message(FATAL_ERROR
+        "A C++17 standard library with floating-point std::to_chars is required")
+endif()
 
 set(MUSTACHE_SPEC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/spec/specs" CACHE PATH
     "Path to the mustache specification suites")

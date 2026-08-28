@@ -36,9 +36,10 @@ branch. ABI 6 is not stable until 0.6.0 is released.
 
 ## Build and package changes
 
-- C++17 is required. CMake consumers receive the requirement from the
-  imported target; pkg-config consumers receive the compiler spelling selected
-  by the build.
+- C++17 is required, including floating-point `std::to_chars` in the standard
+  library. CMake consumers receive the language requirement from the imported
+  target; pkg-config consumers receive the compiler spelling selected by the
+  build.
 - The package version is 0.6.0 and the shared-library ABI is 6 in both CMake
   and Libtool.
 - The installed shared CMake target remains `mustache::mustache`.
