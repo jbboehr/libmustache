@@ -134,6 +134,8 @@ add_test(NAME renderer_safety COMMAND test_renderer_safety)
 add_test(NAME allocation_failure COMMAND test_allocation_failure)
 if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
     add_test(NAME cista_archive COMMAND test_cista_archive)
+    set_tests_properties(cista_archive PROPERTIES
+        ENVIRONMENT "top_srcdir=${CMAKE_CURRENT_SOURCE_DIR}/..")
 endif()
 if(MUSTACHE_BUILD_CLI)
     add_test(NAME cli COMMAND test_cli)

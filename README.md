@@ -75,7 +75,9 @@ cmake -S . -B build \
 Cista and xxHash remain private in every mode and are not required by
 installed-library consumers. Custom system locations can be supplied through
 `CMAKE_PREFIX_PATH`, `cista_DIR`, and `xxHash_DIR`. The feature always requires
-zlib for its selected integrity policy.
+zlib for its selected integrity policy. The experimental format preamble and
+Cista validation responsibilities are specified in the
+[archive format document](docs/development/cista-archive-format-v1.md).
 
 Installed CMake packages expose separate components. The shared component is
 the default and does not require dependency development packages at consume

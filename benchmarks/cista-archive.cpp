@@ -14,6 +14,7 @@
 #include <zlib.h>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -32,8 +33,12 @@ namespace {
 
 namespace archive_data = cista::offset;
 
-constexpr std::uint64_t archiveMagic = UINT64_C(0x4D55535443495354);
-constexpr std::uint32_t archiveVersion = 1;
+constexpr std::uint64_t archiveGraphMagic = UINT64_C(0x4D55535443495354);
+constexpr std::uint32_t archiveSchemaVersion = 1;
+constexpr std::size_t archivePreambleSize = 16;
+constexpr std::array<std::uint8_t, 8> archivePreambleMagic = {'M', 'U', 'S', 'T', 'A', 'R', 'C', 0};
+constexpr std::uint64_t archiveFormatGeneration = 1;
+constexpr std::size_t archiveFormatGenerationOffset = archivePreambleMagic.size();
 #if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
 constexpr cista::mode archiveVersionMode = cista::mode::WITH_VERSION;
 #else
@@ -46,6 +51,63 @@ constexpr cista::mode archiveModeDeepCheckAndIntegrity =
     archiveVersionMode | cista::mode::WITH_INTEGRITY | cista::mode::DEEP_CHECK;
 constexpr std::size_t renderNestingCeiling = mustache::detail::renderNestingCeiling;
 constexpr std::uint32_t invalidIndex = std::numeric_limits<std::uint32_t>::max();
+
+template <typename Unsigned>
+void writeLittleEndian(std::vector<std::uint8_t> * bytes, std::size_t offset, Unsigned value)
+{
+  static_assert(std::is_unsigned_v<Unsigned>, "archive preamble fields must be unsigned");
+  for (std::size_t index = 0; index < sizeof(value); ++index) {
+    (*bytes)[offset + index] = static_cast<std::uint8_t>(value >> (index * 8));
+  }
+}
+
+template <typename Unsigned> Unsigned readLittleEndian(std::string_view bytes, std::size_t offset)
+{
+  static_assert(std::is_unsigned_v<Unsigned>, "archive preamble fields must be unsigned");
+  Unsigned value = 0;
+  for (std::size_t index = 0; index < sizeof(value); ++index) {
+    value |= static_cast<Unsigned>(static_cast<std::uint8_t>(bytes[offset + index])) << (index * 8);
+  }
+  return value;
+}
+
+std::vector<std::uint8_t> frameArchive(std::vector<std::uint8_t>&& payload, const CistaArchiveLimits& limits)
+{
+  if (limits.maxInputBytes < archivePreambleSize || payload.size() > limits.maxInputBytes - archivePreambleSize) {
+    throw mustache::Exception("Cista archive output byte limit exceeded");
+  }
+
+  std::vector<std::uint8_t> bytes;
+  bytes.reserve(archivePreambleSize + payload.size());
+  bytes.resize(archivePreambleSize, 0);
+  std::copy(archivePreambleMagic.begin(), archivePreambleMagic.end(), bytes.begin());
+  writeLittleEndian(&bytes, archiveFormatGenerationOffset, archiveFormatGeneration);
+  bytes.insert(bytes.end(), payload.begin(), payload.end());
+  return bytes;
+}
+
+std::string_view readArchivePreamble(std::string_view bytes, const CistaArchiveLimits& limits)
+{
+  if (bytes.empty()) {
+    throw mustache::Exception("Empty Cista archive");
+  }
+  if (bytes.size() > limits.maxInputBytes) {
+    throw mustache::Exception("Cista archive input byte limit exceeded");
+  }
+  if (bytes.size() < archivePreambleSize) {
+    throw mustache::Exception("Truncated Cista archive preamble");
+  }
+  if (std::memcmp(bytes.data(), archivePreambleMagic.data(), archivePreambleMagic.size()) != 0) {
+    throw mustache::Exception("Invalid Cista archive preamble magic");
+  }
+  if (readLittleEndian<std::uint64_t>(bytes, archiveFormatGenerationOffset) != archiveFormatGeneration) {
+    throw mustache::Exception("Unsupported libmustache archive format generation");
+  }
+  if (bytes.size() == archivePreambleSize) {
+    throw mustache::Exception("Empty Cista archive payload");
+  }
+  return bytes.substr(archivePreambleSize);
+}
 
 enum Presence : std::uint8_t {
   HasData = 1,
@@ -78,14 +140,106 @@ struct ArchivePartial {
 };
 
 struct ArchiveGraph {
-    std::uint64_t magic = archiveMagic;
-    std::uint32_t version = archiveVersion;
+    std::uint64_t magic = archiveGraphMagic;
+    std::uint32_t version = archiveSchemaVersion;
     std::uint32_t root = 0;
     std::uint64_t serializedSize = 0;
     archive_data::vector<ArchiveNode> nodes;
     archive_data::vector<ArchivePartial> partials;
     archive_data::vector<std::uint8_t> strings;
 };
+
+static_assert(
+    archivePreambleSize % alignof(ArchiveGraph) == 0, "archive preamble must preserve the Cista payload alignment");
+
+template <typename Field> Field readNativeArchiveField(std::string_view payload, std::size_t offset)
+{
+  static_assert(std::is_trivially_copyable_v<Field>, "serialized Cista fields must be trivially copyable");
+  if (offset > payload.size() || sizeof(Field) > payload.size() - offset) {
+    throw mustache::Exception("Truncated Cista archive graph header");
+  }
+  Field value{};
+  std::memcpy(&value, payload.data() + offset, sizeof(value));
+  return value;
+}
+
+template <typename Element>
+void validateSerializedVector(std::string_view payload, std::size_t graphOffset, std::size_t vectorOffset)
+{
+  using Vector = archive_data::vector<Element>;
+  using Pointer = typename Vector::pointer;
+  using Size = typename Vector::size_type;
+  static_assert(std::is_standard_layout_v<Vector>, "Cista vector layout must be inspectable before deserialization");
+  static_assert(std::is_standard_layout_v<Pointer>, "Cista offset pointer layout must be inspectable");
+  static_assert(std::is_signed_v<cista::offset_t>, "Cista offsets must be signed");
+  static_assert(
+      std::is_unsigned_v<Size> && sizeof(Size) <= sizeof(std::size_t), "Cista vector sizes must fit in size_t");
+
+  const std::size_t serializedVectorOffset = graphOffset + vectorOffset;
+  const std::size_t pointerOffset =
+      serializedVectorOffset + cista_member_offset(Vector, el_) + cista_member_offset(Pointer, offset_);
+  const cista::offset_t relativeOffset = readNativeArchiveField<cista::offset_t>(payload, pointerOffset);
+  const Size usedSizeField =
+      readNativeArchiveField<Size>(payload, serializedVectorOffset + cista_member_offset(Vector, used_size_));
+  const Size allocatedSizeField =
+      readNativeArchiveField<Size>(payload, serializedVectorOffset + cista_member_offset(Vector, allocated_size_));
+  const std::uint8_t selfAllocated = readNativeArchiveField<std::uint8_t>(
+      payload, serializedVectorOffset + cista_member_offset(Vector, self_allocated_));
+
+  if (selfAllocated != 0 || allocatedSizeField != usedSizeField) {
+    throw mustache::Exception("Invalid Cista archive vector header");
+  }
+  if (relativeOffset == cista::NULLPTR_OFFSET) {
+    if (usedSizeField != 0) {
+      throw mustache::Exception("Invalid Cista archive null vector");
+    }
+    return;
+  }
+  if (usedSizeField == 0) {
+    throw mustache::Exception("Invalid Cista archive empty vector pointer");
+  }
+
+  std::size_t dataOffset = 0;
+  if (relativeOffset < 0) {
+    const std::uintmax_t magnitude =
+        static_cast<std::uintmax_t>(-(relativeOffset + 1)) + static_cast<std::uintmax_t>(1);
+    if (magnitude > pointerOffset) {
+      throw mustache::Exception("Invalid Cista archive vector pointer");
+    }
+    dataOffset = pointerOffset - static_cast<std::size_t>(magnitude);
+  } else {
+    const std::uintmax_t distance = static_cast<std::uintmax_t>(relativeOffset);
+    if (distance > payload.size() - pointerOffset) {
+      throw mustache::Exception("Invalid Cista archive vector pointer");
+    }
+    dataOffset = pointerOffset + static_cast<std::size_t>(distance);
+  }
+
+  const std::size_t usedSize = static_cast<std::size_t>(usedSizeField);
+  if (usedSize > std::numeric_limits<std::size_t>::max() / sizeof(Element)) {
+    throw mustache::Exception("Invalid Cista archive vector size");
+  }
+  const std::size_t byteSize = usedSize * sizeof(Element);
+  if (dataOffset > payload.size() || byteSize > payload.size() - dataOffset) {
+    throw mustache::Exception("Invalid Cista archive vector range");
+  }
+  if (reinterpret_cast<std::uintptr_t>(payload.data() + dataOffset) % alignof(Element) != 0) {
+    throw mustache::Exception("Invalid Cista archive vector alignment");
+  }
+}
+
+template <cista::mode Mode> void validateArchiveGraphLayout(std::string_view payload)
+{
+  constexpr cista::offset_t graphOffsetField = cista::data_start(Mode);
+  static_assert(graphOffsetField >= 0, "Cista graph offset must be non-negative");
+  constexpr std::size_t graphOffset = static_cast<std::size_t>(graphOffsetField);
+  if (graphOffset > payload.size() || sizeof(ArchiveGraph) > payload.size() - graphOffset) {
+    throw mustache::Exception("Truncated Cista archive graph header");
+  }
+  validateSerializedVector<ArchiveNode>(payload, graphOffset, cista_member_offset(ArchiveGraph, nodes));
+  validateSerializedVector<ArchivePartial>(payload, graphOffset, cista_member_offset(ArchiveGraph, partials));
+  validateSerializedVector<std::uint8_t>(payload, graphOffset, cista_member_offset(ArchiveGraph, strings));
+}
 
 std::string_view archiveSliceView(const ArchiveGraph& graph, const ArchiveSlice& value)
 {
@@ -303,7 +457,7 @@ class ArchiveValidator {
 
     void validate()
     {
-      if (graph_.magic != archiveMagic || graph_.version != archiveVersion || graph_.nodes.empty()) {
+      if (graph_.magic != archiveGraphMagic || graph_.version != archiveSchemaVersion || graph_.nodes.empty()) {
         throw mustache::Exception("Invalid Cista archive header");
       }
       if (graph_.nodes.size() > limits_.maxNodes) {
@@ -703,20 +857,16 @@ class ArchivePartialSource {
 
 template <cista::mode Mode> const ArchiveGraph& readArchive(std::string_view bytes, const CistaArchiveLimits& limits)
 {
-  if (bytes.empty()) {
-    throw mustache::Exception("Empty Cista archive");
-  }
-  if (bytes.size() > limits.maxInputBytes) {
-    throw mustache::Exception("Cista archive input byte limit exceeded");
-  }
-  if (reinterpret_cast<std::uintptr_t>(bytes.data()) % alignof(ArchiveGraph) != 0) {
+  const std::string_view payload = readArchivePreamble(bytes, limits);
+  if (reinterpret_cast<std::uintptr_t>(payload.data()) % alignof(ArchiveGraph) != 0) {
     throw mustache::Exception("Unaligned Cista archive buffer");
   }
-  const ArchiveGraph * graph = cista::deserialize<ArchiveGraph, Mode>(bytes);
+  validateArchiveGraphLayout<Mode>(payload);
+  const ArchiveGraph * graph = cista::deserialize<ArchiveGraph, Mode>(payload);
   if (graph == nullptr) {
     throw mustache::Exception("Invalid Cista archive root");
   }
-  ArchiveValidator(*graph, limits, bytes.size()).validate();
+  ArchiveValidator(*graph, limits, payload.size()).validate();
   return *graph;
 }
 
@@ -732,10 +882,7 @@ std::vector<std::uint8_t> serializeCistaArchiveWithMode(
   if (bytes.size() != graph.serializedSize) {
     throw mustache::Exception("Cista archive size changed while framing");
   }
-  if (bytes.size() > archiveLimits.maxInputBytes) {
-    throw mustache::Exception("Cista archive output byte limit exceeded");
-  }
-  return bytes;
+  return frameArchive(std::move(bytes), archiveLimits);
 }
 
 template <cista::mode Mode>

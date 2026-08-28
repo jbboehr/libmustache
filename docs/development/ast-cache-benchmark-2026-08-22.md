@@ -446,6 +446,11 @@ source graph: tokenize and serialize every root/partial with the legacy format,
 or tokenize and serialize the complete Cista graph using the selected native
 mode. Times are median/p95 microseconds aggregated across three runs:
 
+These recorded runs predate the 16-byte libmustache format preamble. The
+preamble adds one writer-side framing copy and a small fixed reader check;
+rerun the native and PHP/APCu measurements before making the final deployment
+decision.
+
 | Workload | Compile + serialize legacy | Compile + serialize Cista | Cista median ratio |
 | --- | ---: | ---: | ---: |
 | Small flat | 18.62 / 19.81 | 24.69 / 26.49 | 1.33x |
@@ -486,11 +491,14 @@ If the feasibility work continues, use this integration policy:
   path, and route both through a shared renderer algorithm using internal view
   adapters. Rendering a checked archive must not require rebuilding a `Node`
   tree first.
-- Give the archive an explicit libmustache schema/version header and include
-  the pinned Cista snapshot, pointer width, endianness, and other relevant
-  compiler/platform assumptions in compatibility checks and PHP cache keys.
-  Treat any Cista update as a deliberate format event backed by golden fixtures
-  and rejection tests for incompatible bytes.
+- The experiment now uses a minimal libmustache format-generation preamble and
+  raw bounds checks for the root vector spans before pointer traversal. Cista's
+  `WITH_VERSION`, `WITH_INTEGRITY`, and `DEEP_CHECK` policies then provide type,
+  integrity, and structural validation; the protected archive graph owns its
+  semantic schema and exact payload size. Its x86-64 little-endian Itanium-ABI
+  bytes are pinned by a golden fixture across every bundled/system dependency
+  combination. Treat any dependency or schema update as a deliberate format
+  event and include the libmustache format generation in future PHP cache keys.
 - Require `DEEP_CHECK`, libmustache semantic validation, full lambda and
   inline-partial semantics, alignment and backing-store lifetime tests,
   corruption fixtures, archive-validation/render fuzzing, and a secured native
@@ -591,13 +599,12 @@ Recommended follow-up:
 3. Keep archived-template support optional and default off. Vendor a reviewed,
    pinned Cista snapshot and license by default; consider a separately tested,
    default-off system-package override for packagers.
-4. Add full lambda and inline-partial semantics, explicit
-   compiler/architecture/schema compatibility, and the selected
-   `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` policy using pinned modern
-   XXH3. Add golden corruption and compatibility fixtures, alignment and
-   lifetime tests, and fuzzing of validation plus rendering. Treat integrity
-   as accidental-corruption detection rather than authentication, and measure
-   the complete policy through the PHP/APCu path.
+4. Retain the completed lambda, inline-partial, format-preamble, golden,
+   corruption, alignment, and selected
+   `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` coverage using pinned modern
+   XXH3. Add backing-store lifetime tests and fuzz validation plus rendering.
+   Treat integrity as accidental-corruption detection rather than
+   authentication, and measure the complete policy through the PHP/APCu path.
 5. Only after the secured native path passes, prototype the libmustache-owned
    archived view behind an experimental php-mustache API and benchmark one APCu
    fetch plus one render against cached source. Include warm and fresh-process

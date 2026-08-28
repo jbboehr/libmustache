@@ -4,7 +4,11 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstdlib>
 #include <cstdio>
+#include <cstring>
+#include <fstream>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -220,6 +224,98 @@ void expect(bool condition, const char * message)
   }
 }
 
+constexpr std::size_t archivePreambleSize = 16;
+
+std::uint64_t readLittleEndian(const std::vector<std::uint8_t>& bytes, std::size_t offset, std::size_t width)
+{
+  if (offset > bytes.size() || width > bytes.size() - offset || width > sizeof(std::uint64_t)) {
+    throw std::runtime_error("archive preamble field is out of bounds");
+  }
+  std::uint64_t value = 0;
+  for (std::size_t index = 0; index < width; ++index) {
+    value |= static_cast<std::uint64_t>(bytes[offset + index]) << (index * 8);
+  }
+  return value;
+}
+
+template <typename Field> Field readNativeArchiveField(const std::vector<std::uint8_t>& bytes, std::size_t offset)
+{
+  if (offset > bytes.size() || sizeof(Field) > bytes.size() - offset) {
+    throw std::runtime_error("native archive field is out of bounds");
+  }
+  Field value{};
+  std::memcpy(&value, bytes.data() + offset, sizeof(value));
+  return value;
+}
+
+template <typename Field>
+void writeNativeArchiveField(std::vector<std::uint8_t> * bytes, std::size_t offset, Field value)
+{
+  if (offset > bytes->size() || sizeof(value) > bytes->size() - offset) {
+    throw std::runtime_error("native archive field is out of bounds");
+  }
+  std::memcpy(bytes->data() + offset, &value, sizeof(value));
+}
+
+bool isGoldenPlatform(std::size_t pointerBytes) noexcept
+{
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3) && (defined(__x86_64__) || defined(_M_X64)) && !defined(_MSC_VER)
+  const std::uint16_t value = 1;
+  return pointerBytes == 8 && *reinterpret_cast<const std::uint8_t *>(&value) == 1;
+#else
+  static_cast<void>(pointerBytes);
+  return false;
+#endif
+}
+
+mustache_benchmark::CistaChecksumAlgorithm cistaIntegrityChecksumAlgorithm() noexcept
+{
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+  return mustache_benchmark::CistaChecksumAlgorithm::Xxh3_64;
+#else
+  return mustache_benchmark::CistaChecksumAlgorithm::Fnv1a64;
+#endif
+}
+
+std::uint8_t hexNibble(char value)
+{
+  if (value >= '0' && value <= '9') {
+    return static_cast<std::uint8_t>(value - '0');
+  }
+  if (value >= 'a' && value <= 'f') {
+    return static_cast<std::uint8_t>(value - 'a' + 10);
+  }
+  if (value >= 'A' && value <= 'F') {
+    return static_cast<std::uint8_t>(value - 'A' + 10);
+  }
+  throw std::runtime_error("golden Cista archive contains a non-hexadecimal byte");
+}
+
+std::vector<std::uint8_t> readGoldenArchive()
+{
+  const char * topSourceDirectory = std::getenv("top_srcdir");
+  if (topSourceDirectory == nullptr || *topSourceDirectory == '\0') {
+    throw std::runtime_error("top_srcdir is required to locate the golden Cista archive");
+  }
+  const std::string path = std::string(topSourceDirectory) + "/tests/fixtures/cista-archive-v1-x86_64-le-itanium.hex";
+  std::ifstream stream(path);
+  if (!stream) {
+    throw std::runtime_error("unable to open the golden Cista archive");
+  }
+  std::vector<std::uint8_t> bytes;
+  std::string encoded;
+  while (stream >> encoded) {
+    if (encoded.size() != 2) {
+      throw std::runtime_error("golden Cista archive contains a malformed byte");
+    }
+    bytes.push_back(static_cast<std::uint8_t>((hexNibble(encoded[0]) << 4) | hexNibble(encoded[1])));
+  }
+  if (!stream.eof() || bytes.empty()) {
+    throw std::runtime_error("unable to read the golden Cista archive");
+  }
+  return bytes;
+}
+
 void testDataPartCursorContract()
 {
   mustache::Data levelC = mustache::Data::object();
@@ -274,6 +370,182 @@ void expectRejected(std::string_view bytes, const mustache::Data& data, const ch
   throw std::runtime_error(std::string("invalid Cista archive was accepted: ") + description);
 }
 
+void rewriteProtectedArchiveIntegrity(std::vector<std::uint8_t> * archive, std::size_t graphOffset)
+{
+  constexpr std::size_t cistaVersionFieldSize = 8;
+  constexpr std::size_t cistaIntegrityFieldOffset = archivePreambleSize + cistaVersionFieldSize;
+  const std::uint64_t integrity = mustache_benchmark::checksumCistaArchive(
+      std::string_view(reinterpret_cast<const char *>(archive->data() + graphOffset), archive->size() - graphOffset),
+      cistaIntegrityChecksumAlgorithm());
+  writeNativeArchiveField(archive, cistaIntegrityFieldOffset, integrity);
+}
+
+template <typename Mutator>
+void expectProtectedMutationRejected(const std::vector<std::uint8_t>& archive, std::size_t graphOffset,
+    const mustache::Data& data, Mutator&& mutate, const std::string& description)
+{
+  std::vector<std::uint8_t> mutated = archive;
+  std::forward<Mutator>(mutate)(&mutated);
+  rewriteProtectedArchiveIntegrity(&mutated, graphOffset);
+  expectRejected(
+      std::string_view(reinterpret_cast<const char *>(mutated.data()), mutated.size()), data, description.c_str());
+}
+
+void testProtectedArchiveVectorValidation(const std::vector<std::uint8_t>& archive, const mustache::Data& data)
+{
+  static_assert(sizeof(std::intptr_t) == sizeof(void *), "Cista offsets must match the native pointer width");
+  constexpr std::size_t cistaVersionFieldSize = 8;
+  constexpr std::size_t cistaIntegrityFieldSize = 8;
+  constexpr std::size_t graphOffset = archivePreambleSize + cistaVersionFieldSize + cistaIntegrityFieldSize;
+  constexpr std::size_t firstVectorOffset = graphOffset + 24;
+  constexpr std::size_t serializedVectorSize = sizeof(std::intptr_t) + 16;
+  constexpr std::size_t usedSizeMemberOffset = sizeof(std::intptr_t);
+  constexpr std::size_t allocatedSizeMemberOffset = usedSizeMemberOffset + sizeof(std::uint32_t);
+  constexpr std::size_t selfAllocatedMemberOffset = allocatedSizeMemberOffset + sizeof(std::uint32_t);
+
+  struct VectorLayout {
+      const char * name;
+      std::size_t headerOffset;
+      std::size_t elementSize;
+      std::size_t elementAlignment;
+  };
+  const std::array<VectorLayout, 3> layouts = {{
+      {"nodes", firstVectorOffset, 40, 4},
+      {"partials", firstVectorOffset + serializedVectorSize, 12, 4},
+      {"strings", firstVectorOffset + serializedVectorSize * 2, 1, 1},
+  }};
+  const std::size_t payloadSize = archive.size() - archivePreambleSize;
+
+  for (const VectorLayout& layout : layouts) {
+    const std::size_t pointerOffsetInPayload = layout.headerOffset - archivePreambleSize;
+    const std::size_t usedSizeOffset = layout.headerOffset + usedSizeMemberOffset;
+    const std::size_t allocatedSizeOffset = layout.headerOffset + allocatedSizeMemberOffset;
+    const std::size_t selfAllocatedOffset = layout.headerOffset + selfAllocatedMemberOffset;
+    const std::uint32_t originalUsedSize = readNativeArchiveField<std::uint32_t>(archive, usedSizeOffset);
+    expect(originalUsedSize != 0, "vector validation fixture unexpectedly contains an empty vector");
+
+    const auto reject = [&](auto&& mutate, const char * caseDescription) {
+      expectProtectedMutationRejected(archive, graphOffset, data, std::forward<decltype(mutate)>(mutate),
+          std::string(layout.name) + " vector " + caseDescription);
+    };
+
+    reject(
+        [&](std::vector<std::uint8_t> * mutated) {
+          writeNativeArchiveField(mutated, layout.headerOffset, std::numeric_limits<std::intptr_t>::min());
+        },
+        "null pointer with nonzero size");
+    reject(
+        [&](std::vector<std::uint8_t> * mutated) {
+          writeNativeArchiveField(mutated, layout.headerOffset, std::numeric_limits<std::intptr_t>::max());
+        },
+        "maximum positive offset");
+    reject(
+        [&](std::vector<std::uint8_t> * mutated) {
+          writeNativeArchiveField(mutated, layout.headerOffset, std::numeric_limits<std::intptr_t>::min() + 1);
+        },
+        "near-minimum negative offset");
+    reject(
+        [&](std::vector<std::uint8_t> * mutated) {
+          const std::intptr_t underflowOffset = -static_cast<std::intptr_t>(pointerOffsetInPayload) - 1;
+          writeNativeArchiveField(mutated, layout.headerOffset, underflowOffset);
+        },
+        "negative offset before the payload");
+    reject(
+        [&](std::vector<std::uint8_t> * mutated) {
+          writeNativeArchiveField(mutated, layout.headerOffset, std::intptr_t{0});
+          writeNativeArchiveField(mutated, usedSizeOffset, std::uint32_t{0});
+          writeNativeArchiveField(mutated, allocatedSizeOffset, std::uint32_t{0});
+        },
+        "nonnull pointer with zero sizes");
+    reject(
+        [&](std::vector<std::uint8_t> * mutated) {
+          writeNativeArchiveField(mutated, layout.headerOffset, std::numeric_limits<std::intptr_t>::min());
+          writeNativeArchiveField(mutated, usedSizeOffset, std::uint32_t{0});
+          writeNativeArchiveField(mutated, allocatedSizeOffset, std::uint32_t{0});
+        },
+        "valid null layout with an invalid graph");
+    reject(
+        [&](std::vector<std::uint8_t> * mutated) {
+          writeNativeArchiveField(mutated, allocatedSizeOffset, originalUsedSize + 1);
+        },
+        "used and allocated size mismatch");
+    reject(
+        [&](std::vector<std::uint8_t> * mutated) {
+          writeNativeArchiveField(mutated, selfAllocatedOffset, std::uint8_t{1});
+        },
+        "self-allocated state");
+    reject(
+        [&](std::vector<std::uint8_t> * mutated) {
+          writeNativeArchiveField(mutated, usedSizeOffset, std::numeric_limits<std::uint32_t>::max());
+          writeNativeArchiveField(mutated, allocatedSizeOffset, std::numeric_limits<std::uint32_t>::max());
+        },
+        "maximum sizes");
+
+    const std::uintmax_t originalByteSize =
+        static_cast<std::uintmax_t>(originalUsedSize) * static_cast<std::uintmax_t>(layout.elementSize);
+    expect(originalByteSize < payloadSize, "vector validation fixture cannot exercise a one-byte range overflow");
+    const std::size_t overflowingDataOffset = payloadSize - static_cast<std::size_t>(originalByteSize) + 1;
+    expect(overflowingDataOffset >= pointerOffsetInPayload,
+        "vector validation fixture unexpectedly requires a negative range-overflow offset");
+    reject(
+        [&](std::vector<std::uint8_t> * mutated) {
+          writeNativeArchiveField(
+              mutated, layout.headerOffset, static_cast<std::intptr_t>(overflowingDataOffset - pointerOffsetInPayload));
+        },
+        "span one byte beyond the payload");
+    reject(
+        [&](std::vector<std::uint8_t> * mutated) {
+          writeNativeArchiveField(
+              mutated, layout.headerOffset, static_cast<std::intptr_t>(payloadSize - pointerOffsetInPayload));
+        },
+        "nonnull pointer at the exact payload end");
+
+    if (layout.elementAlignment > 1) {
+      reject(
+          [&](std::vector<std::uint8_t> * mutated) {
+            writeNativeArchiveField(mutated, layout.headerOffset, std::intptr_t{1});
+          },
+          "misaligned in-range pointer");
+      reject(
+          [&](std::vector<std::uint8_t> * mutated) {
+            writeNativeArchiveField(mutated, layout.headerOffset, std::intptr_t{-1});
+          },
+          "misaligned negative pointer");
+    } else {
+      const std::intptr_t originalRelativeOffset = readNativeArchiveField<std::intptr_t>(archive, layout.headerOffset);
+      expect(originalRelativeOffset >= 0, "strings vector unexpectedly uses a negative offset");
+      const std::size_t originalDataOffset = pointerOffsetInPayload + static_cast<std::size_t>(originalRelativeOffset);
+      expect(originalDataOffset + static_cast<std::size_t>(originalByteSize) == payloadSize,
+          "strings vector no longer exercises a valid exact-end span");
+    }
+  }
+}
+
+void expectPreambleMutationRejected(
+    const std::vector<std::uint8_t>& archive, std::size_t offset, const mustache::Data& data, const char * description)
+{
+  std::vector<std::uint8_t> mutated = archive;
+  mutated.at(offset) ^= std::uint8_t{0x80};
+  expectRejected(std::string_view(reinterpret_cast<const char *>(mutated.data()), mutated.size()), data, description);
+}
+
+void expectSingleByteMutationsRejected(
+    const std::vector<std::uint8_t>& archive, const mustache::Data& data, const char * description)
+{
+  for (std::size_t offset = 0; offset < archive.size(); ++offset) {
+    std::vector<std::uint8_t> mutated = archive;
+    mutated[offset] ^= std::uint8_t{0x80};
+    try {
+      (void)mustache_benchmark::renderCistaArchive(
+          std::string_view(reinterpret_cast<const char *>(mutated.data()), mutated.size()), data);
+    } catch (const std::exception&) {
+      continue;
+    }
+    throw std::runtime_error(std::string("single-byte archive mutation was accepted at offset ") +
+        std::to_string(offset) + ": " + description);
+  }
+}
+
 void expectRejected(std::string_view bytes, const mustache::Data& data,
     const mustache_benchmark::CistaArchiveLimits& archiveLimits, const mustache::RenderLimits& renderLimits,
     const char * description)
@@ -301,6 +573,7 @@ template <typename Operation> void expectOperationRejected(Operation&& operation
 int main()
 {
   try {
+    expect(!isGoldenPlatform(4), "x86-64 x32 ABI incorrectly selected the 64-bit golden archive");
     testDataPartCursorContract();
 
     mustache::Mustache engine;
@@ -319,6 +592,14 @@ int main()
     const std::vector<std::uint8_t> archive = mustache_benchmark::serializeCistaArchive(root, partials);
     expect(archive == mustache_benchmark::serializeCistaArchive(root, partials),
         "Cista archive serialization is not deterministic");
+    constexpr std::array<std::uint8_t, 8> expectedMagic = {'M', 'U', 'S', 'T', 'A', 'R', 'C', 0};
+    expect(archive.size() > archivePreambleSize, "Cista archive preamble has no payload");
+    expect(std::equal(expectedMagic.begin(), expectedMagic.end(), archive.begin()),
+        "Cista archive preamble magic changed");
+    expect(readLittleEndian(archive, 8, 8) == 1, "libmustache archive format generation changed");
+    if (isGoldenPlatform(sizeof(void *))) {
+      expect(archive == readGoldenArchive(), "Cista archive differs from the version 1 golden fixture");
+    }
     const std::string_view bytes(reinterpret_cast<const char *>(archive.data()), archive.size());
     const std::string actual = mustache_benchmark::renderCistaArchive(bytes, data);
     expect(actual == expected, "Cista archive rendering differs from Node rendering");
@@ -349,9 +630,13 @@ int main()
           data, mode);
       expect(modeOutput == expected, "Cista security mode changed rendered output");
     }
-    expect(modeArchives[0] == modeArchives[1], "deep checking unexpectedly changed serialized bytes");
-    expect(modeArchives[2] == modeArchives[3], "deep checking changed integrity-protected bytes");
+    expect(modeArchives[0] == modeArchives[1], "deep checking unexpectedly changed the serialized archive");
+    expect(modeArchives[2] == modeArchives[3], "deep checking changed the integrity-protected archive");
     expect(modeArchives[2].size() > modeArchives[0].size(), "integrity mode did not add archive framing");
+    expect(mustache_benchmark::renderCistaArchive(
+               std::string_view(reinterpret_cast<const char *>(modeArchives[0].data()), modeArchives[0].size()), data,
+               mustache_benchmark::CistaSecurityMode::DeepCheck) == expected,
+        "deep checking is not an independent reader policy");
 
     const std::array<mustache_benchmark::CistaChecksumAlgorithm, 3> checksumAlgorithms = {
         mustache_benchmark::CistaChecksumAlgorithm::Fnv1a64,
@@ -407,6 +692,9 @@ int main()
           (void)mustache_benchmark::serializeCistaArchive(root, partials, serializationLimits);
         },
         "serialized output exceeds the paired reader limit");
+    serializationLimits.maxInputBytes = archive.size();
+    expect(mustache_benchmark::serializeCistaArchive(root, partials, serializationLimits) == archive,
+        "serialized output at the exact paired reader limit was rejected or changed");
 
     std::string nulSource("before\0after ", 13);
     nulSource.append("{{products}}");
@@ -569,18 +857,96 @@ int main()
         },
         "container child ownership");
 
-    expectRejected(std::string_view(), data, "empty");
+    for (std::size_t truncatedSize = 0; truncatedSize <= archivePreambleSize * 8; ++truncatedSize) {
+      expectRejected(bytes.substr(0, truncatedSize), data, "empty, preamble-only, or truncated Cista graph header");
+    }
     expectRejected(bytes.substr(0, bytes.size() - 1), data, "truncated");
 
+    expectPreambleMutationRejected(archive, 0, data, "preamble magic");
+    expectPreambleMutationRejected(archive, 8, data, "format generation");
+
     std::vector<std::uint8_t> corrupted = archive;
-    corrupted[0] ^= std::uint8_t{0xFF};
-    expectRejected(
-        std::string_view(reinterpret_cast<const char *>(corrupted.data()), corrupted.size()), data, "type hash");
+    corrupted[archivePreambleSize] ^= std::uint8_t{0xFF};
+    expectRejected(std::string_view(reinterpret_cast<const char *>(corrupted.data()), corrupted.size()), data,
+        "payload type hash");
 
     corrupted = archive;
     corrupted.back() ^= std::uint8_t{0xFF};
     expectRejected(
         std::string_view(reinterpret_cast<const char *>(corrupted.data()), corrupted.size()), data, "integrity");
+    expectSingleByteMutationsRejected(archive, data, "preamble, type, integrity, and payload coverage");
+
+    constexpr std::size_t cistaVersionFieldSize = 8;
+    constexpr std::size_t archiveGraphOffset = archivePreambleSize + cistaVersionFieldSize;
+    constexpr std::size_t archiveGraphSchemaOffset = archiveGraphOffset + 8;
+    constexpr std::size_t archiveGraphSerializedSizeOffset = archiveGraphOffset + 16;
+    constexpr std::size_t archiveGraphNodesPointerOffset = archiveGraphOffset + 24;
+    testProtectedArchiveVectorValidation(modeArchives[2], data);
+
+    std::vector<std::uint8_t> unprotectedMutation = modeArchives[0];
+    unprotectedMutation.at(archiveGraphOffset) ^= std::uint8_t{0x80};
+    expectOperationRejected(
+        [&unprotectedMutation, &data]() {
+          (void)mustache_benchmark::renderCistaArchive(
+              std::string_view(reinterpret_cast<const char *>(unprotectedMutation.data()), unprotectedMutation.size()),
+              data, mustache_benchmark::CistaSecurityMode::Neither);
+        },
+        "graph magic without integrity");
+
+    unprotectedMutation = modeArchives[0];
+    writeNativeArchiveField(&unprotectedMutation, archiveGraphSchemaOffset, std::uint32_t{2});
+    expectOperationRejected(
+        [&unprotectedMutation, &data]() {
+          (void)mustache_benchmark::renderCistaArchive(
+              std::string_view(reinterpret_cast<const char *>(unprotectedMutation.data()), unprotectedMutation.size()),
+              data, mustache_benchmark::CistaSecurityMode::Neither);
+        },
+        "graph schema without integrity");
+
+    unprotectedMutation = modeArchives[0];
+    writeNativeArchiveField(&unprotectedMutation, archiveGraphSerializedSizeOffset, std::uint64_t{0});
+    expectOperationRejected(
+        [&unprotectedMutation, &data]() {
+          (void)mustache_benchmark::renderCistaArchive(
+              std::string_view(reinterpret_cast<const char *>(unprotectedMutation.data()), unprotectedMutation.size()),
+              data, mustache_benchmark::CistaSecurityMode::Neither);
+        },
+        "graph serialized size without integrity");
+
+    unprotectedMutation = modeArchives[0];
+    unprotectedMutation.push_back(0);
+    expectOperationRejected(
+        [&unprotectedMutation, &data]() {
+          (void)mustache_benchmark::renderCistaArchive(
+              std::string_view(reinterpret_cast<const char *>(unprotectedMutation.data()), unprotectedMutation.size()),
+              data, mustache_benchmark::CistaSecurityMode::Neither);
+        },
+        "trailing payload byte without integrity");
+
+    unprotectedMutation = modeArchives[0];
+    writeNativeArchiveField(&unprotectedMutation, archiveGraphNodesPointerOffset, std::intptr_t{-1});
+    expectOperationRejected(
+        [&unprotectedMutation, &data]() {
+          (void)mustache_benchmark::renderCistaArchive(
+              std::string_view(reinterpret_cast<const char *>(unprotectedMutation.data()), unprotectedMutation.size()),
+              data, mustache_benchmark::CistaSecurityMode::DeepCheck);
+        },
+        "out-of-range graph pointer under deep checking");
+
+    expectOperationRejected(
+        [&modeArchives, &data]() {
+          (void)mustache_benchmark::renderCistaArchive(
+              std::string_view(reinterpret_cast<const char *>(modeArchives[0].data()), modeArchives[0].size()), data,
+              mustache_benchmark::CistaSecurityMode::Integrity);
+        },
+        "unprotected payload read as integrity-protected");
+    expectOperationRejected(
+        [&modeArchives, &data]() {
+          (void)mustache_benchmark::renderCistaArchive(
+              std::string_view(reinterpret_cast<const char *>(modeArchives[2].data()), modeArchives[2].size()), data,
+              mustache_benchmark::CistaSecurityMode::Neither);
+        },
+        "integrity-protected payload read as unprotected");
 
     std::vector<std::uint8_t> unaligned(archive.size() + 1);
     std::copy(archive.begin(), archive.end(), unaligned.begin() + 1);
@@ -590,6 +956,9 @@ int main()
     mustache_benchmark::CistaArchiveLimits archiveLimits;
     archiveLimits.maxInputBytes = archive.size() - 1;
     expectRejected(bytes, data, archiveLimits, mustache::RenderLimits(), "input byte limit");
+    archiveLimits.maxInputBytes = archive.size();
+    expect(mustache_benchmark::renderCistaArchive(bytes, data, archiveLimits) == expected,
+        "archive at the exact input byte limit was rejected or rendered differently");
     archiveLimits = mustache_benchmark::CistaArchiveLimits();
     archiveLimits.maxNodes = 0;
     expectRejected(bytes, data, archiveLimits, mustache::RenderLimits(), "node limit");

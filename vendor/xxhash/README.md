@@ -26,10 +26,12 @@ makes Cista 0.16's runtime type hash unstable in optimized GCC builds.
 Treat an xxHash update as an archive-format dependency change. Review the
 upstream diff and license, copy `xxhash.h` and `LICENSE` from a clean checkout
 of the selected release, update every pin and checksum above plus
-`expected_xxhash_sha256` in `scripts/check-version-consistency.sh`, and run the
-complete bundled/system Cista and xxHash build matrix plus the existing archive
-determinism, corruption, and sanitizer tests. Complete the planned golden
-fixtures and archive fuzzing before treating the updated format as stable.
+`expected_xxhash_sha256` in `scripts/check-version-consistency.sh`, update the
+libmustache archive format generation when compatibility changes, update the
+golden fixture deliberately if the selected bytes change, and run the complete
+bundled/system Cista and xxHash build matrix plus the archive
+determinism, compatibility, corruption, and sanitizer tests. Complete archive
+fuzzing before treating the updated format as stable.
 
 ```sh
 cp /path/to/xxHash/xxhash.h /path/to/libmustache/vendor/xxhash/xxhash.h

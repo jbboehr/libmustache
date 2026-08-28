@@ -70,6 +70,7 @@ endif
 EXTRA_DIST = \
 	CMakeLists.txt \
 	run_spec_crlf.cmake \
+	fixtures/cista-archive-v1-x86_64-le-itanium.hex \
 	fuzz_node_unserialize.cpp \
 	fuzz_tokenizer.cpp \
 	fuzz_data_parser.cpp \

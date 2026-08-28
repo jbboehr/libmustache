@@ -678,11 +678,17 @@ download. Packagers have independent, default-off system-dependency overrides;
 CMake and Autotools test all four bundled/system combinations. Standard CMake
 package search variables and Autotools compiler/linker flag overrides cover
 non-standard prefixes. No `cista::*` type may appear in installed public
-headers. The archive header and PHP cache key must identify the libmustache
-archive schema, Cista snapshot, pointer width, endianness, and other
-compiler/platform assumptions. Cista updates and schema changes require
-explicit compatibility review and golden-fixture tests rather than silently
-changing existing cache bytes.
+headers. The experimental archive now has a minimal fixed little-endian
+preamble identifying its libmustache format generation before Cista is entered.
+Libmustache bounds-checks the serialized root vectors without following their
+offset pointers; Cista's version, integrity, and deep-check modes then validate
+the native type graph, payload, and pointers. The protected archive graph
+carries its semantic schema and exact payload size. A platform-specific golden
+fixture is enforced across all tested bundled/system dependency combinations.
+Future PHP cache keys must
+carry the libmustache format generation. Cista updates and schema changes
+require explicit compatibility review and deliberate format-generation or
+golden-fixture changes rather than silently changing existing cache bytes.
 
 The next end-to-end performance slice is the real one-fetch/one-render PHP/APCu
 path after those native gates pass. Do not adopt a replacement format unless

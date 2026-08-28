@@ -261,16 +261,16 @@ newly compiled ABI 6 templates may use metadata an ABI 5 decoder does not
 understand. Do not replace durable ABI 5 cache entries in place if old
 processes must continue reading them.
 
-The [PHP cache benchmark](ast-cache-benchmark-2026-08-22.md) compared validated
-decoding with cached-source reparsing, including warm and fresh-process cases,
-PHP serialization, and APCu fetch/store overhead. It selected source for current
-cross-request caches and rejected the legacy AST as the basis of a replacement
-format. A later Cista direct-view feasibility result cleared the native latency
-threshold. Follow-up runs found deep checking cheap, FNV-1a integrity expensive,
-and selected modern XXH3-backed `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` as
-the native default. The archive still used substantially more cache space and
-has not crossed the PHP/APCu boundary. It remains an optional experiment, not a
-release decision. Therefore:
+Project benchmarks compared validated decoding with cached-source reparsing,
+including warm and fresh-process cases, PHP serialization, and APCu fetch/store
+overhead. They selected source for current cross-request caches and rejected the
+legacy AST as the basis of a replacement format. A later Cista direct-view
+feasibility result cleared the native latency threshold. Follow-up runs found
+deep checking cheap, FNV-1a integrity expensive, and selected modern
+XXH3-backed `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` as the native default.
+The archive still used substantially more cache space and has not crossed the
+PHP/APCu boundary. It remains an optional experiment, not a release decision.
+Therefore:
 
 - retain checked reads of existing ABI 5 data throughout libmustache 0.6.x and
   php-mustache 0.x;

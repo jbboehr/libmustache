@@ -49,6 +49,11 @@ struct CistaArchiveLimits {
     std::size_t maxDataParts = 100000;
 };
 
+/*! Serialize an experimental archive with a libmustache format preamble.
+
+    The fixed-width preamble is validated before Cista performs its own type,
+    integrity, and structural checks. It counts toward maxInputBytes.
+*/
 std::vector<std::uint8_t> serializeCistaArchive(const mustache::Node& root,
     const mustache::Node::Partials& partials = mustache::Node::Partials(),
     const CistaArchiveLimits& archiveLimits = CistaArchiveLimits());
@@ -56,6 +61,7 @@ std::vector<std::uint8_t> serializeCistaArchive(const mustache::Node& root,
 std::vector<std::uint8_t> serializeCistaArchive(const mustache::Node& root, const mustache::Node::Partials& partials,
     CistaSecurityMode mode, const CistaArchiveLimits& archiveLimits = CistaArchiveLimits());
 
+/*! Validate and render a framed archive without rebuilding owned Nodes. */
 std::string renderCistaArchive(std::string_view bytes, const mustache::Data& data,
     const CistaArchiveLimits& archiveLimits = CistaArchiveLimits(),
     const mustache::RenderLimits& renderLimits = mustache::RenderLimits());

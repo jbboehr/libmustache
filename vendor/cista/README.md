@@ -25,10 +25,12 @@ the separately versioned bundled or system xxHash dependency.
 Treat a Cista update as an archive-format change, even when the public
 libmustache schema number has not changed. Review the upstream diff and
 licenses, regenerate the header, update every pin and checksum above plus
-`expected_cista_sha256` in `scripts/check-version-consistency.sh`, and run both
-the vendored and system-Cista build matrices plus the existing archive
-determinism, corruption, and sanitizer tests. Complete the planned golden
-fixtures and archive fuzzing before treating the updated format as stable.
+`expected_cista_sha256` in `scripts/check-version-consistency.sh`, bump the
+libmustache archive format generation when compatibility changes, update the
+golden fixture deliberately, and run both
+the vendored and system-Cista build matrices plus the archive determinism,
+compatibility, corruption, and sanitizer tests. Complete archive fuzzing before
+treating the updated format as stable.
 
 From a clean checkout of the selected upstream tag:
 
