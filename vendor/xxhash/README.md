@@ -16,10 +16,12 @@ headers.
 
 The bundled configuration defines `XXH_IMPLEMENTATION`,
 `XXH_STATIC_LINKING_ONLY`, and a libmustache-specific `XXH_NAMESPACE` before
-including this header. This keeps one implementation in the private archive
-translation unit, avoids symbol collisions, and does not require a separately
-linked xxHash library. `XXH_INLINE_ALL` is deliberately not used because it
-makes Cista 0.16's runtime type hash unstable in optimized GCC builds.
+including this header. This keeps one implementation behind the private
+out-of-line Cista XXH3 adapter, avoids symbol collisions, and does not require a
+separately linked xxHash library. `XXH_INLINE_ALL` is deliberately not used
+because it makes Cista 0.16's runtime type hash unstable in optimized GCC
+builds. The out-of-line boundary also avoids a GCC 15 miscompilation of Cista's
+address-of-parameter hash helper while preserving identical archive bytes.
 
 ## Updating
 

@@ -10,7 +10,7 @@ check_PROGRAMS += test_spec
 endif
 
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
-check_PROGRAMS += test_cista_archive
+check_PROGRAMS += test_cista_archive test_archived_template
 endif
 
 test_spec_SOURCES = test_spec.cpp test_spec.hpp spec_expectations.hpp ./fixtures/lambdas.cpp ./fixtures/lambdas.hpp
@@ -30,17 +30,20 @@ test_allocation_failure_SOURCES = test_allocation_failure.cpp
 # mismatched-new-delete after inlining into std::make_unique.
 test_allocation_failure_CXXFLAGS = $(AM_CXXFLAGS) -Wno-mismatched-new-delete
 test_cli_SOURCES = test_cli.cpp ../bin/cli.cpp ../bin/cli.hpp
+test_archived_template_SOURCES = test_archived_template.cpp
 test_cista_archive_SOURCES = \
 	../benchmarks/test-cista-archive.cpp \
 	../benchmarks/cista-archive.cpp \
-	../benchmarks/cista-archive.hpp
+	../benchmarks/cista-archive.hpp \
+	../benchmarks/cista-xxh3.cpp
 test_cista_archive_CPPFLAGS = \
 	$(AM_CPPFLAGS) \
 	-I$(top_srcdir)/benchmarks \
 	-I$(top_srcdir)/benchmarks/cista-xxh3 \
 	$(ZLIB_CFLAGS) \
 	-DCISTA_XXH3=1 \
-	-DMUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1
+	-DMUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1 \
+	-DMUSTACHE_CISTA_ARCHIVE_PROTOTYPE_ONLY=1
 if MUSTACHE_SYSTEM_XXHASH
 test_cista_archive_CPPFLAGS += $(XXHASH_CFLAGS)
 else
@@ -69,6 +72,7 @@ endif
 
 EXTRA_DIST = \
 	CMakeLists.txt \
+	check_installed_shared_consumer.cmake \
 	run_fuzzer_smoke.cmake \
 	run_spec_crlf.cmake \
 	verify_fuzzer_smoke_safety.cmake \
@@ -117,7 +121,7 @@ if MUSTACHE_SPEC_TEST_ENABLED
 TESTS += test_spec
 endif
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
-TESTS += test_cista_archive
+TESTS += test_cista_archive test_archived_template
 endif
 TESTS_ENVIRONMENT = \
 	top_srcdir=$(top_srcdir) \

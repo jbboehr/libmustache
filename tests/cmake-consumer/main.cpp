@@ -119,6 +119,14 @@ int main()
   const mustache::Data consumerLambda = mustache::Data::lambda(std::make_unique<ConsumerLambda>());
   const std::string lambdaOutput = mustache::render(mustache::compile("{{.}}"), consumerLambda);
 
+#ifdef MUSTACHE_HAVE_ARCHIVED_TEMPLATES
+  const std::vector<std::uint8_t> archiveBytes = mustache::serializeArchivedTemplate(parsed);
+  const mustache::ArchivedTemplateView archived = mustache::loadArchivedTemplate(archiveBytes);
+  const std::string archivedOutput = mustache.render(archived, scalar);
+#else
+  const std::string archivedOutput = "ok";
+#endif
+
   mustache::LambdaRenderContext inactiveContext;
   bool inactiveContextRejected = false;
   try {
@@ -130,7 +138,7 @@ int main()
   return decoded->type == mustache::Node::TypeRoot && decoded->children.size() == 1 &&
           decoded->children.front()->data.has_value() && *decoded->children.front()->data == "owned" &&
           nodeTemplate == "owned" && compiledOutput == "[compiled]" && lambdaOutput == "consumer-lambda" &&
-          !inactiveContext.active() && inactiveContextRejected
+          archivedOutput == "ok" && !inactiveContext.active() && inactiveContextRejected
       ? 0
       : 1;
 }

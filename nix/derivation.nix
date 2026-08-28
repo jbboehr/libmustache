@@ -225,6 +225,25 @@ stdenv.mkDerivation (finalAttrs: {
         -o pkg-config-consumer
       LD_LIBRARY_PATH="$lib/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
         ./pkg-config-consumer
+
+      ${lib.optionalString (cmakeSupport || staticOnlySupport) ''
+        read -r -a pkg_config_static_flags <<< "$(pkg-config --static --cflags --libs mustache)"
+        pkg_config_forced_static_flags=()
+        for flag in "''${pkg_config_static_flags[@]}"; do
+          if test "$flag" = -lmustache; then
+            pkg_config_forced_static_flags+=("$lib/lib/libmustache.a")
+          else
+            pkg_config_forced_static_flags+=("$flag")
+          fi
+        done
+        "$CXX" "$src/tests/cmake-consumer/main.cpp" \
+          -std=c++11 \
+          -DMUSTACHE_EXPECTED_VERSION='"${finalAttrs.version}"' \
+          "''${pkg_config_forced_static_flags[@]}" \
+          "''${pkg_config_consumer_flags[@]}" \
+          -o pkg-config-static-consumer
+        ./pkg-config-static-consumer
+      ''}
     ''
     + lib.optionalString cmakeSupport ''
       consumer_cmake_flags=()

@@ -62,6 +62,7 @@ option(MUSTACHE_ENABLE_FUZZING "Build the Clang libFuzzer targets and smoke test
 option(MUSTACHE_ENABLE_CLANG_TIDY "Run clang-tidy on production targets" OFF)
 option(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES
     "Build the experimental archived-template implementation" OFF)
+set(MUSTACHE_HAVE_ARCHIVED_TEMPLATES ${MUSTACHE_ENABLE_ARCHIVED_TEMPLATES})
 option(MUSTACHE_USE_SYSTEM_CISTA
     "Use a system Cista package instead of the bundled private snapshot" OFF)
 option(MUSTACHE_USE_SYSTEM_XXHASH
@@ -247,6 +248,14 @@ if(MUSTACHE_HAVE_LIBYAML)
     set(MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE yaml-0.1)
 else()
     set(MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE "")
+endif()
+if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+    string(APPEND MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE " zlib")
+    if(MUSTACHE_USE_SYSTEM_XXHASH)
+        string(APPEND MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE " libxxhash")
+    endif()
+    string(STRIP "${MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE}"
+        MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE)
 endif()
 
 configure_file(

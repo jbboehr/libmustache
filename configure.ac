@@ -19,6 +19,7 @@ MUSTACHE_CXXFLAGS=
 MUSTACHE_CPPFLAGS=
 MUSTACHE_LDFLAGS=
 MUSTACHE_JSON_CXXFLAGS=
+MUSTACHE_ARCHIVE_CXXFLAGS=
 MUSTACHE_LIBRARY_EXPORT_CPPFLAGS=
 MUSTACHE_CONSUMER_EXPORT_CPPFLAGS=
 
@@ -126,8 +127,10 @@ AC_CACHE_CHECK([whether $CXX supports private C++ symbol visibility],
 ])
 AS_IF([test "x$mustache_cv_cxx_visibility_hidden" = "xyes"], [
     MUSTACHE_JSON_CXXFLAGS="-fvisibility=hidden -fvisibility-inlines-hidden"
+    MUSTACHE_ARCHIVE_CXXFLAGS="-fvisibility=hidden -fvisibility-inlines-hidden"
 ])
 AC_SUBST([MUSTACHE_JSON_CXXFLAGS])
+AC_SUBST([MUSTACHE_ARCHIVE_CXXFLAGS])
 
 AC_ARG_ENABLE([debug],
     [AS_HELP_STRING([--enable-debug], [enable debug mode])],
@@ -341,9 +344,11 @@ AC_ARG_VAR([CISTA_CFLAGS],
     [C++ preprocessor flags for a system Cista installation])
 AS_IF([test "x$enable_archived_templates" = "xyes"], [
     PKG_CHECK_MODULES([ZLIB], [zlib])
+    MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE="$MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE zlib"
 
     AS_IF([test "x$with_system_xxhash" = "xyes"], [
         PKG_CHECK_MODULES([XXHASH], [libxxhash >= 0.8.0])
+        MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE="$MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE libxxhash"
     ], [
         AS_IF([test ! -f "$srcdir/vendor/xxhash/xxhash.h"], [
             AC_MSG_ERROR([bundled xxHash header is missing: $srcdir/vendor/xxhash/xxhash.h])
@@ -365,6 +370,10 @@ AS_IF([test "x$enable_archived_templates" = "xyes"], [
 ])
 AM_CONDITIONAL([MUSTACHE_ARCHIVED_TEMPLATES_ENABLED],
     [test "x$enable_archived_templates" = "xyes"])
+AS_IF([test "x$enable_archived_templates" = "xyes"], [
+    AC_DEFINE([HAVE_ARCHIVED_TEMPLATES], [1],
+        [Define if archived-template support is enabled])
+])
 AM_CONDITIONAL([MUSTACHE_SYSTEM_CISTA],
     [test "x$with_system_cista" = "xyes"])
 AM_CONDITIONAL([MUSTACHE_SYSTEM_XXHASH],

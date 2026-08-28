@@ -5,12 +5,16 @@
 #if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3) && defined(CISTA_FNV1A)
 #undef CISTA_FNV1A
 #endif
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+#include "cista-xxh3/xxh3.h"
+#else
+#include <xxhash.h>
+#endif
 #if defined(MUSTACHE_USE_VENDORED_CISTA)
 #include <cista.h>
 #else
 #include <cista/serialization.h>
 #endif
-#include <xxhash.h>
 #include <zlib.h>
 
 #include <algorithm>
@@ -298,18 +302,18 @@ void addBounded(std::size_t amount, std::size_t maximum, std::size_t * total, co
 
 class ArchiveBuilder {
   public:
+    ArchiveBuilder(const CistaArchiveLimits& limits, std::size_t cistaHeaderBytes) :
+        limits_(limits),
+        cistaHeaderBytes_(cistaHeaderBytes)
+    {}
+
     ArchiveGraph build(const mustache::Node& root, const mustache::Node::Partials& partials)
     {
+      validateMinimumSize();
       const EffectivePartials effectivePartials = collectEffectivePartials(root.partials, partials);
       countNode(root, 0);
       for (const EffectivePartial& partial : effectivePartials) {
-        addStringBytes(partial.first.size());
         countNode(*partial.second, 0);
-      }
-      if (nodeCount_ > std::numeric_limits<std::uint32_t>::max() ||
-          stringBytes_ > std::numeric_limits<std::uint32_t>::max() ||
-          effectivePartials.size() > std::numeric_limits<std::uint32_t>::max()) {
-        throw mustache::Exception("Cista archive exceeds format limit");
       }
       graph_.nodes.reserve(static_cast<std::uint32_t>(nodeCount_));
       graph_.partials.reserve(static_cast<std::uint32_t>(effectivePartials.size()));
@@ -329,23 +333,48 @@ class ArchiveBuilder {
     using EffectivePartials = std::map<std::string_view, const mustache::Node *>;
     using EffectivePartial = EffectivePartials::value_type;
 
-    static EffectivePartials collectEffectivePartials(
+    EffectivePartials collectEffectivePartials(
         const mustache::Node::Partials& fallback, const mustache::Node::Partials& overriding)
     {
       EffectivePartials effective;
       for (const mustache::Node::PartialPair& partial : fallback) {
         if (partial.second != nullptr) {
-          effective.emplace(partial.first, partial.second.get());
+          const auto inserted = effective.emplace(partial.first, partial.second.get());
+          if (inserted.second) {
+            addPartialName(partial.first);
+          }
         }
       }
       // A null external entry does not mask the root-owned fallback in
       // OwnedPartialSource, so only non-null overrides enter the archive.
       for (const mustache::Node::PartialPair& partial : overriding) {
         if (partial.second != nullptr) {
-          effective.insert_or_assign(partial.first, partial.second.get());
+          const auto position = effective.find(partial.first);
+          if (position == effective.end()) {
+            effective.emplace(partial.first, partial.second.get());
+            addPartialName(partial.first);
+          } else {
+            position->second = partial.second.get();
+          }
         }
       }
       return effective;
+    }
+
+    void addPartialName(std::string_view name)
+    {
+      // Every archived partial owns at least one root node, so this conservative
+      // writer bound guarantees that its output fits the paired reader's shared
+      // aggregate node budget before the partial table is allocated.
+      if (limits_.maxNodes == 0 || partialCount_ >= limits_.maxNodes - 1) {
+        throw mustache::Exception("Cista archive node count limit exceeded");
+      }
+      if (partialCount_ == std::numeric_limits<std::uint32_t>::max()) {
+        throw mustache::Exception("Cista archive partial count exceeds format limit");
+      }
+      ++partialCount_;
+      addStringBytes(name.size());
+      validateMinimumSize();
     }
 
     void addStringBytes(std::size_t bytes)
@@ -354,15 +383,23 @@ class ArchiveBuilder {
           bytes > std::numeric_limits<std::uint32_t>::max() - stringBytes_) {
         throw mustache::Exception("Cista archive string bytes exceed format limit");
       }
+      if (stringBytes_ > limits_.maxStringBytes || bytes > limits_.maxStringBytes - stringBytes_) {
+        throw mustache::Exception("Cista archive string byte limit exceeded");
+      }
       stringBytes_ += bytes;
+      validateMinimumSize();
     }
 
     void countNode(const mustache::Node& source, std::size_t depth)
     {
-      if (depth >= renderNestingCeiling || nodeCount_ == std::numeric_limits<std::uint32_t>::max()) {
-        throw mustache::Exception("Cista archive node limit exceeded");
+      if (depth >= limits_.maxNestingDepth || depth >= renderNestingCeiling) {
+        throw mustache::Exception("Cista archive nesting limit exceeded");
+      }
+      if (nodeCount_ >= limits_.maxNodes || nodeCount_ == std::numeric_limits<std::uint32_t>::max()) {
+        throw mustache::Exception("Cista archive node count limit exceeded");
       }
       ++nodeCount_;
+      validateMinimumSize();
       if (source.data.has_value()) {
         addStringBytes(source.data->size());
       }
@@ -372,12 +409,42 @@ class ArchiveBuilder {
       if (source.stopSequence.has_value()) {
         addStringBytes(source.stopSequence->size());
       }
+      const NodeTypeValue type = nodeTypeValue(source);
+      if (isSerializableType(type) && typeUsesDataParts(static_cast<mustache::Node::Type>(type)) &&
+          source.data.has_value()) {
+        const std::size_t parts =
+            static_cast<std::size_t>(std::count(source.data->begin(), source.data->end(), '.')) + 1;
+        if (parts > limits_.maxDataPartsPerNode) {
+          throw mustache::Exception("Cista archive per-node data-part limit exceeded");
+        }
+        addBounded(parts, limits_.maxDataParts, &dataParts_, "Cista archive data-part limit exceeded");
+      }
       for (const std::unique_ptr<mustache::Node>& child : source.children) {
         if (child == nullptr) {
           throw mustache::Exception("Invalid null Cista archive child");
         }
         countNode(*child, depth + 1);
       }
+    }
+
+    void validateMinimumSize() const
+    {
+      std::size_t minimum = archivePreambleSize;
+      const auto addMinimum = [&minimum, this](std::size_t amount) {
+        if (minimum > limits_.maxInputBytes || amount > limits_.maxInputBytes - minimum) {
+          throw mustache::Exception("Cista archive output byte limit exceeded");
+        }
+        minimum += amount;
+      };
+      addMinimum(cistaHeaderBytes_);
+      addMinimum(sizeof(ArchiveGraph));
+      if (nodeCount_ > limits_.maxInputBytes / sizeof(ArchiveNode) ||
+          partialCount_ > limits_.maxInputBytes / sizeof(ArchivePartial)) {
+        throw mustache::Exception("Cista archive output byte limit exceeded");
+      }
+      addMinimum(nodeCount_ * sizeof(ArchiveNode));
+      addMinimum(partialCount_ * sizeof(ArchivePartial));
+      addMinimum(stringBytes_);
     }
 
     ArchiveSlice appendString(std::string_view value)
@@ -441,8 +508,12 @@ class ArchiveBuilder {
     }
 
     ArchiveGraph graph_{};
+    const CistaArchiveLimits& limits_;
+    std::size_t cistaHeaderBytes_;
     std::size_t nodeCount_ = 0;
+    std::size_t partialCount_ = 0;
     std::size_t stringBytes_ = 0;
+    std::size_t dataParts_ = 0;
 };
 
 class ArchiveValidator {
@@ -646,6 +717,133 @@ class ArchiveValidator {
     std::vector<std::uint8_t> states_;
     std::size_t nodes_;
     std::size_t dataParts_;
+};
+
+class CistaSizeCounter {
+  public:
+    explicit CistaSizeCounter(std::size_t maximum) noexcept :
+        maximum_(maximum)
+    {}
+
+    cista::offset_t write(const void *, std::size_t bytes, std::size_t alignment = 0)
+    {
+      const std::size_t start = alignedSize(alignment);
+      if (start > maximum_ || bytes > maximum_ - start ||
+          start > static_cast<std::uintmax_t>(std::numeric_limits<cista::offset_t>::max())) {
+        throw mustache::Exception("Cista archive output byte limit exceeded");
+      }
+      size_ = start + bytes;
+      return static_cast<cista::offset_t>(start);
+    }
+
+    template <typename Value> void write(std::size_t position, const Value&)
+    {
+      if (position > size_ || cista::serialized_size<Value>() > size_ - position) {
+        throw mustache::Exception("Invalid Cista archive serializer write");
+      }
+    }
+
+    std::uint64_t checksum(cista::offset_t = 0) const noexcept
+    {
+      return 0;
+    }
+
+    std::size_t size() const noexcept
+    {
+      return size_;
+    }
+
+  private:
+    std::size_t alignedSize(std::size_t alignment) const
+    {
+      if (alignment <= 1) {
+        return size_;
+      }
+      const std::size_t remainder = size_ % alignment;
+      if (remainder == 0) {
+        return size_;
+      }
+      const std::size_t padding = alignment - remainder;
+      if (size_ > maximum_ || padding > maximum_ - size_) {
+        throw mustache::Exception("Cista archive output byte limit exceeded");
+      }
+      return size_ + padding;
+    }
+
+    std::size_t maximum_;
+    std::size_t size_ = 0;
+};
+
+class CistaBoundedBuffer {
+  public:
+    CistaBoundedBuffer(std::size_t maximum, std::size_t expected) :
+        maximum_(maximum),
+        expected_(expected)
+    {
+      if (expected > maximum) {
+        throw mustache::Exception("Cista archive output byte limit exceeded");
+      }
+      bytes_.reserve(expected);
+    }
+
+    cista::offset_t write(const void * source, std::size_t bytes, std::size_t alignment = 0)
+    {
+      const std::size_t start = alignedSize(alignment);
+      if (start > maximum_ || bytes > maximum_ - start ||
+          start > static_cast<std::uintmax_t>(std::numeric_limits<cista::offset_t>::max())) {
+        throw mustache::Exception("Cista archive output byte limit exceeded");
+      }
+      bytes_.resize(start + bytes);
+      if (bytes != 0) {
+        std::memcpy(bytes_.data() + start, source, bytes);
+      }
+      return static_cast<cista::offset_t>(start);
+    }
+
+    template <typename Value> void write(std::size_t position, const Value& value)
+    {
+      const std::size_t bytes = cista::serialized_size<Value>();
+      if (position > bytes_.size() || bytes > bytes_.size() - position) {
+        throw mustache::Exception("Invalid Cista archive serializer write");
+      }
+      std::memcpy(bytes_.data() + position, &value, bytes);
+    }
+
+    std::uint64_t checksum(cista::offset_t start = 0) const noexcept
+    {
+      const std::size_t offset = static_cast<std::size_t>(start);
+      return cista::hash(
+          std::string_view(reinterpret_cast<const char *>(bytes_.data() + offset), bytes_.size() - offset));
+    }
+
+    std::vector<std::uint8_t> release()
+    {
+      if (bytes_.size() != expected_) {
+        throw mustache::Exception("Cista archive size changed while framing");
+      }
+      return std::move(bytes_);
+    }
+
+  private:
+    std::size_t alignedSize(std::size_t alignment) const
+    {
+      if (alignment <= 1) {
+        return bytes_.size();
+      }
+      const std::size_t remainder = bytes_.size() % alignment;
+      if (remainder == 0) {
+        return bytes_.size();
+      }
+      const std::size_t padding = alignment - remainder;
+      if (bytes_.size() > maximum_ || padding > maximum_ - bytes_.size()) {
+        throw mustache::Exception("Cista archive output byte limit exceeded");
+      }
+      return bytes_.size() + padding;
+    }
+
+    std::size_t maximum_;
+    std::size_t expected_;
+    std::vector<std::uint8_t> bytes_;
 };
 
 class ArchiveChildCursor;
@@ -879,15 +1077,19 @@ template <cista::mode Mode>
 std::vector<std::uint8_t> serializeCistaArchiveWithMode(
     const mustache::Node& root, const mustache::Node::Partials& partials, const CistaArchiveLimits& archiveLimits)
 {
-  ArchiveGraph graph = ArchiveBuilder().build(root, partials);
-  ArchiveValidator(graph, archiveLimits).validate();
-  std::vector<std::uint8_t> bytes = cista::serialize<Mode>(graph);
-  graph.serializedSize = bytes.size();
-  bytes = cista::serialize<Mode>(graph);
-  if (bytes.size() != graph.serializedSize) {
-    throw mustache::Exception("Cista archive size changed while framing");
+  if (archiveLimits.maxInputBytes < archivePreambleSize) {
+    throw mustache::Exception("Cista archive output byte limit exceeded");
   }
-  return frameArchive(std::move(bytes), archiveLimits);
+  const std::size_t maximumPayloadBytes = archiveLimits.maxInputBytes - archivePreambleSize;
+  ArchiveGraph graph =
+      ArchiveBuilder(archiveLimits, static_cast<std::size_t>(cista::data_start(Mode))).build(root, partials);
+  ArchiveValidator(graph, archiveLimits).validate();
+  CistaSizeCounter counter(maximumPayloadBytes);
+  cista::serialize<Mode>(counter, graph);
+  graph.serializedSize = counter.size();
+  CistaBoundedBuffer buffer(maximumPayloadBytes, counter.size());
+  cista::serialize<Mode>(buffer, graph);
+  return frameArchive(buffer.release(), archiveLimits);
 }
 
 template <cista::mode Mode>
@@ -909,6 +1111,41 @@ std::string renderCistaArchiveWithMode(std::string_view bytes, const mustache::D
   engine.renderRoot(ArchiveNodeView::fromNode(&graph, graph.root));
   return output;
 }
+
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES) && !defined(MUSTACHE_CISTA_ARCHIVE_PROTOTYPE_ONLY)
+CistaArchiveLimits toCistaArchiveLimits(const mustache::ArchivedTemplateLimits& limits)
+{
+  CistaArchiveLimits converted;
+  converted.maxInputBytes = limits.maxInputBytes;
+  converted.maxNestingDepth = limits.maxNestingDepth;
+  converted.maxNodes = limits.maxNodes;
+  converted.maxStringBytes = limits.maxStringBytes;
+  converted.maxDataPartsPerNode = limits.maxDataPartsPerNode;
+  converted.maxDataParts = limits.maxDataParts;
+  return converted;
+}
+
+const void * validateProtectedArchive(std::string_view bytes, const mustache::ArchivedTemplateLimits& limits)
+{
+  return &readArchive<archiveModeDeepCheckAndIntegrity>(bytes, toCistaArchiveLimits(limits));
+}
+
+std::string renderProtectedArchive(
+    const void * validatedGraph, const mustache::Data& data, const mustache::RenderLimits& renderLimits)
+{
+  if (validatedGraph == nullptr) {
+    throw mustache::Exception("Empty archived template");
+  }
+  const ArchiveGraph& graph = *static_cast<const ArchiveGraph *>(validatedGraph);
+  std::string output;
+  mustache::Renderer renderer;
+  renderer.init(nullptr, &data, nullptr, &output, renderLimits);
+  ArchivePartialSource partialSource(graph);
+  mustache::detail::RenderEngine<ArchivePartialSource> engine(renderer, partialSource);
+  engine.renderRoot(ArchiveNodeView::fromNode(&graph, graph.root));
+  return output;
+}
+#endif
 
 } // namespace
 
@@ -978,7 +1215,7 @@ std::uint64_t checksumCistaArchive(std::string_view bytes, CistaChecksumAlgorith
           crc32_z(0, reinterpret_cast<const Bytef *>(data), static_cast<z_size_t>(bytes.size())));
     case CistaChecksumAlgorithm::Xxh3_64:
 #if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
-      return cista::XXH3_64bits(data, bytes.size());
+      return mustache_cista_xxh3_64bits_with_seed(data, bytes.size(), 0);
 #else
       return XXH3_64bits(data, bytes.size());
 #endif
@@ -1051,3 +1288,104 @@ std::string renderCistaArchive(std::string_view bytes, const mustache::Data& dat
 }
 
 } // namespace mustache_benchmark
+
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES) && !defined(MUSTACHE_CISTA_ARCHIVE_PROTOTYPE_ONLY)
+namespace mustache {
+
+struct ArchivedTemplateView::State {
+    explicit State(std::vector<std::uint8_t> archiveBytes) :
+        bytes(std::move(archiveBytes)),
+        graph(nullptr)
+    {}
+
+    std::vector<std::uint8_t> bytes;
+    const void * graph;
+};
+
+ArchivedTemplateView::ArchivedTemplateView() noexcept = default;
+
+ArchivedTemplateView::ArchivedTemplateView(const ArchivedTemplateView& other) noexcept = default;
+
+ArchivedTemplateView& ArchivedTemplateView::operator=(const ArchivedTemplateView& other) noexcept = default;
+
+ArchivedTemplateView::ArchivedTemplateView(ArchivedTemplateView&& other) noexcept = default;
+
+ArchivedTemplateView& ArchivedTemplateView::operator=(ArchivedTemplateView&& other) noexcept = default;
+
+ArchivedTemplateView::~ArchivedTemplateView() = default;
+
+ArchivedTemplateView::ArchivedTemplateView(std::shared_ptr<const State> state) noexcept :
+    state(std::move(state))
+{}
+
+bool ArchivedTemplateView::empty() const noexcept
+{
+  return !state;
+}
+
+ArchivedTemplateView::operator bool() const noexcept
+{
+  return !empty();
+}
+
+std::vector<std::uint8_t> serializeArchivedTemplate(
+    const Node& root, const Node::Partials& partials, const ArchivedTemplateLimits& limits)
+{
+  return mustache_benchmark::serializeCistaArchive(root, partials, mustache_benchmark::toCistaArchiveLimits(limits));
+}
+
+ArchivedTemplateView loadArchivedTemplate(const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits)
+{
+  if (bytes.size() > limits.maxInputBytes) {
+    throw Exception("Cista archive input byte limit exceeded");
+  }
+  std::shared_ptr<ArchivedTemplateView::State> loaded =
+      std::make_shared<ArchivedTemplateView::State>(std::vector<std::uint8_t>(bytes));
+  const char * data = loaded->bytes.empty() ? "" : reinterpret_cast<const char *>(loaded->bytes.data());
+  const std::string_view archivedBytes(data, loaded->bytes.size());
+  loaded->graph = mustache_benchmark::validateProtectedArchive(archivedBytes, limits);
+  return ArchivedTemplateView(std::move(loaded));
+}
+
+ArchivedTemplateView loadArchivedTemplate(std::string_view bytes, const ArchivedTemplateLimits& limits)
+{
+  if (bytes.size() > limits.maxInputBytes) {
+    throw Exception("Cista archive input byte limit exceeded");
+  }
+  std::vector<std::uint8_t> ownedBytes(bytes.size());
+  if (!bytes.empty()) {
+    std::memcpy(ownedBytes.data(), bytes.data(), bytes.size());
+  }
+  std::shared_ptr<ArchivedTemplateView::State> loaded =
+      std::make_shared<ArchivedTemplateView::State>(std::move(ownedBytes));
+  const char * data = loaded->bytes.empty() ? "" : reinterpret_cast<const char *>(loaded->bytes.data());
+  const std::string_view archivedBytes(data, loaded->bytes.size());
+  loaded->graph = mustache_benchmark::validateProtectedArchive(archivedBytes, limits);
+  return ArchivedTemplateView(std::move(loaded));
+}
+
+std::string render(const ArchivedTemplateView& archived, const Data& data)
+{
+  return render(archived, data, RenderLimits());
+}
+
+std::string render(const ArchivedTemplateView& archived, const Data& data, const RenderLimits& limits)
+{
+  if (archived.empty()) {
+    throw Exception("Empty archived template");
+  }
+  return mustache_benchmark::renderProtectedArchive(archived.state->graph, data, limits);
+}
+
+std::string Mustache::render(const ArchivedTemplateView& archived, const Data& data) const
+{
+  return mustache::render(archived, data);
+}
+
+std::string Mustache::render(const ArchivedTemplateView& archived, const Data& data, const RenderLimits& limits) const
+{
+  return mustache::render(archived, data, limits);
+}
+
+} // namespace mustache
+#endif

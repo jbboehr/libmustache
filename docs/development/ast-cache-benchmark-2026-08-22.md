@@ -490,7 +490,9 @@ If the feasibility work continues, use this integration policy:
   `ArchivedTemplateView` alongside the ordinary owned `Node`/`CompiledTemplate`
   path, and route both through a shared renderer algorithm using internal view
   adapters. Rendering a checked archive must not require rebuilding a `Node`
-  tree first.
+  tree first. This API now defensively copies archive bytes, validates them once
+  in final aligned storage, and keeps that private backing alive through an
+  immutable shared handle.
 - The experiment now uses a minimal libmustache format-generation preamble and
   raw bounds checks for the root vector spans before pointer traversal. Cista's
   `WITH_VERSION`, `WITH_INTEGRITY`, and `DEEP_CHECK` policies then provide type,
@@ -504,8 +506,9 @@ If the feasibility work continues, use this integration policy:
   corruption fixtures, archive-validation/render fuzzing, and a secured native
   rerun before exposing the experiment to php-mustache. The archive fuzzer now
   covers raw and checksum-repaired protected inputs plus differential rendering;
-  retain its smoke test and complete the longer acceptance run and lifetime
-  coverage before PHP integration. Use
+  retain its smoke test and lifetime coverage. The sanitizer-backed longer
+  acceptance run and the owning-handle lifetime/alignment tests are complete;
+  the PHP/APCu integration benchmark remains. Use
   `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` with the pinned modern XXH3
   implementation by default; this detects accidental corruption but does not
   authenticate hostile cache contents.

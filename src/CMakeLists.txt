@@ -9,6 +9,18 @@ set(MUSTACHE_SOURCES
     tokenizer.cpp
     utils.cpp
 )
+if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+    list(APPEND MUSTACHE_SOURCES
+        "${PROJECT_SOURCE_DIR}/benchmarks/cista-archive.cpp"
+        "${PROJECT_SOURCE_DIR}/benchmarks/cista-xxh3.cpp")
+    set_property(SOURCE
+        "${PROJECT_SOURCE_DIR}/benchmarks/cista-archive.cpp"
+        "${PROJECT_SOURCE_DIR}/benchmarks/cista-xxh3.cpp"
+        APPEND PROPERTY COMPILE_OPTIONS
+            "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility=hidden>"
+            "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility-inlines-hidden>"
+    )
+endif()
 set(MUSTACHE_PRIVATE_HEADERS
     render_engine.hpp
 )
@@ -29,8 +41,19 @@ if(MUSTACHE_HAVE_LIBYAML)
     list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES
         ${MUSTACHE_YAML_TARGET})
 endif()
+if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+    list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES ZLIB::ZLIB)
+    if(MUSTACHE_USE_SYSTEM_CISTA)
+        list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES
+            "$<BUILD_INTERFACE:${MUSTACHE_CISTA_TARGET}>")
+    endif()
+    if(MUSTACHE_USE_SYSTEM_XXHASH)
+        list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES ${MUSTACHE_XXHASH_TARGET})
+    endif()
+endif()
 
 set(MUSTACHE_PUBLIC_HEADERS
+    archived_template.hpp
     compiled_template.hpp
     data.hpp
     exception.hpp
@@ -57,6 +80,32 @@ function(mustache_configure_library target)
         PRIVATE
             ${MUSTACHE_PRIVATE_DEPENDENCIES}
     )
+    if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+        target_include_directories(${target} BEFORE PRIVATE
+            "${PROJECT_SOURCE_DIR}/benchmarks/cista-xxh3")
+        target_compile_definitions(${target} PRIVATE
+            CISTA_XXH3=1
+            MUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1)
+        if(MSVC)
+            target_compile_options(${target} PRIVATE /UCISTA_FMT)
+        else()
+            target_compile_options(${target} PRIVATE -UCISTA_FMT)
+        endif()
+        if(NOT MUSTACHE_USE_SYSTEM_CISTA)
+            target_include_directories(${target} SYSTEM PRIVATE
+                "${PROJECT_SOURCE_DIR}/vendor/cista")
+            target_compile_definitions(${target} PRIVATE
+                MUSTACHE_USE_VENDORED_CISTA=1)
+        endif()
+        if(NOT MUSTACHE_USE_SYSTEM_XXHASH)
+            target_include_directories(${target} SYSTEM PRIVATE
+                "${PROJECT_SOURCE_DIR}/vendor/xxhash")
+            target_compile_definitions(${target} PRIVATE
+                XXH_IMPLEMENTATION=1
+                XXH_STATIC_LINKING_ONLY=1
+                XXH_NAMESPACE=MUSTACHE_CISTA_XXH_)
+        endif()
+    endif()
     mustache_apply_build_options(${target})
 endfunction()
 
@@ -68,6 +117,11 @@ set_target_properties(mustache PROPERTIES
     VERSION "${MUSTACHE_ABI_VERSION}.0.0"
     SOVERSION "${MUSTACHE_ABI_VERSION}"
 )
+if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+    # Shared consumers do not import private archive dependencies. Preserve
+    # their non-system link directories in the installed library instead.
+    set_property(TARGET mustache PROPERTY INSTALL_RPATH_USE_LINK_PATH TRUE)
+endif()
 
 add_library(mustache_static STATIC ${MUSTACHE_SOURCES} ${MUSTACHE_PRIVATE_HEADERS} ${MUSTACHE_PUBLIC_HEADERS})
 add_library(mustache::mustache_static ALIAS mustache_static)

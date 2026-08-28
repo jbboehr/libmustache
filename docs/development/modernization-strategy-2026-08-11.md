@@ -690,6 +690,13 @@ carry the libmustache format generation. Cista updates and schema changes
 require explicit compatibility review and deliberate format-generation or
 golden-fixture changes rather than silently changing existing cache bytes.
 
+The optional public API now exposes an opaque, owning `ArchivedTemplateView`.
+`loadArchivedTemplate()` defensively copies bytes, validates the protected
+archive once in its final aligned storage, and retains that private immutable
+backing across cheap handle copies. Rendering walks the already validated graph
+through the shared renderer without reconstructing `Node` objects or borrowing
+the caller's buffer.
+
 The archive fuzzer, `fuzz_cista_archive`, now drives arbitrary framed bytes
 through the default protected reader and renderer. It also recomputes XXH3 for
 mutated protected payloads so integrity rejection does not hide deep structural
@@ -697,8 +704,10 @@ or semantic paths. Its second oracle tokenizes arbitrary template input and
 requires owned and archived rendering to agree on rejection and exact output,
 including a fixed partial and lambda. The sanitizer-backed 1,000-run smoke test
 is part of `nix build .#checks.x86_64-linux.libmustache-fuzz`; a longer
-acceptance run and backing-store lifetime tests remain required before PHP
-exposure.
+acceptance run has completed, and the public-handle tests cover backing-store
+lifetime, unaligned caller input, copy/move behavior, reuse, corruption, and
+empty handles. The remaining gate before PHP exposure is the real
+one-fetch/one-render APCu integration and benchmark.
 
 The next end-to-end performance slice is the real one-fetch/one-render PHP/APCu
 path after those native gates pass. Do not adopt a replacement format unless

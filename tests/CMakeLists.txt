@@ -71,7 +71,17 @@ if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
         "${CMAKE_CURRENT_SOURCE_DIR}/../benchmarks/test-cista-archive.cpp")
     target_link_libraries(test_cista_archive PRIVATE
         mustache_cista_archive_experiment)
+    if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES OR
+            MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3)
+        target_compile_definitions(test_cista_archive PRIVATE
+            MUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1)
+    endif()
     mustache_apply_build_options(test_cista_archive)
+endif()
+if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+    add_executable(test_archived_template test_archived_template.cpp)
+    target_link_libraries(test_archived_template PRIVATE mustache_static)
+    mustache_apply_build_options(test_archived_template)
 endif()
 
 if(MUSTACHE_BUILD_CLI)
@@ -136,6 +146,91 @@ if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
     add_test(NAME cista_archive COMMAND test_cista_archive)
     set_tests_properties(cista_archive PROPERTIES
         ENVIRONMENT "top_srcdir=${CMAKE_CURRENT_SOURCE_DIR}/..")
+endif()
+if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+    add_test(NAME archived_template COMMAND test_archived_template)
+
+    # Exercise the installed shared library only when the configuration can
+    # safely be redirected beneath the test build and the selected zlib is a
+    # non-system shared dependency. This keeps the test sensitive to the
+    # installed library's runtime search path.
+    set(MUSTACHE_SHARED_INSTALL_TEST_SAFE TRUE)
+    if(CMAKE_SKIP_RPATH OR CMAKE_SKIP_INSTALL_RPATH OR
+            IS_ABSOLUTE "${CMAKE_INSTALL_LIBDIR}" OR
+            IS_ABSOLUTE "${CMAKE_INSTALL_INCLUDEDIR}" OR
+            (MUSTACHE_BUILD_CLI AND IS_ABSOLUTE "${CMAKE_INSTALL_BINDIR}"))
+        set(MUSTACHE_SHARED_INSTALL_TEST_SAFE FALSE)
+    endif()
+
+    set(MUSTACHE_TEST_ZLIB_LIBRARY "")
+    get_target_property(MUSTACHE_TEST_ZLIB_LIBRARY
+        ZLIB::ZLIB IMPORTED_LOCATION)
+    if(NOT MUSTACHE_TEST_ZLIB_LIBRARY OR
+            MUSTACHE_TEST_ZLIB_LIBRARY MATCHES "-NOTFOUND$")
+        get_target_property(MUSTACHE_TEST_ZLIB_CONFIGURATIONS
+            ZLIB::ZLIB IMPORTED_CONFIGURATIONS)
+        foreach(MUSTACHE_TEST_ZLIB_CONFIGURATION
+                IN LISTS MUSTACHE_TEST_ZLIB_CONFIGURATIONS)
+            string(TOUPPER "${MUSTACHE_TEST_ZLIB_CONFIGURATION}"
+                MUSTACHE_TEST_ZLIB_CONFIGURATION)
+            get_target_property(MUSTACHE_TEST_ZLIB_CANDIDATE
+                ZLIB::ZLIB
+                "IMPORTED_LOCATION_${MUSTACHE_TEST_ZLIB_CONFIGURATION}")
+            if(MUSTACHE_TEST_ZLIB_CANDIDATE AND
+                    NOT MUSTACHE_TEST_ZLIB_CANDIDATE MATCHES "-NOTFOUND$")
+                set(MUSTACHE_TEST_ZLIB_LIBRARY
+                    "${MUSTACHE_TEST_ZLIB_CANDIDATE}")
+                break()
+            endif()
+        endforeach()
+    endif()
+
+    set(MUSTACHE_TEST_ZLIB_IS_NONDEFAULT FALSE)
+    if(MUSTACHE_TEST_ZLIB_LIBRARY AND
+            EXISTS "${MUSTACHE_TEST_ZLIB_LIBRARY}" AND
+            NOT MUSTACHE_TEST_ZLIB_LIBRARY MATCHES
+                "\\${CMAKE_STATIC_LIBRARY_SUFFIX}$")
+        get_filename_component(MUSTACHE_TEST_ZLIB_LIBRARY_DIRECTORY
+            "${MUSTACHE_TEST_ZLIB_LIBRARY}" DIRECTORY)
+        get_filename_component(MUSTACHE_TEST_ZLIB_LIBRARY_DIRECTORY
+            "${MUSTACHE_TEST_ZLIB_LIBRARY_DIRECTORY}" REALPATH)
+        get_filename_component(MUSTACHE_TEST_ZLIB_LIBRARY
+            "${MUSTACHE_TEST_ZLIB_LIBRARY}" REALPATH)
+        set(MUSTACHE_TEST_ZLIB_IS_NONDEFAULT TRUE)
+        foreach(MUSTACHE_TEST_IMPLICIT_LINK_DIRECTORY
+                IN LISTS CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES)
+            get_filename_component(MUSTACHE_TEST_IMPLICIT_LINK_DIRECTORY
+                "${MUSTACHE_TEST_IMPLICIT_LINK_DIRECTORY}" REALPATH)
+            if(MUSTACHE_TEST_ZLIB_LIBRARY_DIRECTORY STREQUAL
+                    MUSTACHE_TEST_IMPLICIT_LINK_DIRECTORY)
+                set(MUSTACHE_TEST_ZLIB_IS_NONDEFAULT FALSE)
+                break()
+            endif()
+        endforeach()
+    endif()
+
+    # --prefix can safely redirect only relative install destinations. Nix and
+    # other split-output packagers verify their absolute destinations during
+    # their own install checks.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+            MUSTACHE_SHARED_INSTALL_TEST_SAFE AND
+            MUSTACHE_TEST_ZLIB_IS_NONDEFAULT)
+        add_test(NAME installed_shared_archive_consumer
+            COMMAND "${CMAKE_COMMAND}"
+                "-DMUSTACHE_BUILD_DIRECTORY=${CMAKE_BINARY_DIR}"
+                "-DMUSTACHE_BUILD_CONFIG=$<CONFIG>"
+                "-DMUSTACHE_CONSUMER_SOURCE_DIRECTORY=${CMAKE_CURRENT_SOURCE_DIR}/cmake-consumer"
+                "-DMUSTACHE_ENABLE_SANITIZERS=${MUSTACHE_ENABLE_SANITIZERS}"
+                "-DMUSTACHE_INSTALL_LIBDIR=${CMAKE_INSTALL_LIBDIR}"
+                "-DMUSTACHE_SHARED_LIBRARY_FILE_NAME=$<TARGET_FILE_NAME:mustache>"
+                "-DMUSTACHE_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/installed-shared-archive-consumer"
+                "-DMUSTACHE_ZLIB_LIBRARY=${MUSTACHE_TEST_ZLIB_LIBRARY}"
+                "-DMUSTACHE_ZLIB_LIBRARY_DIRECTORY=${MUSTACHE_TEST_ZLIB_LIBRARY_DIRECTORY}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/check_installed_shared_consumer.cmake")
+        set_tests_properties(installed_shared_archive_consumer PROPERTIES
+            RUN_SERIAL TRUE
+            TIMEOUT 60)
+    endif()
 endif()
 if(MUSTACHE_BUILD_CLI)
     add_test(NAME cli COMMAND test_cli)

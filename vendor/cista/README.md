@@ -16,9 +16,13 @@ directory is installed or included by libmustache's public headers.
 - License: MIT; see `LICENSE`. The generated header also embeds the license.
 
 The snapshot is generated with Cista's upstream `uniter` tool and is not edited
-by hand. Before generation, libmustache's small compatibility include is staged
-as `include/xxh3.h`, so the single header uses the selected modern XXH3 API from
-the separately versioned bundled or system xxHash dependency.
+by hand. Libmustache pre-includes its small `benchmarks/cista-xxh3/xxh3.h`
+compatibility header, which suppresses the older embedded copy and routes
+Cista's hash calls through one private out-of-line adapter. That adapter uses
+the selected modern XXH3 API from the separately versioned bundled or system
+xxHash dependency. Keeping the call out of Cista's inline parameter-pack hash
+avoids a demonstrated GCC 15 optimized-build miscompilation that otherwise
+produces different writer and reader type hashes.
 
 ## Updating
 

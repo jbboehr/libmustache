@@ -80,10 +80,11 @@ as a release commitment.
   continue through the owned `Node`/`CompiledTemplate` path; cached archive
   bytes may use the checked view path. Both paths must share rendering
   semantics inside libmustache.
-- Bound an archived view's lifetime to the Zend string or other aligned backing
-  storage that owns its bytes. If a Zend/APCu result does not satisfy the
-  archive's alignment requirement, copy it into checked aligned storage before
-  constructing the view; never retain the view after that storage is released.
+- Construct archived views through `loadArchivedTemplate()`. Its byte-vector
+  and `std::string_view` overloads defensively copy Zend/APCu bytes into private
+  aligned storage. The resulting immutable handle validates once and remains
+  valid independently of the input buffer, so the extension must not create a
+  separate borrowed Cista view over Zend memory.
 
 ## Verified downstream touchpoints
 

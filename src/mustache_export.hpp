@@ -14,6 +14,8 @@
 #else
 #define MUSTACHE_API __declspec(dllimport)
 #endif
+#elif defined(__GNUC__) || defined(__clang__)
+#define MUSTACHE_API __attribute__((visibility("default")))
 #else
 #define MUSTACHE_API
 #endif

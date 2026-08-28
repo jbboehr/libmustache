@@ -13,6 +13,7 @@ EXTRA_DIST = \
 	benchmarks/ast-cache-vs-source.php \
 	benchmarks/cista-archive.cpp \
 	benchmarks/cista-archive.hpp \
+	benchmarks/cista-xxh3.cpp \
 	benchmarks/cista-xxh3/xxh3.h \
 	benchmarks/test-cista-archive.cpp \
 	docs/development/abi-6-source-migration-2026-08-20.md \

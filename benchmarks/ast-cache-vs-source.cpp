@@ -4,6 +4,11 @@
 #include "cista-archive.hpp"
 #endif
 
+#if defined(MUSTACHE_CISTA_BENCHMARK) && defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES) &&                                  \
+    !defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+#error "the archived-template benchmark must use the library's runtime-version XXH3 archive mode"
+#endif
+
 #include <algorithm>
 #include <array>
 #include <chrono>

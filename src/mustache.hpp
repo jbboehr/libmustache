@@ -13,6 +13,7 @@
 #include <string_view>
 #include <vector>
 
+#include "archived_template.hpp"
 #include "compiled_template.hpp"
 #include "data.hpp"
 #include "exception.hpp"
@@ -80,6 +81,15 @@ class Mustache {
     //! Renders compiled templates and partials with resource limits
     MUSTACHE_API std::string render(const CompiledTemplate& compiled, const Data& data, const PartialMap& partials,
         const RenderLimits& limits) const;
+
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+    //! Renders a previously validated archived template
+    MUSTACHE_API std::string render(const ArchivedTemplateView& archived, const Data& data) const;
+
+    //! Renders a previously validated archived template with resource limits
+    MUSTACHE_API std::string render(
+        const ArchivedTemplateView& archived, const Data& data, const RenderLimits& limits) const;
+#endif
 
     //! Utility method for Tokenizer::setStartSequence()
     void setStartSequence(const std::string& start)

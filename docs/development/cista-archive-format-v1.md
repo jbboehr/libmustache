@@ -66,6 +66,12 @@ accepted by the default reader limits. XXH3 detects accidental payload
 corruption; it does not authenticate the preamble or defend against an attacker
 who can replace the complete cache entry.
 
+Libmustache supplies XXH3 to Cista through one hidden, out-of-line adapter.
+This preserves Cista's selected `WITH_VERSION | WITH_INTEGRITY` bytes while
+preventing optimized compilers from separately inlining its address-of-local
+type-hash helper in writer and reader paths. The archive golden fixture ensures
+that this implementation boundary does not change the format.
+
 ## Compatibility and golden fixture
 
 `tests/fixtures/cista-archive-v1-x86_64-le-itanium.hex` pins the complete bytes

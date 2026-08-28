@@ -61,8 +61,8 @@ cmake -S . -B build \
 The accepted values are `AUTO`, `ON`, and `OFF`. A format set to `ON` makes
 configuration fail if its dependency is unavailable.
 
-Experimental archived-template internals and their tests are default-off. They
-use pinned private Cista and xxHash snapshots by default; packagers can
+Experimental archived-template support is default-off. It uses pinned private
+Cista and xxHash snapshots by default; packagers can
 independently select system installations:
 
 ```sh
@@ -72,12 +72,35 @@ cmake -S . -B build \
   -DMUSTACHE_USE_SYSTEM_XXHASH=ON
 ```
 
-Cista and xxHash remain private in every mode and are not required by
-installed-library consumers. Custom system locations can be supplied through
+Cista types never appear in installed headers. Shared-library consumers do not
+need either dependency; static consumers of a build configured with system
+xxHash must make that link dependency available through the installed CMake or
+pkg-config metadata. Custom system locations can be supplied through
 `CMAKE_PREFIX_PATH`, `cista_DIR`, and `xxHash_DIR`. The feature always requires
-zlib for its selected integrity policy. The experimental format preamble and
-Cista validation responsibilities are specified in the
+zlib. The experimental format preamble and Cista validation responsibilities
+are specified in the
 [archive format document](docs/development/cista-archive-format-v1.md).
+
+When enabled, `mustache_config.h` defines
+`MUSTACHE_HAVE_ARCHIVED_TEMPLATES`. The public API serializes a complete node
+and partial graph, then loads it into an owning, validated handle:
+
+```cpp
+mustache::Node root;
+mustache::Mustache engine;
+engine.tokenize("Hello {{name}}", &root);
+
+std::vector<std::uint8_t> bytes = mustache::serializeArchivedTemplate(root);
+mustache::ArchivedTemplateView archived =
+    mustache::loadArchivedTemplate(bytes);
+std::string output = engine.render(archived, data);
+```
+
+Loading defensively copies a byte vector or `std::string_view`, then validates
+the protected archive once. This prevents caller-retained aliases from changing
+an already validated graph. The handle keeps its private immutable backing alive
+across cheap copies and renders directly from it; it does not rebuild an owned
+`Node` tree or borrow the caller's input buffer.
 
 Installed CMake packages expose separate components. The shared component is
 the default and does not require dependency development packages at consume
@@ -118,8 +141,8 @@ JSON and YAML support are independently auto-detected by default. Use
 `--with-json=yes` or `--with-yaml=yes` to require the corresponding dependency,
 and `--without-json` or `--without-yaml` to disable an adapter explicitly.
 
-Use `--enable-archived-templates` for the experimental archived-template
-internals and tests. This selects the bundled Cista and xxHash snapshots; add
+Use `--enable-archived-templates` for the experimental archived-template API
+and tests. This selects the bundled Cista and xxHash snapshots; add
 `--with-system-cista` and/or `--with-system-xxhash` to require system
 installations instead. Use `CISTA_CFLAGS`, `XXHASH_CFLAGS` and `XXHASH_LIBS`,
 or `PKG_CONFIG_PATH` for custom locations.
