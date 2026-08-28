@@ -690,6 +690,16 @@ carry the libmustache format generation. Cista updates and schema changes
 require explicit compatibility review and deliberate format-generation or
 golden-fixture changes rather than silently changing existing cache bytes.
 
+The archive fuzzer, `fuzz_cista_archive`, now drives arbitrary framed bytes
+through the default protected reader and renderer. It also recomputes XXH3 for
+mutated protected payloads so integrity rejection does not hide deep structural
+or semantic paths. Its second oracle tokenizes arbitrary template input and
+requires owned and archived rendering to agree on rejection and exact output,
+including a fixed partial and lambda. The sanitizer-backed 1,000-run smoke test
+is part of `nix build .#checks.x86_64-linux.libmustache-fuzz`; a longer
+acceptance run and backing-store lifetime tests remain required before PHP
+exposure.
+
 The next end-to-end performance slice is the real one-fetch/one-render PHP/APCu
 path after those native gates pass. Do not adopt a replacement format unless
 that path clears the threshold and the format's semantic, compatibility,

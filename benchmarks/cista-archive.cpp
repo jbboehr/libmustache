@@ -862,7 +862,12 @@ template <cista::mode Mode> const ArchiveGraph& readArchive(std::string_view byt
     throw mustache::Exception("Unaligned Cista archive buffer");
   }
   validateArchiveGraphLayout<Mode>(payload);
-  const ArchiveGraph * graph = cista::deserialize<ArchiveGraph, Mode>(payload);
+  const ArchiveGraph * graph = nullptr;
+  try {
+    graph = cista::deserialize<ArchiveGraph, Mode>(payload);
+  } catch (const cista::cista_exception& exception) {
+    throw mustache::Exception(exception.what());
+  }
   if (graph == nullptr) {
     throw mustache::Exception("Invalid Cista archive root");
   }
@@ -883,6 +888,12 @@ std::vector<std::uint8_t> serializeCistaArchiveWithMode(
     throw mustache::Exception("Cista archive size changed while framing");
   }
   return frameArchive(std::move(bytes), archiveLimits);
+}
+
+template <cista::mode Mode>
+void validateCistaArchiveWithMode(std::string_view bytes, const CistaArchiveLimits& archiveLimits)
+{
+  static_cast<void>(readArchive<Mode>(bytes, archiveLimits));
 }
 
 template <cista::mode Mode>
@@ -993,6 +1004,26 @@ std::vector<std::uint8_t> serializeCistaArchive(const mustache::Node& root, cons
       return serializeCistaArchiveWithMode<archiveModeIntegrity>(root, partials, archiveLimits);
     case CistaSecurityMode::DeepCheckAndIntegrity:
       return serializeCistaArchiveWithMode<archiveModeDeepCheckAndIntegrity>(root, partials, archiveLimits);
+  }
+  throw mustache::Exception("Unknown Cista security mode");
+}
+
+void validateCistaArchive(std::string_view bytes, const CistaArchiveLimits& archiveLimits)
+{
+  validateCistaArchive(bytes, CistaSecurityMode::DeepCheckAndIntegrity, archiveLimits);
+}
+
+void validateCistaArchive(std::string_view bytes, CistaSecurityMode mode, const CistaArchiveLimits& archiveLimits)
+{
+  switch (mode) {
+    case CistaSecurityMode::Neither:
+      return validateCistaArchiveWithMode<archiveModeNeither>(bytes, archiveLimits);
+    case CistaSecurityMode::DeepCheck:
+      return validateCistaArchiveWithMode<archiveModeDeepCheck>(bytes, archiveLimits);
+    case CistaSecurityMode::Integrity:
+      return validateCistaArchiveWithMode<archiveModeIntegrity>(bytes, archiveLimits);
+    case CistaSecurityMode::DeepCheckAndIntegrity:
+      return validateCistaArchiveWithMode<archiveModeDeepCheckAndIntegrity>(bytes, archiveLimits);
   }
   throw mustache::Exception("Unknown Cista security mode");
 }

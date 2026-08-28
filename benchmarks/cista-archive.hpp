@@ -61,6 +61,12 @@ std::vector<std::uint8_t> serializeCistaArchive(const mustache::Node& root,
 std::vector<std::uint8_t> serializeCistaArchive(const mustache::Node& root, const mustache::Node::Partials& partials,
     CistaSecurityMode mode, const CistaArchiveLimits& archiveLimits = CistaArchiveLimits());
 
+/*! Validate a framed archive without rendering it. */
+void validateCistaArchive(std::string_view bytes, const CistaArchiveLimits& archiveLimits = CistaArchiveLimits());
+
+void validateCistaArchive(
+    std::string_view bytes, CistaSecurityMode mode, const CistaArchiveLimits& archiveLimits = CistaArchiveLimits());
+
 /*! Validate and render a framed archive without rebuilding owned Nodes. */
 std::string renderCistaArchive(std::string_view bytes, const mustache::Data& data,
     const CistaArchiveLimits& archiveLimits = CistaArchiveLimits(),

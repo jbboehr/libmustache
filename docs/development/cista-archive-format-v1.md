@@ -80,3 +80,25 @@ preamble or the Cista encoding contract requires a format-generation change.
 Updating Cista, xxHash, or the supported security policy requires explicit
 review and a deliberate golden-fixture decision; incompatible bytes must never
 silently reuse an existing cache key.
+
+## Fuzz coverage
+
+`fuzz_cista_archive` exercises the complete default reader and renderer with
+arbitrary framed bytes. It also repairs the XXH3 integrity field after mutation
+so coverage can proceed past checksum rejection into Cista deep checking,
+libmustache semantic validation, and archive-backed rendering. Validation is
+isolated from rendering so only expected archive rejection is caught; any
+failure after validation remains a fuzz finding. A separate template path
+tokenizes the same input, renders both the owned tree and its protected archive,
+and requires matching expected Mustache rejections or identical output;
+unrelated post-tokenization exceptions remain fuzz findings.
+
+The Clang sanitizer job and `libmustache-fuzz` Nix check run a bounded corpus
+smoke test with a fixed seed and a freshly recreated writable output corpus. Its
+immutable input corpus contains the golden archive, a truncated preamble, a
+checksum-corruption/repair protocol derived from the golden archive, and a
+template covering escaped and unescaped values, sections, dotted lookup,
+partials, arrays, and a lambda. Crash artifacts persist across invocations.
+Minimized findings must be retained as permanent regressions. A longer
+sanitizer-backed acceptance run remains a gate before the format crosses the PHP
+cache boundary.

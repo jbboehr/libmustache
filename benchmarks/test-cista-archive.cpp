@@ -601,6 +601,7 @@ int main()
       expect(archive == readGoldenArchive(), "Cista archive differs from the version 1 golden fixture");
     }
     const std::string_view bytes(reinterpret_cast<const char *>(archive.data()), archive.size());
+    mustache_benchmark::validateCistaArchive(bytes);
     const std::string actual = mustache_benchmark::renderCistaArchive(bytes, data);
     expect(actual == expected, "Cista archive rendering differs from Node rendering");
 
@@ -625,6 +626,9 @@ int main()
     for (std::size_t index = 0; index < securityModes.size(); ++index) {
       const mustache_benchmark::CistaSecurityMode mode = securityModes[index];
       modeArchives[index] = mustache_benchmark::serializeCistaArchive(root, partials, mode);
+      mustache_benchmark::validateCistaArchive(
+          std::string_view(reinterpret_cast<const char *>(modeArchives[index].data()), modeArchives[index].size()),
+          mode);
       const std::string modeOutput = mustache_benchmark::renderCistaArchive(
           std::string_view(reinterpret_cast<const char *>(modeArchives[index].data()), modeArchives[index].size()),
           data, mode);
@@ -669,6 +673,15 @@ int main()
 
     std::vector<std::uint8_t> integrityCorruption = modeArchives[2];
     integrityCorruption.back() ^= std::uint8_t{0xFF};
+    bool validationRejected = false;
+    try {
+      mustache_benchmark::validateCistaArchive(
+          std::string_view(reinterpret_cast<const char *>(integrityCorruption.data()), integrityCorruption.size()),
+          mustache_benchmark::CistaSecurityMode::Integrity);
+    } catch (const mustache::Exception&) {
+      validationRejected = true;
+    }
+    expect(validationRejected, "validation-only API did not translate Cista integrity rejection");
     expectOperationRejected(
         [&integrityCorruption, &data]() {
           (void)mustache_benchmark::renderCistaArchive(

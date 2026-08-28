@@ -107,6 +107,7 @@
             debugSupport = true;
             sanitizerSupport = true;
             fuzzSupport = true;
+            archivedTemplateSupport = true;
           };
           libmustache-clang-tidy = makePackage {
             stdenv = pkgs.llvmPackages.stdenv;

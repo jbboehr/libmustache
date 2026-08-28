@@ -38,6 +38,12 @@ if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
     endif()
     mustache_apply_build_options(mustache_cista_archive_experiment)
     mustache_enable_clang_tidy(mustache_cista_archive_experiment)
+    if(MUSTACHE_ENABLE_FUZZING)
+        # The archive fuzzer links this static library, so the decoder and
+        # archive-backed renderer need SanitizerCoverage instrumentation too.
+        target_compile_options(mustache_cista_archive_experiment PRIVATE
+            -fsanitize=fuzzer-no-link)
+    endif()
 
     if(MUSTACHE_ENABLE_CISTA_BENCHMARK)
         target_link_libraries(mustache_ast_cache_vs_source PRIVATE

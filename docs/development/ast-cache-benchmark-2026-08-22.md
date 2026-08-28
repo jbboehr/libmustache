@@ -502,7 +502,10 @@ If the feasibility work continues, use this integration policy:
 - Require `DEEP_CHECK`, libmustache semantic validation, full lambda and
   inline-partial semantics, alignment and backing-store lifetime tests,
   corruption fixtures, archive-validation/render fuzzing, and a secured native
-  rerun before exposing the experiment to php-mustache. Use
+  rerun before exposing the experiment to php-mustache. The archive fuzzer now
+  covers raw and checksum-repaired protected inputs plus differential rendering;
+  retain its smoke test and complete the longer acceptance run and lifetime
+  coverage before PHP integration. Use
   `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` with the pinned modern XXH3
   implementation by default; this detects accidental corruption but does not
   authenticate hostile cache contents.

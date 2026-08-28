@@ -155,6 +155,13 @@ if(MUSTACHE_ENABLE_FUZZING)
     add_executable(fuzz_tokenizer fuzz_tokenizer.cpp)
     mustache_configure_fuzz_target(fuzz_tokenizer)
 
+    if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+        add_executable(fuzz_cista_archive fuzz_cista_archive.cpp)
+        mustache_configure_fuzz_target(fuzz_cista_archive)
+        target_link_libraries(fuzz_cista_archive PRIVATE
+            mustache_cista_archive_experiment)
+    endif()
+
     if(MUSTACHE_HAVE_LIBJSON OR MUSTACHE_HAVE_LIBYAML)
         add_executable(fuzz_data_parser fuzz_data_parser.cpp)
         mustache_configure_fuzz_target(fuzz_data_parser)
@@ -172,11 +179,29 @@ if(MUSTACHE_ENABLE_FUZZING)
         "${CMAKE_CURRENT_BINARY_DIR}/fuzz-corpus/tokenizer")
     set(MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS
         "${CMAKE_CURRENT_BINARY_DIR}/fuzz-artifacts/tokenizer")
+    if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+        set(MUSTACHE_CISTA_FUZZ_CORPUS_SOURCE
+            "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus/cista_archive")
+        set(MUSTACHE_CISTA_FUZZ_SEED_CORPUS
+            "${CMAKE_CURRENT_BINARY_DIR}/fuzz-seeds/cista_archive")
+        set(MUSTACHE_CISTA_FUZZ_SCRATCH_PARENT
+            "${CMAKE_CURRENT_BINARY_DIR}/fuzz-scratch")
+        set(MUSTACHE_CISTA_FUZZ_SCRATCH_ROOT
+            "${MUSTACHE_CISTA_FUZZ_SCRATCH_PARENT}/cista_archive")
+        set(MUSTACHE_CISTA_FUZZ_ARTIFACTS
+            "${CMAKE_CURRENT_BINARY_DIR}/fuzz-artifacts/cista_archive")
+    endif()
     file(MAKE_DIRECTORY
         "${MUSTACHE_FUZZ_CORPUS_BINARY}"
         "${MUSTACHE_FUZZ_ARTIFACTS}"
         "${MUSTACHE_TOKENIZER_FUZZ_CORPUS_BINARY}"
         "${MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS}")
+    if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+        file(MAKE_DIRECTORY
+            "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}"
+            "${MUSTACHE_CISTA_FUZZ_SCRATCH_PARENT}"
+            "${MUSTACHE_CISTA_FUZZ_ARTIFACTS}")
+    endif()
     if(MUSTACHE_HAVE_LIBJSON OR MUSTACHE_HAVE_LIBYAML)
         set(MUSTACHE_DATA_FUZZ_CORPUS_SOURCE
             "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus/data_parser")
@@ -218,6 +243,44 @@ if(MUSTACHE_ENABLE_FUZZING)
         LABELS fuzz
         RUN_SERIAL TRUE
         TIMEOUT 30)
+
+    if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+        file(REMOVE_RECURSE "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}")
+        file(MAKE_DIRECTORY "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}")
+        file(COPY "${MUSTACHE_CISTA_FUZZ_CORPUS_SOURCE}/"
+            DESTINATION "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}")
+        file(READ
+            "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/cista-archive-v1-x86_64-le-itanium.hex"
+            MUSTACHE_CISTA_GOLDEN_HEX)
+        file(WRITE "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}/golden-v1"
+            "hex:${MUSTACHE_CISTA_GOLDEN_HEX}")
+        file(WRITE "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}/integrity-repair-v1"
+            "corrupt-integrity:${MUSTACHE_CISTA_GOLDEN_HEX}")
+        add_test(NAME fuzz_cista_archive_smoke
+            COMMAND "${CMAKE_COMMAND}"
+                "-DFUZZ_EXECUTABLE=$<TARGET_FILE:fuzz_cista_archive>"
+                "-DFUZZ_DICTIONARY=${CMAKE_CURRENT_SOURCE_DIR}/fuzz/cista_archive.dict"
+                "-DFUZZ_SEED_CORPUS=${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}"
+                "-DFUZZ_ALLOWED_SCRATCH_PARENT=${MUSTACHE_CISTA_FUZZ_SCRATCH_PARENT}"
+                "-DFUZZ_SCRATCH_ROOT=${MUSTACHE_CISTA_FUZZ_SCRATCH_ROOT}"
+                "-DFUZZ_ARTIFACT_DIRECTORY=${MUSTACHE_CISTA_FUZZ_ARTIFACTS}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/run_fuzzer_smoke.cmake")
+        set_tests_properties(fuzz_cista_archive_smoke PROPERTIES
+            LABELS fuzz
+            RUN_SERIAL TRUE
+            TIMEOUT 30)
+        add_test(NAME fuzz_cista_archive_runner_safety
+            COMMAND "${CMAKE_COMMAND}"
+                "-DFUZZ_EXECUTABLE=$<TARGET_FILE:fuzz_cista_archive>"
+                "-DFUZZ_DICTIONARY=${CMAKE_CURRENT_SOURCE_DIR}/fuzz/cista_archive.dict"
+                "-DFUZZ_RUNNER=${CMAKE_CURRENT_SOURCE_DIR}/run_fuzzer_smoke.cmake"
+                "-DFUZZ_SAFETY_ROOT=${CMAKE_CURRENT_BINARY_DIR}/fuzz-runner-safety/cista_archive"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/verify_fuzzer_smoke_safety.cmake")
+        set_tests_properties(fuzz_cista_archive_runner_safety PROPERTIES
+            LABELS fuzz
+            RUN_SERIAL TRUE
+            TIMEOUT 30)
+    endif()
 
     if(MUSTACHE_HAVE_LIBJSON OR MUSTACHE_HAVE_LIBYAML)
         file(COPY "${MUSTACHE_DATA_FUZZ_CORPUS_SOURCE}/"

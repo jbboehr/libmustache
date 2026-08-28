@@ -69,14 +69,21 @@ endif
 
 EXTRA_DIST = \
 	CMakeLists.txt \
+	run_fuzzer_smoke.cmake \
 	run_spec_crlf.cmake \
+	verify_fuzzer_smoke_safety.cmake \
 	fixtures/cista-archive-v1-x86_64-le-itanium.hex \
 	fuzz_node_unserialize.cpp \
 	fuzz_tokenizer.cpp \
 	fuzz_data_parser.cpp \
+	fuzz_cista_archive.cpp \
 	fuzz/node_unserialize.dict \
 	fuzz/tokenizer.dict \
 	fuzz/data_parser.dict \
+	fuzz/cista_archive.dict \
+	fuzz/corpus/cista_archive/template-semantics \
+	fuzz/corpus/cista_archive/nested-node-limit \
+	fuzz/corpus/cista_archive/truncated-preamble \
 	fuzz/corpus/data_parser/json-deep \
 	fuzz/corpus/data_parser/json-duplicate-keys \
 	fuzz/corpus/data_parser/json-floating-overflow \

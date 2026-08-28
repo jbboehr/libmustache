@@ -333,7 +333,8 @@ jobs:
             m4 \
             make \
             ninja-build \
-            pkg-config
+            pkg-config \
+            zlib1g-dev
 
       - name: Build and test with sanitizers
         run: |
@@ -341,7 +342,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DMUSTACHE_ENABLE_SANITIZERS=ON \
             -DMUSTACHE_WARNINGS_AS_ERRORS=ON \
-            -DMUSTACHE_ENABLE_FUZZING=${{ matrix.compiler.name == 'Clang' && 'ON' || 'OFF' }}
+            -DMUSTACHE_ENABLE_FUZZING=${{ matrix.compiler.name == 'Clang' && 'ON' || 'OFF' }} \
+            -DMUSTACHE_ENABLE_ARCHIVED_TEMPLATES=${{ matrix.compiler.name == 'Clang' && 'ON' || 'OFF' }}
           cmake --build build-sanitized --parallel
           ctest --test-dir build-sanitized \
             --output-on-failure \
