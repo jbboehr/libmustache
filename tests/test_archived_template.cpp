@@ -11,9 +11,12 @@
 #include "mustache.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstdint>
 #include <cstdio>
 #include <exception>
+#include <fstream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -46,6 +49,87 @@ void expect(bool condition, const char * message)
     std::fprintf(stderr, "%s\n", message);
     ++failures;
   }
+}
+
+bool isGoldenPlatform(std::size_t pointerBytes) noexcept
+{
+#if defined(__x86_64__) && !defined(_MSC_VER)
+  const std::uint16_t value = 1;
+  return pointerBytes == 8 && *reinterpret_cast<const std::uint8_t *>(&value) == 1;
+#else
+  static_cast<void>(pointerBytes);
+  return false;
+#endif
+}
+
+std::uint8_t hexNibble(char value)
+{
+  if (value >= '0' && value <= '9') {
+    return static_cast<std::uint8_t>(value - '0');
+  }
+  if (value >= 'a' && value <= 'f') {
+    return static_cast<std::uint8_t>(value - 'a' + 10);
+  }
+  if (value >= 'A' && value <= 'F') {
+    return static_cast<std::uint8_t>(value - 'A' + 10);
+  }
+  throw std::runtime_error("golden archive contains a non-hexadecimal byte");
+}
+
+std::vector<std::uint8_t> readGoldenArchive()
+{
+#if defined(_MSC_VER)
+  char * environmentValue = nullptr;
+  std::size_t environmentValueSize = 0;
+  if (_dupenv_s(&environmentValue, &environmentValueSize, "top_srcdir") != 0) {
+    throw std::runtime_error("unable to read top_srcdir");
+  }
+  const std::unique_ptr<char, decltype(&std::free)> ownedEnvironmentValue(environmentValue, &std::free);
+  const char * topSourceDirectory = ownedEnvironmentValue.get();
+#else
+  const char * topSourceDirectory = std::getenv("top_srcdir");
+#endif
+  if (topSourceDirectory == nullptr || *topSourceDirectory == '\0') {
+    throw std::runtime_error("top_srcdir is required to locate the golden archive");
+  }
+  const std::string path = std::string(topSourceDirectory) + "/tests/fixtures/cista-archive-v1-x86_64-le-itanium.hex";
+  std::ifstream stream(path);
+  if (!stream) {
+    throw std::runtime_error("unable to open the golden archive");
+  }
+  std::vector<std::uint8_t> bytes;
+  std::string encoded;
+  while (stream >> encoded) {
+    if (encoded.size() != 2) {
+      throw std::runtime_error("golden archive contains a malformed byte");
+    }
+    bytes.push_back(static_cast<std::uint8_t>((hexNibble(encoded[0]) << 4) | hexNibble(encoded[1])));
+  }
+  if (!stream.eof() || bytes.empty()) {
+    throw std::runtime_error("unable to read the golden archive");
+  }
+  return bytes;
+}
+
+void testPublicArchiveGolden()
+{
+  if (!isGoldenPlatform(sizeof(void *))) {
+    return;
+  }
+
+  mustache::Mustache engine;
+  mustache::Node root;
+  engine.tokenize("{{#products}}\n  {{> card}}\n{{/products}}\n", &root);
+
+  mustache::Node card;
+  engine.tokenize("<p class=\"{{category.slug}}\">{{name}}</p>{{^visible}}hidden{{/visible}}\n", &card);
+  mustache::Node::Partials partials;
+  partials.emplace("card", std::make_unique<mustache::Node>(std::move(card)));
+
+  const std::vector<std::uint8_t> archive = mustache::serializeArchivedTemplate(root, partials);
+  expect(archive == readGoldenArchive(), "the public archive API changed the version 1 golden fixture");
+  expect(static_cast<bool>(mustache::loadArchivedTemplate(archive)),
+      "the public archive API did not load the golden fixture");
 }
 
 void testOwnershipAndRendering()
@@ -234,6 +318,7 @@ static_assert(std::is_nothrow_move_assignable<mustache::ArchivedTemplateView>::v
 int main()
 {
   try {
+    testPublicArchiveGolden();
     testOwnershipAndRendering();
     testCopiedInputCannotMutateValidatedState();
     testPartialsAndLambdas();

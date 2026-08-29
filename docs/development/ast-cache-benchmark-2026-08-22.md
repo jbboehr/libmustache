@@ -99,10 +99,12 @@ The repository benchmark programs are:
 
 When `MUSTACHE_ENABLE_CISTA_BENCHMARK=ON`, the C++ program also builds a
 flattened Cista archive and validates and renders directly from its immutable
-offset-based view. [`benchmarks/cista-archive.cpp`](../../benchmarks/cista-archive.cpp)
-is deliberately benchmark-only and is not linked into libmustache. The opt-in
-benchmark also compares Cista's FNV-1a, zlib CRC-32, and XXH3-64 over the same
-deep-checked archive bytes.
+offset-based view. [`src/archive/cista.cpp`](../../src/archive/cista.cpp)
+is shared by the private production adapter and the experiment: production
+builds compile only the fixed public archive policy, while the opt-in benchmark
+enables the additional policy and checksum comparisons. Those comparisons cover
+Cista's FNV-1a, zlib CRC-32, and XXH3-64 over the same deep-checked archive
+bytes.
 
 Each program generates deterministic small, medium, and large cases at about
 1 KiB, 32 KiB, and 256 KiB. Every size has two shapes:
@@ -475,9 +477,9 @@ If the feasibility work continues, use this integration policy:
 - Keep archived templates optional under
   `MUSTACHE_ENABLE_ARCHIVED_TEMPLATES`. The feasibility phase kept them
   default-off; after the native security, compatibility, and platform gates
-  completed, the build default changed to `AUTO` so zlib and private-symbol
-  controls select the feature without making zlib mandatory or leaking private
-  implementation symbols.
+  completed, the build default changed to `AUTO` so private-symbol controls
+  select the feature without leaking implementation symbols. Production
+  archives do not link zlib; it remains an explicit benchmark-only dependency.
 - Vendor reviewed and pinned Cista and xxHash snapshots as private
   implementation dependencies, together with their
   [MIT license](https://github.com/felixguendling/cista/blob/master/LICENSE),

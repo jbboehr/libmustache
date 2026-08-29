@@ -8,33 +8,42 @@ target_link_libraries(mustache_ast_cache_vs_source PRIVATE mustache_static)
 mustache_apply_build_options(mustache_ast_cache_vs_source)
 mustache_enable_clang_tidy(mustache_ast_cache_vs_source)
 
-if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
-    add_library(mustache_cista_archive_experiment INTERFACE)
-    target_include_directories(mustache_cista_archive_experiment INTERFACE
-        "${CMAKE_CURRENT_SOURCE_DIR}")
-    target_compile_definitions(mustache_cista_archive_experiment INTERFACE
-        MUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1)
-    target_link_libraries(mustache_cista_archive_experiment INTERFACE
-        mustache_static)
-elseif(MUSTACHE_ENABLE_CISTA_BENCHMARK)
-    add_library(mustache_cista_archive_experiment STATIC
-        cista-archive.cpp)
-    if(MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3)
+if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
+    if(MUSTACHE_ENABLE_CISTA_BENCHMARK)
+        add_library(mustache_cista_archive_experiment STATIC
+            "${PROJECT_SOURCE_DIR}/src/archive/cista.cpp")
+    else()
+        add_library(mustache_cista_archive_experiment STATIC EXCLUDE_FROM_ALL
+            "${PROJECT_SOURCE_DIR}/src/archive/cista.cpp")
+    endif()
+    if(NOT MUSTACHE_HAVE_ARCHIVED_TEMPLATES AND
+            MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3)
         target_sources(mustache_cista_archive_experiment PRIVATE
-            cista-xxh3.cpp)
+            "${PROJECT_SOURCE_DIR}/src/archive/xxh3.cpp")
     endif()
     target_include_directories(mustache_cista_archive_experiment PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(mustache_cista_archive_experiment
         PUBLIC mustache_static
-        PRIVATE ${MUSTACHE_CISTA_TARGET} ${MUSTACHE_XXHASH_TARGET} ZLIB::ZLIB)
+        PRIVATE ${MUSTACHE_CISTA_TARGET})
+    if(TARGET ZLIB::ZLIB)
+        target_link_libraries(mustache_cista_archive_experiment PRIVATE
+            ZLIB::ZLIB)
+        target_compile_definitions(mustache_cista_archive_experiment
+            PUBLIC MUSTACHE_CISTA_HAVE_ZLIB=1)
+    endif()
+    if(NOT MUSTACHE_HAVE_ARCHIVED_TEMPLATES OR MUSTACHE_USE_SYSTEM_XXHASH)
+        target_link_libraries(mustache_cista_archive_experiment PRIVATE
+            ${MUSTACHE_XXHASH_TARGET})
+    endif()
     if(NOT MUSTACHE_USE_SYSTEM_CISTA)
         target_compile_definitions(mustache_cista_archive_experiment
             PRIVATE MUSTACHE_USE_VENDORED_CISTA=1)
     endif()
-    if(MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3)
+    if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES OR
+            MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3)
         target_include_directories(mustache_cista_archive_experiment BEFORE PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/cista-xxh3")
+            "${PROJECT_SOURCE_DIR}/src/archive/xxh3")
         target_compile_definitions(mustache_cista_archive_experiment
             PRIVATE CISTA_XXH3=1
             PUBLIC MUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1)

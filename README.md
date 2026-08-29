@@ -15,7 +15,7 @@ as an ordinary C++ library.
 - A C++17 compiler and standard library with floating-point `std::to_chars`
 - nlohmann/json 3.10.5 or newer for JSON input (optional; build only)
 - libyaml for YAML input (optional)
-- zlib for experimental archived templates (optional; auto-detected)
+- zlib for the optional archive-policy benchmark only
 - xxHash 0.8 or newer when selecting a system xxHash installation (optional)
 - CMake 3.18 or Autoconf 2.69 with Automake and Libtool
 
@@ -62,10 +62,10 @@ The accepted values are `AUTO`, `ON`, and `OFF`. A format set to `ON` makes
 configuration fail if its dependency is unavailable.
 
 Experimental archived-template support also defaults to `AUTO`: it is built
-when zlib and the required private-symbol controls are available, and omitted
-otherwise. Use `ON` to require both capabilities or `OFF` to disable the API
-explicitly. The feature uses pinned private Cista and xxHash snapshots by
-default; packagers can independently select system installations:
+when the required private-symbol controls are available, and omitted otherwise.
+Use `ON` to require that capability or `OFF` to disable the API explicitly. The
+feature uses pinned private Cista and xxHash snapshots by default; packagers can
+independently select system installations:
 
 ```sh
 cmake -S . -B build \
@@ -78,9 +78,10 @@ Cista types never appear in installed headers. Shared-library consumers do not
 need either dependency; static consumers of a build configured with system
 xxHash must make that link dependency available through the installed CMake or
 pkg-config metadata. Custom system locations can be supplied through
-`CMAKE_PREFIX_PATH`, `cista_DIR`, and `xxHash_DIR`. The feature always requires
-zlib. The experimental format preamble and Cista validation responsibilities
-are specified in the
+`CMAKE_PREFIX_PATH`, `cista_DIR`, and `xxHash_DIR`. zlib is used only by the
+explicit `MUSTACHE_ENABLE_CISTA_BENCHMARK` comparison and is not a production
+archive dependency. The experimental format preamble and Cista validation
+responsibilities are specified in the
 [archive format document](docs/development/cista-archive-format-v1.md).
 
 When enabled, `mustache_config.h` defines
@@ -143,10 +144,10 @@ JSON and YAML support are independently auto-detected by default. Use
 `--with-json=yes` or `--with-yaml=yes` to require the corresponding dependency,
 and `--without-json` or `--without-yaml` to disable an adapter explicitly.
 
-Archived-template support is auto-detected through zlib and private-symbol
-controls by default. Use `--enable-archived-templates` to require the feature
-or `--disable-archived-templates` to omit it explicitly. Enabling it selects
-the bundled Cista and xxHash snapshots; add `--with-system-cista` and/or
+Archived-template support is auto-detected through private-symbol controls by
+default. Use `--enable-archived-templates` to require the feature or
+`--disable-archived-templates` to omit it explicitly. Enabling it selects the
+bundled Cista and xxHash snapshots; add `--with-system-cista` and/or
 `--with-system-xxhash` to require system installations instead. Use
 `CISTA_CFLAGS`, `XXHASH_CFLAGS` and `XXHASH_LIBS`, or `PKG_CONFIG_PATH` for
 custom locations.
@@ -164,14 +165,14 @@ The default Nix package uses Autotools; `libmustache-cmake` exercises the CMake
 packaging path. When importing `default.nix`, pass `nlohmann_json = null` or
 `libyaml = null` to omit that dependency and explicitly disable the
 corresponding adapter. `archivedTemplateSupport = null` selects automatic
-detection and is the default; because the default `zlib` argument is non-null,
-the standard packages include the archived-template API. Pass
-`archivedTemplateSupport = false` or `zlib = null` to omit it, or `true` to
-require it. Set `useSystemCista = true` with automatic or explicit archive
+detection and is the default, so supported toolchains include the
+archived-template API. Pass `archivedTemplateSupport = false` to omit it or
+`true` to require it. Set `useSystemCista = true` with automatic or explicit archive
 support and a non-null `cista` package; the bundled snapshot is the default.
 Likewise, `useSystemXxhash = true` requires a non-null `xxhash`; pass
 `xxhash = null` to exercise the bundled default.
-`cistaBenchmarkSupport` is CMake-only and requires `cmakeSupport = true`.
+`cistaBenchmarkSupport` is CMake-only and requires `cmakeSupport = true` plus a
+non-null `zlib` package for its CRC-32 comparison.
 
 The parsing entry points remain available regardless of the selected feature
 set so builds have a stable C++ ABI. Calling `Data::fromJSON()` or

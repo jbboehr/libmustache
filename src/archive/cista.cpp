@@ -1,4 +1,10 @@
+#if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
+#include "archived_template.hpp"
+#include "data.hpp"
+#include "mustache.hpp"
+#else
 #include "cista-archive.hpp"
+#endif
 
 #include "render_engine.hpp"
 
@@ -6,7 +12,7 @@
 #undef CISTA_FNV1A
 #endif
 #if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
-#include "cista-xxh3/xxh3.h"
+#include "xxh3/xxh3.h"
 #else
 #include <xxhash.h>
 #endif
@@ -68,7 +74,9 @@ std::uint64_t mustacheCistaInterlockedAnd64(std::int64_t * block, std::uint64_t 
 #undef _InterlockedAnd64
 #undef _InterlockedOr64
 #endif
+#if defined(MUSTACHE_CISTA_HAVE_ZLIB)
 #include <zlib.h>
+#endif
 
 #include <algorithm>
 #include <array>
@@ -86,6 +94,10 @@ std::uint64_t mustacheCistaInterlockedAnd64(std::int64_t * block, std::uint64_t 
 
 namespace mustache_benchmark {
 
+#if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
+using CistaArchiveLimits = mustache::ArchivedTemplateLimits;
+#endif
+
 namespace {
 
 namespace archive_data = cista::offset;
@@ -101,11 +113,13 @@ constexpr cista::mode archiveVersionMode = cista::mode::WITH_VERSION;
 #else
 constexpr cista::mode archiveVersionMode = cista::mode::WITH_STATIC_VERSION;
 #endif
+constexpr cista::mode archiveModeDeepCheckAndIntegrity =
+    archiveVersionMode | cista::mode::WITH_INTEGRITY | cista::mode::DEEP_CHECK;
+#if !defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
 constexpr cista::mode archiveModeNeither = archiveVersionMode;
 constexpr cista::mode archiveModeDeepCheck = archiveVersionMode | cista::mode::DEEP_CHECK;
 constexpr cista::mode archiveModeIntegrity = archiveVersionMode | cista::mode::WITH_INTEGRITY;
-constexpr cista::mode archiveModeDeepCheckAndIntegrity =
-    archiveVersionMode | cista::mode::WITH_INTEGRITY | cista::mode::DEEP_CHECK;
+#endif
 constexpr std::size_t renderNestingCeiling = mustache::detail::renderNestingCeiling;
 constexpr std::uint32_t invalidIndex = std::numeric_limits<std::uint32_t>::max();
 
@@ -1180,22 +1194,10 @@ std::string renderCistaArchiveWithMode(std::string_view bytes, const mustache::D
   return output;
 }
 
-#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES) && !defined(MUSTACHE_CISTA_ARCHIVE_PROTOTYPE_ONLY)
-CistaArchiveLimits toCistaArchiveLimits(const mustache::ArchivedTemplateLimits& limits)
-{
-  CistaArchiveLimits converted;
-  converted.maxInputBytes = limits.maxInputBytes;
-  converted.maxNestingDepth = limits.maxNestingDepth;
-  converted.maxNodes = limits.maxNodes;
-  converted.maxStringBytes = limits.maxStringBytes;
-  converted.maxDataPartsPerNode = limits.maxDataPartsPerNode;
-  converted.maxDataParts = limits.maxDataParts;
-  return converted;
-}
-
+#if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
 const void * validateProtectedArchive(std::string_view bytes, const mustache::ArchivedTemplateLimits& limits)
 {
-  return &readArchive<archiveModeDeepCheckAndIntegrity>(bytes, toCistaArchiveLimits(limits));
+  return &readArchive<archiveModeDeepCheckAndIntegrity>(bytes, limits);
 }
 
 std::string renderProtectedArchive(
@@ -1217,7 +1219,7 @@ std::string renderProtectedArchive(
 
 } // namespace
 
-#if defined(_MSC_VER) && defined(_M_IX86)
+#if !defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY) && defined(_MSC_VER) && defined(_M_IX86)
 namespace detail {
 
 std::size_t win32ArchiveGraphReservedMemberOffset() noexcept
@@ -1228,6 +1230,7 @@ std::size_t win32ArchiveGraphReservedMemberOffset() noexcept
 } // namespace detail
 #endif
 
+#if !defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
 const char * cistaSecurityModeName(CistaSecurityMode mode) noexcept
 {
   switch (mode) {
@@ -1290,8 +1293,12 @@ std::uint64_t checksumCistaArchive(std::string_view bytes, CistaChecksumAlgorith
       return hash;
     }
     case CistaChecksumAlgorithm::Crc32:
+#if defined(MUSTACHE_CISTA_HAVE_ZLIB)
       return static_cast<std::uint32_t>(
           crc32_z(0, reinterpret_cast<const Bytef *>(data), static_cast<z_size_t>(bytes.size())));
+#else
+      throw mustache::Exception("zlib CRC-32 is unavailable in this build");
+#endif
     case CistaChecksumAlgorithm::Xxh3_64:
 #if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
       return mustache_cista_xxh3_64bits_with_seed(data, bytes.size(), 0);
@@ -1365,10 +1372,11 @@ std::string renderCistaArchive(std::string_view bytes, const mustache::Data& dat
   }
   throw mustache::Exception("Unknown Cista security mode");
 }
+#endif
 
 } // namespace mustache_benchmark
 
-#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES) && !defined(MUSTACHE_CISTA_ARCHIVE_PROTOTYPE_ONLY)
+#if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
 namespace mustache {
 
 struct ArchivedTemplateView::State {
@@ -1410,7 +1418,8 @@ ArchivedTemplateView::operator bool() const noexcept
 std::vector<std::uint8_t> serializeArchivedTemplate(
     const Node& root, const Node::Partials& partials, const ArchivedTemplateLimits& limits)
 {
-  return mustache_benchmark::serializeCistaArchive(root, partials, mustache_benchmark::toCistaArchiveLimits(limits));
+  return mustache_benchmark::serializeCistaArchiveWithMode<mustache_benchmark::archiveModeDeepCheckAndIntegrity>(
+      root, partials, limits);
 }
 
 ArchivedTemplateView loadArchivedTemplate(const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits)

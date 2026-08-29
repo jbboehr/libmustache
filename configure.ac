@@ -310,7 +310,7 @@ AM_CONDITIONAL([MUSTACHE_SPEC_TEST_ENABLED],
 
 AC_ARG_ENABLE([archived-templates],
     [AS_HELP_STRING([--enable-archived-templates@<:@=auto|yes|no@:>@],
-        [build archived-template support when zlib and private symbol visibility are available @<:@default=auto@:>@])],
+        [build archived-template support when private symbol visibility is available @<:@default=auto@:>@])],
     [], [enable_archived_templates=auto])
 AS_CASE([$enable_archived_templates],
     [auto|yes|no], [],
@@ -346,13 +346,7 @@ mustache_archived_templates_requested=$enable_archived_templates
 enable_archived_templates=no
 AS_IF([test "x$mustache_archived_templates_requested" != "xno"], [
     AS_IF([test "x$mustache_cv_cxx_visibility_hidden" = "xyes"], [
-        PKG_CHECK_MODULES([ZLIB], [zlib], [
-            enable_archived_templates=yes
-        ], [
-            AS_IF([test "x$mustache_archived_templates_requested" = "xyes"], [
-                AC_MSG_ERROR([zlib is required for --enable-archived-templates])
-            ])
-        ])
+        enable_archived_templates=yes
     ], [
         AS_IF([test "x$mustache_archived_templates_requested" = "xyes"], [
             AC_MSG_ERROR([archived-template support requires private C++ symbol visibility])
@@ -361,15 +355,13 @@ AS_IF([test "x$mustache_archived_templates_requested" != "xno"], [
 ])
 AS_IF([test "x$enable_archived_templates" != "xyes" &&
         test "x$with_system_cista" = "xyes"], [
-    AC_MSG_ERROR([--with-system-cista requires archived-template support, zlib, and private C++ symbol visibility])
+    AC_MSG_ERROR([--with-system-cista requires archived-template support and private C++ symbol visibility])
 ])
 AS_IF([test "x$enable_archived_templates" != "xyes" &&
         test "x$with_system_xxhash" = "xyes"], [
-    AC_MSG_ERROR([--with-system-xxhash requires archived-template support, zlib, and private C++ symbol visibility])
+    AC_MSG_ERROR([--with-system-xxhash requires archived-template support and private C++ symbol visibility])
 ])
 AS_IF([test "x$enable_archived_templates" = "xyes"], [
-    MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE="$MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE zlib"
-
     AS_IF([test "x$with_system_xxhash" = "xyes"], [
         PKG_CHECK_MODULES([XXHASH], [libxxhash >= 0.8.0])
         MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE="$MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE libxxhash"
@@ -392,6 +384,13 @@ AS_IF([test "x$enable_archived_templates" = "xyes"], [
         ])
     ])
 ])
+PKG_CHECK_MODULES([ZLIB], [zlib], [mustache_have_zlib=yes], [
+    mustache_have_zlib=no
+    ZLIB_CFLAGS=
+    ZLIB_LIBS=
+])
+AM_CONDITIONAL([MUSTACHE_ZLIB_AVAILABLE],
+    [test "x$mustache_have_zlib" = "xyes"])
 AM_CONDITIONAL([MUSTACHE_ARCHIVED_TEMPLATES_ENABLED],
     [test "x$enable_archived_templates" = "xyes"])
 AS_IF([test "x$enable_archived_templates" = "xyes"], [

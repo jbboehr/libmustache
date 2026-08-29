@@ -676,22 +676,36 @@ int main()
                mustache_benchmark::CistaSecurityMode::DeepCheck) == expected,
         "deep checking is not an independent reader policy");
 
-    const std::array<mustache_benchmark::CistaChecksumAlgorithm, 3> checksumAlgorithms = {
-        mustache_benchmark::CistaChecksumAlgorithm::Fnv1a64,
-        mustache_benchmark::CistaChecksumAlgorithm::Crc32,
-        mustache_benchmark::CistaChecksumAlgorithm::Xxh3_64,
-    };
+    std::vector<mustache_benchmark::CistaChecksumAlgorithm> checksumAlgorithms;
+    checksumAlgorithms.reserve(3);
+    checksumAlgorithms.push_back(mustache_benchmark::CistaChecksumAlgorithm::Fnv1a64);
+    checksumAlgorithms.push_back(mustache_benchmark::CistaChecksumAlgorithm::Xxh3_64);
+#if defined(MUSTACHE_CISTA_HAVE_ZLIB)
+    checksumAlgorithms.push_back(mustache_benchmark::CistaChecksumAlgorithm::Crc32);
+#endif
     expect(std::string_view(mustache_benchmark::cistaChecksumAlgorithmName(
                mustache_benchmark::CistaChecksumAlgorithm::None)) == "none",
         "disabled checksum policy is not identified as none");
     expect(mustache_benchmark::checksumCistaArchive(
                "archive payload", mustache_benchmark::CistaChecksumAlgorithm::None) == 0,
         "disabled checksum policy unexpectedly hashed the archive");
-    expect(mustache_benchmark::checksumCistaArchive("", checksumAlgorithms[0]) == UINT64_C(0xCBF29CE484222325),
+    expect(mustache_benchmark::checksumCistaArchive("", mustache_benchmark::CistaChecksumAlgorithm::Fnv1a64) ==
+            UINT64_C(0xCBF29CE484222325),
         "FNV-1a checksum does not match the standard empty-input vector");
-    expect(mustache_benchmark::checksumCistaArchive("123456789", checksumAlgorithms[1]) == UINT32_C(0xCBF43926),
+#if defined(MUSTACHE_CISTA_HAVE_ZLIB)
+    expect(mustache_benchmark::checksumCistaArchive("123456789", mustache_benchmark::CistaChecksumAlgorithm::Crc32) ==
+            UINT32_C(0xCBF43926),
         "CRC-32 checksum does not match the standard check value");
-    expect(mustache_benchmark::checksumCistaArchive("", checksumAlgorithms[2]) == UINT64_C(0x2D06800538D394C2),
+#else
+    expectOperationRejected(
+        []() {
+          (void)mustache_benchmark::checksumCistaArchive(
+              "123456789", mustache_benchmark::CistaChecksumAlgorithm::Crc32);
+        },
+        "unavailable zlib CRC-32");
+#endif
+    expect(mustache_benchmark::checksumCistaArchive("", mustache_benchmark::CistaChecksumAlgorithm::Xxh3_64) ==
+            UINT64_C(0x2D06800538D394C2),
         "XXH3 checksum does not match the standard empty-input vector");
     for (const mustache_benchmark::CistaChecksumAlgorithm algorithm : checksumAlgorithms) {
       expect(mustache_benchmark::checksumCistaArchive("archive payload", algorithm) !=

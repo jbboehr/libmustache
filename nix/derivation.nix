@@ -80,11 +80,11 @@ stdenv.mkDerivation (finalAttrs: {
   assert !useSystemCista || cista != null;
   assert !useSystemXxhash || archivedTemplateSupport != false || (cmakeSupport && cistaBenchmarkSupport);
   assert !useSystemXxhash || xxhash != null;
-  assert !(archivedTemplateSupport == true || useSystemCista || useSystemXxhash || cistaBenchmarkSupport) || zlib != null;
+  assert !cistaBenchmarkSupport || zlib != null;
     lib.optional (nlohmann_json != null) nlohmann_json
     ++ lib.optional (useSystemCista && (archivedTemplateSupport != false || cistaBenchmarkSupport)) cista
     ++ lib.optional (useSystemXxhash && (archivedTemplateSupport != false || cistaBenchmarkSupport)) xxhash
-    ++ lib.optional ((archivedTemplateSupport != false && zlib != null) || cistaBenchmarkSupport) zlib;
+    ++ lib.optional cistaBenchmarkSupport zlib;
   propagatedBuildInputs = lib.optional (libyaml != null) libyaml;
   nativeBuildInputs =
     lib.optional checkSupport mustache_spec
@@ -158,7 +158,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   postBuild =
     lib.optionalString (
-      cmakeSupport && archivedTemplateSupport != false && zlib != null && !cistaBenchmarkSupport
+      cmakeSupport && archivedTemplateSupport != false && !cistaBenchmarkSupport
     ) ''
       if test -e benchmarks/mustache_ast_cache_vs_source; then
         echo "archive-only CMake build unexpectedly included the AST benchmark" >&2
@@ -184,7 +184,7 @@ stdenv.mkDerivation (finalAttrs: {
       }' \
         install-check-version.txt
       if ${
-        if archivedTemplateSupport != false && zlib != null
+        if archivedTemplateSupport != false
         then "true"
         else "false"
       }; then
@@ -317,13 +317,13 @@ stdenv.mkDerivation (finalAttrs: {
   YAML_CFLAGS = lib.optionalString (libyaml == null) "-I/definitely-missing-libmustache-yaml-headers";
   YAML_LIBS = lib.optionalString (libyaml == null) "-lmustache-disabled-yaml-must-not-link";
   CISTA_CFLAGS =
-    lib.optionalString (!cmakeSupport && archivedTemplateSupport != false && zlib != null && !useSystemCista)
+    lib.optionalString (!cmakeSupport && archivedTemplateSupport != false && !useSystemCista)
     "-include /definitely-missing-libmustache-system-cista-header";
   XXHASH_CFLAGS =
-    lib.optionalString (!cmakeSupport && archivedTemplateSupport != false && zlib != null && !useSystemXxhash)
+    lib.optionalString (!cmakeSupport && archivedTemplateSupport != false && !useSystemXxhash)
     "-I/definitely-missing-libmustache-system-xxhash-headers";
   XXHASH_LIBS =
-    lib.optionalString (!cmakeSupport && archivedTemplateSupport != false && zlib != null && !useSystemXxhash)
+    lib.optionalString (!cmakeSupport && archivedTemplateSupport != false && !useSystemXxhash)
     "-lmustache-vendored-xxhash-must-not-link";
 
   meta = {

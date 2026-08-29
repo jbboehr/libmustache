@@ -662,8 +662,9 @@ write-once, render-many lifecycle.
 The completed libmustache experiment remains optional under
 `MUSTACHE_ENABLE_ARCHIVED_TEMPLATES`. After its native security, compatibility,
 and platform gates passed, CMake and Autotools changed the default to `AUTO`:
-zlib and private-symbol-control availability enable the feature without making
-zlib mandatory or widening the shared-library ABI. Cista remains private behind
+private-symbol-control availability enables the feature without widening the
+shared-library ABI. Production archives do not depend on zlib; it remains only
+in the explicit CRC-32 benchmark. Cista remains private behind
 the libmustache-owned `ArchivedTemplateView`; owned and archived representations
 share one renderer algorithm without reconstructing a `Node` tree. The
 supported path includes lambda and inline-partial semantics, pinned modern XXH3,

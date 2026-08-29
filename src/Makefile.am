@@ -36,9 +36,9 @@ endif
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
 noinst_LTLIBRARIES += libmustache_archive_adapter.la
 libmustache_archive_adapter_la_SOURCES = \
-	../benchmarks/cista-archive.cpp \
-	../benchmarks/cista-archive.hpp \
-	../benchmarks/cista-xxh3.cpp
+	archive/cista.cpp \
+	archive/xxh3.cpp \
+	archived_template.hpp
 libmustache_archive_adapter_la_CXXFLAGS = \
 	@MUSTACHE_CXXFLAGS@ \
 	@MUSTACHE_ARCHIVE_CXXFLAGS@ \
@@ -46,10 +46,10 @@ libmustache_archive_adapter_la_CXXFLAGS = \
 libmustache_archive_adapter_la_CPPFLAGS = \
 	@MUSTACHE_CPPFLAGS@ \
 	@MUSTACHE_LIBRARY_EXPORT_CPPFLAGS@ \
-	-I$(top_srcdir)/benchmarks \
-	-I$(top_srcdir)/benchmarks/cista-xxh3 \
-	$(ZLIB_CFLAGS) \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/src/archive/xxh3 \
 	-DCISTA_XXH3=1 \
+	-DMUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY=1 \
 	-DMUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1
 if MUSTACHE_SYSTEM_XXHASH
 libmustache_archive_adapter_la_CPPFLAGS += $(XXHASH_CFLAGS)
@@ -99,7 +99,7 @@ if MUSTACHE_JSON_ENABLED
 libmustache_la_LIBADD += libmustache_json_adapter.la
 endif
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
-libmustache_la_LIBADD += libmustache_archive_adapter.la $(ZLIB_LIBS)
+libmustache_la_LIBADD += libmustache_archive_adapter.la
 if MUSTACHE_SYSTEM_XXHASH
 libmustache_la_LIBADD += $(XXHASH_LIBS)
 endif

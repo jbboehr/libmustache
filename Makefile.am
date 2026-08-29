@@ -9,13 +9,9 @@ EXTRA_DIST = \
 	README.md \
 	LICENSE.md \
 	benchmarks/CMakeLists.txt \
-	benchmarks/.clang-tidy \
 	benchmarks/ast-cache-vs-source.cpp \
 	benchmarks/ast-cache-vs-source.php \
-	benchmarks/cista-archive.cpp \
 	benchmarks/cista-archive.hpp \
-	benchmarks/cista-xxh3.cpp \
-	benchmarks/cista-xxh3/xxh3.h \
 	benchmarks/test-cista-archive.cpp \
 	docs/development/abi-6-source-migration-2026-08-20.md \
 	docs/development/cista-archive-format-v1.md \
@@ -31,6 +27,10 @@ EXTRA_DIST = \
 	flake.lock \
 	nix/derivation.nix \
 	scripts/check-version-consistency.sh \
+	src/archive/.clang-tidy \
+	src/archive/cista.cpp \
+	src/archive/xxh3.cpp \
+	src/archive/xxh3/xxh3.h \
 	spec/specs \
 	tests/check_archive_feature_modes.cmake \
 	tests/check_windows_exports.cmake \

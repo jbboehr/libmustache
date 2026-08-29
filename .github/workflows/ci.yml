@@ -75,8 +75,7 @@ jobs:
             locales \
             m4 \
             make \
-            pkg-config \
-            zlib1g-dev
+            pkg-config
           sudo locale-gen de_DE.UTF-8
 
       - name: Generate configure script
@@ -176,8 +175,7 @@ jobs:
             nlohmann-json3-dev \
             libyaml-dev \
             ninja-build \
-            pkg-config \
-            zlib1g-dev
+            pkg-config
 
       - name: Configure, build, and test
         run: |
@@ -340,8 +338,7 @@ jobs:
             m4 \
             make \
             ninja-build \
-            pkg-config \
-            zlib1g-dev
+            pkg-config
 
       - name: Build and test with sanitizers
         run: |

@@ -9,7 +9,7 @@ in
     nlohmann_json ? pkgs.nlohmann_json,
     libyaml ? pkgs.libyaml,
     xxhash ? pkgs.xxhash,
-    zlib ? pkgs.zlib,
+    zlib ? null,
     gitignoreFilterWith ?
       (import (
         fetchTarball {

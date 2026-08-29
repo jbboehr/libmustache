@@ -7,10 +7,11 @@ compatibility, integrity, and structural validation. No `cista::*` type appears
 in the installed API.
 
 This format remains experimental and optional. CMake and Autotools enable it
-automatically when zlib and the required private-symbol controls are available,
-while explicit require and disable modes remain available. Generation 1 is
-pinned so dependency changes and future API work cannot silently change cache
-bytes.
+automatically when the required private-symbol controls are available, while
+explicit require and disable modes remain available. Production archives use
+XXH3 through the bundled or selected xxHash implementation; zlib is only an
+optional dependency of the separate checksum benchmark. Generation 1 is pinned
+so dependency changes and future API work cannot silently change cache bytes.
 
 ## Preamble layout
 

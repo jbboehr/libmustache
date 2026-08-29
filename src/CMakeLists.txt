@@ -11,9 +11,9 @@ set(MUSTACHE_SOURCES
 )
 if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
     set(MUSTACHE_CISTA_ARCHIVE_SOURCE
-        "${PROJECT_SOURCE_DIR}/benchmarks/cista-archive.cpp")
+        "${CMAKE_CURRENT_SOURCE_DIR}/archive/cista.cpp")
     set(MUSTACHE_CISTA_XXH3_SOURCE
-        "${PROJECT_SOURCE_DIR}/benchmarks/cista-xxh3.cpp")
+        "${CMAKE_CURRENT_SOURCE_DIR}/archive/xxh3.cpp")
     list(APPEND MUSTACHE_SOURCES
         "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
         "${MUSTACHE_CISTA_XXH3_SOURCE}")
@@ -29,6 +29,7 @@ if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
     set_property(SOURCE "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
         APPEND PROPERTY COMPILE_DEFINITIONS
             CISTA_XXH3=1
+            MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY=1
             MUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1)
     if(MSVC)
         set_property(SOURCE "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
@@ -71,7 +72,6 @@ if(MUSTACHE_HAVE_LIBYAML)
         ${MUSTACHE_YAML_TARGET})
 endif()
 if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
-    list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES ZLIB::ZLIB)
     if(MUSTACHE_USE_SYSTEM_XXHASH)
         list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES ${MUSTACHE_XXHASH_TARGET})
     endif()
@@ -107,7 +107,7 @@ function(mustache_configure_library target)
     )
     if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
         target_include_directories(${target} BEFORE PRIVATE
-            "${PROJECT_SOURCE_DIR}/benchmarks/cista-xxh3")
+            "${CMAKE_CURRENT_SOURCE_DIR}/archive/xxh3")
         if(MUSTACHE_USE_SYSTEM_CISTA)
             target_include_directories(${target} SYSTEM PRIVATE
                 "$<TARGET_PROPERTY:${MUSTACHE_CISTA_TARGET},INTERFACE_INCLUDE_DIRECTORIES>")
@@ -131,9 +131,9 @@ set_target_properties(mustache PROPERTIES
     VERSION "${MUSTACHE_ABI_VERSION}.0.0"
     SOVERSION "${MUSTACHE_ABI_VERSION}"
 )
-if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
-    # Shared consumers do not import private archive dependencies. Preserve
-    # their non-system link directories in the installed library instead.
+if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES AND MUSTACHE_USE_SYSTEM_XXHASH)
+    # Shared consumers do not import the private xxHash dependency. Preserve a
+    # non-system link directory in the installed library instead.
     set_property(TARGET mustache PROPERTY INSTALL_RPATH_USE_LINK_PATH TRUE)
 endif()
 

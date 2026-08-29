@@ -124,6 +124,7 @@
             nlohmann_json = null;
             libyaml = null;
             zlib = null;
+            archivedTemplateSupport = false;
           };
           libmustache-cmake-no-yaml = makePackage {
             cmakeSupport = true;
@@ -134,6 +135,7 @@
             nlohmann_json = null;
             libyaml = null;
             zlib = null;
+            archivedTemplateSupport = false;
           };
           libmustache-cista-benchmark = makePackage {
             cmakeSupport = true;
@@ -157,25 +159,25 @@
             cistaBenchmarkSupport = true;
             cistaBuiltinXxh3Support = true;
           };
-          libmustache-archived-vendored-cmake = makePackage {
+          libmustache-archived-no-zlib-cmake = makePackage {
             cmakeSupport = true;
             cista = null;
             xxhash = null;
-            zlib = pkgs.zlib;
+            zlib = null;
             archivedTemplateSupport = true;
           };
-          libmustache-archived-vendored-autotools = makePackage {
+          libmustache-archived-no-zlib-autotools = makePackage {
             cmakeSupport = false;
             cista = null;
             xxhash = null;
-            zlib = pkgs.zlib;
+            zlib = null;
             archivedTemplateSupport = true;
           };
           libmustache-archived-system-autotools = makePackage {
             cmakeSupport = false;
             cista = pkgs.cista;
             xxhash = pkgs.xxhash;
-            zlib = pkgs.zlib;
+            zlib = null;
             archivedTemplateSupport = null;
             useSystemCista = true;
             useSystemXxhash = true;
@@ -184,7 +186,7 @@
             cmakeSupport = true;
             cista = pkgs.cista;
             xxhash = null;
-            zlib = pkgs.zlib;
+            zlib = null;
             archivedTemplateSupport = true;
             useSystemCista = true;
           };
@@ -192,7 +194,7 @@
             cmakeSupport = true;
             cista = null;
             xxhash = pkgs.xxhash;
-            zlib = pkgs.zlib;
+            zlib = null;
             archivedTemplateSupport = true;
             useSystemXxhash = true;
           };
@@ -200,7 +202,7 @@
             cmakeSupport = false;
             cista = pkgs.cista;
             xxhash = null;
-            zlib = pkgs.zlib;
+            zlib = null;
             archivedTemplateSupport = true;
             useSystemCista = true;
           };
@@ -208,7 +210,7 @@
             cmakeSupport = false;
             cista = null;
             xxhash = pkgs.xxhash;
-            zlib = pkgs.zlib;
+            zlib = null;
             archivedTemplateSupport = true;
             useSystemXxhash = true;
           };

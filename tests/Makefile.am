@@ -33,17 +33,20 @@ test_cli_SOURCES = test_cli.cpp ../bin/cli.cpp ../bin/cli.hpp
 test_archived_template_SOURCES = test_archived_template.cpp
 test_cista_archive_SOURCES = \
 	../benchmarks/test-cista-archive.cpp \
-	../benchmarks/cista-archive.cpp \
+	../src/archive/cista.cpp \
 	../benchmarks/cista-archive.hpp \
-	../benchmarks/cista-xxh3.cpp
+	../src/archive/xxh3.cpp
 test_cista_archive_CPPFLAGS = \
 	$(AM_CPPFLAGS) \
 	-I$(top_srcdir)/benchmarks \
-	-I$(top_srcdir)/benchmarks/cista-xxh3 \
-	$(ZLIB_CFLAGS) \
+	-I$(top_srcdir)/src/archive/xxh3 \
 	-DCISTA_XXH3=1 \
-	-DMUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1 \
-	-DMUSTACHE_CISTA_ARCHIVE_PROTOTYPE_ONLY=1
+	-DMUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1
+if MUSTACHE_ZLIB_AVAILABLE
+test_cista_archive_CPPFLAGS += \
+	$(ZLIB_CFLAGS) \
+	-DMUSTACHE_CISTA_HAVE_ZLIB=1
+endif
 if MUSTACHE_SYSTEM_XXHASH
 test_cista_archive_CPPFLAGS += $(XXHASH_CFLAGS)
 else
@@ -64,19 +67,23 @@ test_cista_archive_CPPFLAGS += \
 endif
 test_cista_archive_CXXFLAGS = $(AM_CXXFLAGS) -UCISTA_FMT
 test_cista_archive_LDADD = \
-	$(top_builddir)/src/libmustache.la \
-	$(ZLIB_LIBS)
+	$(top_builddir)/src/libmustache.la
+if MUSTACHE_ZLIB_AVAILABLE
+test_cista_archive_LDADD += $(ZLIB_LIBS)
+endif
 if MUSTACHE_SYSTEM_XXHASH
 test_cista_archive_LDADD += $(XXHASH_LIBS)
 endif
 
 EXTRA_DIST = \
 	CMakeLists.txt \
-	check_installed_shared_consumer.cmake \
+	archive_runtime_dependency_helpers.cmake \
+	check_archive_runtime_dependencies.cmake \
 	check_unix_exports.cmake \
 	run_fuzzer_smoke.cmake \
 	run_spec_crlf.cmake \
 	select_unix_export_format.cmake \
+	verify_archive_runtime_dependency_names.cmake \
 	verify_fuzzer_smoke_safety.cmake \
 	verify_unix_export_platform.cmake \
 	fixtures/cista-archive-v1-x86_64-le-itanium.hex \

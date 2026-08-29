@@ -335,8 +335,9 @@ has the same rendering semantics as owned nodes, keeps Cista private, requires
 versioning, deep checking, integrity, and libmustache semantic validation, and
 uses pinned modern XXH3. The archive boundary has sanitizer-backed fuzz,
 platform, installed-consumer, and export-boundary coverage. Build systems now
-default to automatic detection of zlib and the required private-symbol controls
-rather than requiring the feature.
+default to automatic detection of the required private-symbol controls. The
+production archive implementation has no zlib dependency; zlib remains only in
+the explicit CRC-32 benchmark.
 
 The next slice belongs in php-mustache: add a narrow experimental bridge and a
 one-fetch/one-render APCu experiment. That experiment

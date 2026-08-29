@@ -16,7 +16,7 @@ directory is installed or included by libmustache's public headers.
 - License: MIT; see `LICENSE`. The generated header also embeds the license.
 
 The snapshot is generated with Cista's upstream `uniter` tool and is not edited
-by hand. Libmustache pre-includes its small `benchmarks/cista-xxh3/xxh3.h`
+by hand. Libmustache pre-includes its small `src/archive/xxh3/xxh3.h`
 compatibility header, which suppresses the older embedded copy and routes
 Cista's hash calls through one private out-of-line adapter. That adapter uses
 the selected modern XXH3 API from the separately versioned bundled or system
@@ -40,7 +40,7 @@ From a clean checkout of the selected upstream tag:
 
 ```sh
 c++ -std=c++17 -O2 tools/uniter/uniter.cc -o /tmp/cista-uniter
-cp /path/to/libmustache/benchmarks/cista-xxh3/xxh3.h include/xxh3.h
+cp /path/to/libmustache/src/archive/xxh3/xxh3.h include/xxh3.h
 /tmp/cista-uniter \
   LICENSE \
   include \
