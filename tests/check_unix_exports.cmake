@@ -82,8 +82,8 @@ if(MUSTACHE_ARCHIVED_TEMPLATES)
         "^_?_ZN8mustache20loadArchivedTemplate.*$" 2
         "loadArchivedTemplate overloads")
     require_export_count(
-        "^_?_ZN8mustache25serializeArchivedTemplate.*$" 1
-        "serializeArchivedTemplate")
+        "^_?_ZN8mustache25serializeArchivedTemplate.*$" 2
+        "serializeArchivedTemplate overloads")
     require_export_count(
         "^_?_ZN8mustache6render.*20ArchivedTemplateView.*$" 2
         "archived-template free render overloads")
@@ -94,6 +94,7 @@ endif()
 
 set(forbidden_exports
     "N5cista"
+    "archivedTemplateRoot"
     "MUSTACHE_CISTA_XXH_"
     "mustache_cista_xxh3_64bits_with_seed")
 foreach(export_symbol IN LISTS export_symbols)

@@ -1,15 +1,21 @@
 #ifndef MUSTACHE_COMPILED_TEMPLATE_HPP
 #define MUSTACHE_COMPILED_TEMPLATE_HPP
 
+#include "mustache_config.h"
 #include "mustache_export.hpp"
 
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace mustache {
 
 class Mustache;
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+struct ArchivedTemplateLimits;
+#endif
 
 /*! \class CompiledTemplate
     \brief Opaque, immutable compiled template handle.
@@ -40,6 +46,15 @@ class CompiledTemplate {
 
     std::shared_ptr<const State> state;
 
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+#if defined(__GNUC__) && !defined(_WIN32)
+    __attribute__((visibility("hidden")))
+#endif
+    const void * archivedTemplateRoot() const noexcept;
+
+    friend MUSTACHE_API std::vector<std::uint8_t> serializeArchivedTemplate(const CompiledTemplate& compiled,
+        const std::map<std::string, CompiledTemplate>& partials, const ArchivedTemplateLimits& limits);
+#endif
     friend class Mustache;
 };
 

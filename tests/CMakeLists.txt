@@ -180,6 +180,21 @@ add_test(NAME allocation_failure COMMAND test_allocation_failure)
 add_test(NAME archive_runtime_dependency_names
     COMMAND "${CMAKE_COMMAND}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/verify_archive_runtime_dependency_names.cmake")
+if(MUSTACHE_IS_TOP_LEVEL)
+    add_test(NAME public_compiled_template_boundary
+        COMMAND "${CMAKE_COMMAND}"
+            "-DMUSTACHE_PUBLIC_HEADER=${PROJECT_SOURCE_DIR}/src/compiled_template.hpp"
+            "-DMUSTACHE_CONFIG_INCLUDE_DIR=${PROJECT_BINARY_DIR}/src"
+            "-DMUSTACHE_SOURCE_INCLUDE_DIR=${PROJECT_SOURCE_DIR}/src"
+            "-DMUSTACHE_TEST_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/public-compiled-template-boundary"
+            "-DMUSTACHE_ARCHIVED_TEMPLATES=${MUSTACHE_HAVE_ARCHIVED_TEMPLATES}"
+            "-DMUSTACHE_TEST_GENERATOR=${CMAKE_GENERATOR}"
+            "-DMUSTACHE_TEST_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}"
+            "-DMUSTACHE_TEST_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}"
+            "-DMUSTACHE_TEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+            "-DMUSTACHE_TEST_CONFIG=$<CONFIG>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/check_public_compiled_template_boundary.cmake")
+endif()
 if(MUSTACHE_IS_TOP_LEVEL AND NOT MSVC)
     add_test(NAME cmake_archive_feature_modes
         COMMAND "${CMAKE_COMMAND}"

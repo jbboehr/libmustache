@@ -6,6 +6,7 @@
 
 #if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
 
+#include "compiled_template.hpp"
 #include "node.hpp"
 #include "renderer.hpp"
 
@@ -88,6 +89,10 @@ class ArchivedTemplateView {
 //! Serializes a Node graph using the protected archived-template format.
 MUSTACHE_API std::vector<std::uint8_t> serializeArchivedTemplate(const Node& root,
     const Node::Partials& partials = Node::Partials(), const ArchivedTemplateLimits& limits = ArchivedTemplateLimits());
+
+//! Serializes an opaque compiled template and compiled partials using the protected archived-template format.
+MUSTACHE_API std::vector<std::uint8_t> serializeArchivedTemplate(const CompiledTemplate& compiled,
+    const PartialMap& partials = PartialMap(), const ArchivedTemplateLimits& limits = ArchivedTemplateLimits());
 
 } // namespace mustache
 

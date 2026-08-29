@@ -120,7 +120,7 @@ int main()
   const std::string lambdaOutput = mustache::render(mustache::compile("{{.}}"), consumerLambda);
 
 #ifdef MUSTACHE_HAVE_ARCHIVED_TEMPLATES
-  const std::vector<std::uint8_t> archiveBytes = mustache::serializeArchivedTemplate(parsed);
+  const std::vector<std::uint8_t> archiveBytes = mustache::serializeArchivedTemplate(compiled, partials);
   mustache::ArchivedTemplateLimits archiveLimits;
   const mustache::ArchivedTemplateView archived = mustache::loadArchivedTemplate(archiveBytes, archiveLimits);
   const std::string_view archiveByteView(reinterpret_cast<const char *>(archiveBytes.data()), archiveBytes.size());
@@ -140,12 +140,14 @@ int main()
   const std::string archivedLimitedOutput = mustache.render(archivedFromView, scalar, renderLimits);
   const std::string archivedFreeOutput = mustache::render(archivedMoved, scalar);
   const std::string archivedLimitedFreeOutput = mustache::render(archivedMoveAssigned, scalar, renderLimits);
+  const std::string expectedArchivedOutput = "[compiled]";
 #else
   const bool archivedHandlesValid = true;
   const std::string archivedOutput = "ok";
   const std::string archivedLimitedOutput = "ok";
   const std::string archivedFreeOutput = "ok";
   const std::string archivedLimitedFreeOutput = "ok";
+  const std::string expectedArchivedOutput = "ok";
 #endif
 
   mustache::LambdaRenderContext inactiveContext;
@@ -159,9 +161,9 @@ int main()
   return decoded->type == mustache::Node::TypeRoot && decoded->children.size() == 1 &&
           decoded->children.front()->data.has_value() && *decoded->children.front()->data == "owned" &&
           nodeTemplate == "owned" && compiledOutput == "[compiled]" && lambdaOutput == "consumer-lambda" &&
-          archivedHandlesValid && archivedOutput == "ok" && archivedLimitedOutput == "ok" &&
-          archivedFreeOutput == "ok" && archivedLimitedFreeOutput == "ok" && !inactiveContext.active() &&
-          inactiveContextRejected
+          archivedHandlesValid && archivedOutput == expectedArchivedOutput &&
+          archivedLimitedOutput == expectedArchivedOutput && archivedFreeOutput == expectedArchivedOutput &&
+          archivedLimitedFreeOutput == expectedArchivedOutput && !inactiveContext.active() && inactiveContextRejected
       ? 0
       : 1;
 }

@@ -85,19 +85,21 @@ responsibilities are specified in the
 [archive format document](docs/development/cista-archive-format-v1.md).
 
 When enabled, `mustache_config.h` defines
-`MUSTACHE_HAVE_ARCHIVED_TEMPLATES`. The public API serializes a complete node
-and partial graph, then loads it into an owning, validated handle:
+`MUSTACHE_HAVE_ARCHIVED_TEMPLATES`. The preferred public API serializes an
+opaque compiled template and its compiled partial graph, then loads it into an
+owning, validated handle:
 
 ```cpp
-mustache::Node root;
-mustache::Mustache engine;
-engine.tokenize("Hello {{name}}", &root);
+mustache::CompiledTemplate compiled = mustache::compile("Hello {{name}}");
 
-std::vector<std::uint8_t> bytes = mustache::serializeArchivedTemplate(root);
+std::vector<std::uint8_t> bytes = mustache::serializeArchivedTemplate(compiled);
 mustache::ArchivedTemplateView archived =
     mustache::loadArchivedTemplate(bytes);
-std::string output = engine.render(archived, data);
+std::string output = mustache::render(archived, data);
 ```
+
+The `Node` overload remains available for advanced callers that construct or
+transform syntax trees directly.
 
 Loading defensively copies a byte vector or `std::string_view`, then validates
 the protected archive once. This prevents caller-retained aliases from changing

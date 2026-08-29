@@ -79,6 +79,7 @@ EXTRA_DIST = \
 	CMakeLists.txt \
 	archive_runtime_dependency_helpers.cmake \
 	check_archive_runtime_dependencies.cmake \
+	check_public_compiled_template_boundary.cmake \
 	check_unix_exports.cmake \
 	run_fuzzer_smoke.cmake \
 	run_spec_crlf.cmake \

@@ -52,7 +52,7 @@ if(MUSTACHE_ARCHIVED_TEMPLATES)
     require_archive_export_count("\\?\\?BArchivedTemplateView@mustache@@" 1 "bool conversion")
     require_archive_export_count("\\?empty@ArchivedTemplateView@mustache@@" 1 "empty method")
     require_archive_export_count("\\?loadArchivedTemplate@mustache@@" 2 "load overloads")
-    require_archive_export_count("\\?serializeArchivedTemplate@mustache@@" 1 "serialize function")
+    require_archive_export_count("\\?serializeArchivedTemplate@mustache@@" 2 "serialize overloads")
     require_archive_export_count(
         "\\?render@Mustache@mustache@@[^\n]*ArchivedTemplateView@" 2
         "member render overloads")
@@ -76,6 +76,7 @@ set(forbidden_exports
     "State@LambdaRenderContext@"
     "TemplateStringState@"
     "?appendNodeTemplate@"
+    "?archivedTemplateRoot@CompiledTemplate@"
     "?unserializeOwnedRange@"
     "?_renderNode@Renderer@"
     "?_renderChildren@Renderer@"

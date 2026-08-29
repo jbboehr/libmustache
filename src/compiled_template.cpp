@@ -26,6 +26,13 @@ CompiledTemplate::CompiledTemplate(std::shared_ptr<const State> state) noexcept 
     state(std::move(state))
 {}
 
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+const void * CompiledTemplate::archivedTemplateRoot() const noexcept
+{
+  return state ? &state->root : nullptr;
+}
+#endif
+
 bool CompiledTemplate::empty() const noexcept
 {
   return !state;

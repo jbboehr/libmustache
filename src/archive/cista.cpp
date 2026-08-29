@@ -96,6 +96,11 @@ namespace mustache_benchmark {
 
 #if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
 using CistaArchiveLimits = mustache::ArchivedTemplateLimits;
+using CompiledRootAccessor = const mustache::Node * (*)(const mustache::CompiledTemplate&) noexcept;
+struct CompiledPartialSource {
+    const mustache::PartialMap& partials;
+    CompiledRootAccessor root;
+};
 #endif
 
 namespace {
@@ -386,9 +391,25 @@ class ArchiveBuilder {
 
     ArchiveGraph build(const mustache::Node& root, const mustache::Node::Partials& partials)
     {
+      return buildWithPartials(root, partials);
+    }
+
+#if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
+    ArchiveGraph build(const mustache::Node& root, const CompiledPartialSource& partials)
+    {
+      return buildWithPartials(root, partials);
+    }
+#endif
+
+  private:
+    using EffectivePartials = std::map<std::string_view, const mustache::Node *>;
+    using EffectivePartial = EffectivePartials::value_type;
+
+    template <typename Partials> ArchiveGraph buildWithPartials(const mustache::Node& root, const Partials& partials)
+    {
       validateMinimumSize();
-      const EffectivePartials effectivePartials = collectEffectivePartials(root.partials, partials);
       countNode(root, 0);
+      const EffectivePartials effectivePartials = collectEffectivePartials(root.partials, partials);
       for (const EffectivePartial& partial : effectivePartials) {
         countNode(*partial.second, 0);
       }
@@ -406,19 +427,15 @@ class ArchiveBuilder {
       return std::move(graph_);
     }
 
-  private:
-    using EffectivePartials = std::map<std::string_view, const mustache::Node *>;
-    using EffectivePartial = EffectivePartials::value_type;
-
     EffectivePartials collectEffectivePartials(
         const mustache::Node::Partials& fallback, const mustache::Node::Partials& overriding)
     {
       EffectivePartials effective;
       for (const mustache::Node::PartialPair& partial : fallback) {
         if (partial.second != nullptr) {
-          const auto inserted = effective.emplace(partial.first, partial.second.get());
-          if (inserted.second) {
+          if (effective.find(partial.first) == effective.end()) {
             addPartialName(partial.first);
+            effective.emplace(partial.first, partial.second.get());
           }
         }
       }
@@ -428,8 +445,8 @@ class ArchiveBuilder {
         if (partial.second != nullptr) {
           const auto position = effective.find(partial.first);
           if (position == effective.end()) {
-            effective.emplace(partial.first, partial.second.get());
             addPartialName(partial.first);
+            effective.emplace(partial.first, partial.second.get());
           } else {
             position->second = partial.second.get();
           }
@@ -438,12 +455,44 @@ class ArchiveBuilder {
       return effective;
     }
 
+#if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
+    EffectivePartials collectEffectivePartials(
+        const mustache::Node::Partials& fallback, const CompiledPartialSource& overriding)
+    {
+      EffectivePartials effective;
+      for (const mustache::Node::PartialPair& partial : fallback) {
+        if (partial.second != nullptr) {
+          if (effective.find(partial.first) == effective.end()) {
+            addPartialName(partial.first);
+            effective.emplace(partial.first, partial.second.get());
+          }
+        }
+      }
+      for (const mustache::PartialMap::value_type& partial : overriding.partials) {
+        const auto position = effective.find(partial.first);
+        if (position == effective.end()) {
+          addPartialName(partial.first);
+        }
+        const mustache::Node * const root = overriding.root(partial.second);
+        if (root == nullptr) {
+          throw mustache::Exception("Empty compiled partial");
+        }
+        if (position == effective.end()) {
+          effective.emplace(partial.first, root);
+        } else {
+          position->second = root;
+        }
+      }
+      return effective;
+    }
+#endif
+
     void addPartialName(std::string_view name)
     {
       // Every archived partial owns at least one root node, so this conservative
       // writer bound guarantees that its output fits the paired reader's shared
       // aggregate node budget before the partial table is allocated.
-      if (limits_.maxNodes == 0 || partialCount_ >= limits_.maxNodes - 1) {
+      if (nodeCount_ >= limits_.maxNodes || partialCount_ >= limits_.maxNodes - nodeCount_) {
         throw mustache::Exception("Cista archive node count limit exceeded");
       }
       if (partialCount_ == std::numeric_limits<std::uint32_t>::max()) {
@@ -1155,9 +1204,9 @@ template <cista::mode Mode> const ArchiveGraph& readArchive(std::string_view byt
   return *graph;
 }
 
-template <cista::mode Mode>
+template <cista::mode Mode, typename Partials>
 std::vector<std::uint8_t> serializeCistaArchiveWithMode(
-    const mustache::Node& root, const mustache::Node::Partials& partials, const CistaArchiveLimits& archiveLimits)
+    const mustache::Node& root, const Partials& partials, const CistaArchiveLimits& archiveLimits)
 {
   if (archiveLimits.maxInputBytes < archivePreambleSize) {
     throw mustache::Exception("Cista archive output byte limit exceeded");
@@ -1420,6 +1469,21 @@ std::vector<std::uint8_t> serializeArchivedTemplate(
 {
   return mustache_benchmark::serializeCistaArchiveWithMode<mustache_benchmark::archiveModeDeepCheckAndIntegrity>(
       root, partials, limits);
+}
+
+std::vector<std::uint8_t> serializeArchivedTemplate(
+    const CompiledTemplate& compiled, const PartialMap& partials, const ArchivedTemplateLimits& limits)
+{
+  const auto rootFor = [](const CompiledTemplate& source) noexcept -> const Node * {
+    return static_cast<const Node *>(source.archivedTemplateRoot());
+  };
+  const Node * const root = rootFor(compiled);
+  if (root == nullptr) {
+    throw Exception("Empty compiled template");
+  }
+  const mustache_benchmark::CompiledPartialSource partialSource{partials, rootFor};
+  return mustache_benchmark::serializeCistaArchiveWithMode<mustache_benchmark::archiveModeDeepCheckAndIntegrity>(
+      *root, partialSource, limits);
 }
 
 ArchivedTemplateView loadArchivedTemplate(const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits)

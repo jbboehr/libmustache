@@ -263,6 +263,79 @@ void testPartialsAndLambdas()
       "the public archived-template API changed partial or lambda rendering");
 }
 
+void testCompiledTemplateSerialization()
+{
+  const std::string inlineSource = "Hello {{name}}";
+  const mustache::CompiledTemplate inlineCompiled = mustache::compile(inlineSource);
+  mustache::Node inlineRoot;
+  mustache::Mustache engine;
+  engine.tokenize(inlineSource, &inlineRoot);
+  const std::vector<std::uint8_t> inlineCompiledBytes = mustache::serializeArchivedTemplate(inlineCompiled);
+  const std::vector<std::uint8_t> inlineNodeBytes = mustache::serializeArchivedTemplate(inlineRoot);
+  expect(inlineCompiledBytes == inlineNodeBytes,
+      "compiled and node serialization produced different archives for the same template");
+  mustache::Data inlineData = mustache::Data::object();
+  inlineData.set("name", mustache::Data::string("Ada"));
+  expect(mustache::render(mustache::loadArchivedTemplate(inlineCompiledBytes), inlineData) == "Hello Ada",
+      "the documented compile-serialize-render path changed behavior");
+
+  const mustache::CompiledTemplate compiled = mustache::compile("[{{>value}}]");
+  mustache::PartialMap partials;
+  partials.emplace("value", mustache::compile("{{.}}"));
+
+  const std::vector<std::uint8_t> serialized = mustache::serializeArchivedTemplate(compiled, partials);
+  const mustache::ArchivedTemplateView archived = mustache::loadArchivedTemplate(serialized);
+
+  expect(mustache::render(archived, mustache::Data::string("compiled")) == "[compiled]",
+      "compiled templates and partials did not compose with archived serialization");
+
+  bool rejected = false;
+  try {
+    static_cast<void>(mustache::serializeArchivedTemplate(mustache::CompiledTemplate()));
+  } catch (const mustache::Exception&) {
+    rejected = true;
+  }
+  expect(rejected, "an empty compiled template was serialized");
+
+  mustache::PartialMap emptyPartials;
+  emptyPartials.emplace("value", mustache::CompiledTemplate());
+  rejected = false;
+  try {
+    static_cast<void>(mustache::serializeArchivedTemplate(compiled, emptyPartials));
+  } catch (const mustache::Exception&) {
+    rejected = true;
+  }
+  expect(rejected, "an empty compiled partial was serialized");
+
+  const auto expectLimitBeforePartialInspection = [](const mustache::CompiledTemplate& source,
+                                                      mustache::ArchivedTemplateLimits limits,
+                                                      const char * expectedMessage, const char * failureMessage) {
+    mustache::PartialMap uninspectablePartials;
+    uninspectablePartials.emplace("unused", mustache::CompiledTemplate());
+    try {
+      static_cast<void>(mustache::serializeArchivedTemplate(source, uninspectablePartials, limits));
+      expect(false, failureMessage);
+    } catch (const mustache::Exception& exception) {
+      expect(std::string(exception.what()) == expectedMessage, failureMessage);
+    }
+  };
+
+  mustache::ArchivedTemplateLimits limits;
+  limits.maxInputBytes = 0;
+  expectLimitBeforePartialInspection(compiled, limits, "Cista archive output byte limit exceeded",
+      "the output byte limit was checked after compiled partial preprocessing");
+
+  limits = mustache::ArchivedTemplateLimits();
+  limits.maxNodes = 0;
+  expectLimitBeforePartialInspection(compiled, limits, "Cista archive node count limit exceeded",
+      "the node limit was checked after compiled partial preprocessing");
+
+  limits = mustache::ArchivedTemplateLimits();
+  limits.maxNodes = 2;
+  expectLimitBeforePartialInspection(mustache::compile("x"), limits, "Cista archive node count limit exceeded",
+      "the aggregate node limit was checked after compiled partial preprocessing");
+}
+
 void testSerializationLimits()
 {
   mustache::Mustache engine;
@@ -322,6 +395,7 @@ int main()
     testOwnershipAndRendering();
     testCopiedInputCannotMutateValidatedState();
     testPartialsAndLambdas();
+    testCompiledTemplateSerialization();
     testSerializationLimits();
   } catch (const std::exception& exception) {
     std::fprintf(stderr, "archived-template API test failed: %s\n", exception.what());
