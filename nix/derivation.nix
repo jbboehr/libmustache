@@ -24,7 +24,7 @@
   sanitizerSupport ? false,
   fuzzSupport ? false,
   clangTidySupport ? false,
-  archivedTemplateSupport ? false,
+  archivedTemplateSupport ? null,
   useSystemCista ? false,
   useSystemXxhash ? false,
   cistaBenchmarkSupport ? false,
@@ -38,7 +38,7 @@ stdenv.mkDerivation (finalAttrs: {
     + lib.optionalString sanitizerSupport "-sanitized"
     + lib.optionalString fuzzSupport "-fuzz"
     + lib.optionalString clangTidySupport "-clang-tidy"
-    + lib.optionalString archivedTemplateSupport "-archived-templates"
+    + lib.optionalString (archivedTemplateSupport == true) "-archived-templates"
     + lib.optionalString useSystemCista "-system-cista"
     + lib.optionalString useSystemXxhash "-system-xxhash"
     + lib.optionalString cistaBenchmarkSupport "-cista-benchmark"
@@ -74,16 +74,17 @@ stdenv.mkDerivation (finalAttrs: {
   separateDebugInfo = debugSupport;
   dontStrip = sanitizerSupport || fuzzSupport;
 
-  buildInputs = assert !cistaBenchmarkSupport || cmakeSupport;
-  assert !useSystemCista || archivedTemplateSupport || (cmakeSupport && cistaBenchmarkSupport);
+  buildInputs = assert archivedTemplateSupport == null || builtins.isBool archivedTemplateSupport;
+  assert !cistaBenchmarkSupport || cmakeSupport;
+  assert !useSystemCista || archivedTemplateSupport != false || (cmakeSupport && cistaBenchmarkSupport);
   assert !useSystemCista || cista != null;
-  assert !useSystemXxhash || archivedTemplateSupport || (cmakeSupport && cistaBenchmarkSupport);
+  assert !useSystemXxhash || archivedTemplateSupport != false || (cmakeSupport && cistaBenchmarkSupport);
   assert !useSystemXxhash || xxhash != null;
-  assert !(archivedTemplateSupport || cistaBenchmarkSupport) || zlib != null;
+  assert !(archivedTemplateSupport == true || useSystemCista || useSystemXxhash || cistaBenchmarkSupport) || zlib != null;
     lib.optional (nlohmann_json != null) nlohmann_json
-    ++ lib.optional (useSystemCista && (archivedTemplateSupport || cistaBenchmarkSupport)) cista
-    ++ lib.optional (useSystemXxhash && (archivedTemplateSupport || cistaBenchmarkSupport)) xxhash
-    ++ lib.optional (archivedTemplateSupport || cistaBenchmarkSupport) zlib;
+    ++ lib.optional (useSystemCista && (archivedTemplateSupport != false || cistaBenchmarkSupport)) cista
+    ++ lib.optional (useSystemXxhash && (archivedTemplateSupport != false || cistaBenchmarkSupport)) xxhash
+    ++ lib.optional ((archivedTemplateSupport != false && zlib != null) || cistaBenchmarkSupport) zlib;
   propagatedBuildInputs = lib.optional (libyaml != null) libyaml;
   nativeBuildInputs =
     lib.optional checkSupport mustache_spec
@@ -110,7 +111,8 @@ stdenv.mkDerivation (finalAttrs: {
     ++ lib.optional checkSupport "--enable-warnings-as-errors"
     ++ lib.optionals staticOnlySupport ["--disable-shared" "--enable-static"]
     ++ lib.optional sanitizerSupport "--enable-sanitizers"
-    ++ lib.optional archivedTemplateSupport "--enable-archived-templates"
+    ++ lib.optional (archivedTemplateSupport == true) "--enable-archived-templates"
+    ++ lib.optional (archivedTemplateSupport == false) "--disable-archived-templates"
     ++ lib.optional useSystemCista "--with-system-cista"
     ++ lib.optional useSystemXxhash "--with-system-xxhash"
     ++ lib.optional (nlohmann_json == null) "--without-json"
@@ -125,7 +127,13 @@ stdenv.mkDerivation (finalAttrs: {
       (lib.cmakeBool "MUSTACHE_ENABLE_SANITIZERS" sanitizerSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_FUZZING" fuzzSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_CLANG_TIDY" clangTidySupport)
-      (lib.cmakeBool "MUSTACHE_ENABLE_ARCHIVED_TEMPLATES" archivedTemplateSupport)
+      "-DMUSTACHE_ENABLE_ARCHIVED_TEMPLATES=${
+        if archivedTemplateSupport == null
+        then "AUTO"
+        else if archivedTemplateSupport
+        then "ON"
+        else "OFF"
+      }"
       (lib.cmakeBool "MUSTACHE_USE_SYSTEM_CISTA" useSystemCista)
       (lib.cmakeBool "MUSTACHE_USE_SYSTEM_XXHASH" useSystemXxhash)
       (lib.cmakeBool "MUSTACHE_ENABLE_CISTA_BENCHMARK" cistaBenchmarkSupport)
@@ -150,7 +158,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   postBuild =
     lib.optionalString (
-      cmakeSupport && archivedTemplateSupport && !cistaBenchmarkSupport
+      cmakeSupport && archivedTemplateSupport != false && zlib != null && !cistaBenchmarkSupport
     ) ''
       if test -e benchmarks/mustache_ast_cache_vs_source; then
         echo "archive-only CMake build unexpectedly included the AST benchmark" >&2
@@ -175,6 +183,18 @@ stdenv.mkDerivation (finalAttrs: {
         else "JSON support: none"
       }' \
         install-check-version.txt
+      if ${
+        if archivedTemplateSupport != false && zlib != null
+        then "true"
+        else "false"
+      }; then
+        grep -F '#define MUSTACHE_HAVE_ARCHIVED_TEMPLATES 1' \
+          "$dev/include/mustache/mustache_config.h"
+      elif grep -q -F '#define MUSTACHE_HAVE_ARCHIVED_TEMPLATES 1' \
+          "$dev/include/mustache/mustache_config.h"; then
+        echo "archived-template support was enabled unexpectedly" >&2
+        exit 1
+      fi
       grep -F '${
         if libyaml != null
         then "YAML support: libyaml"
@@ -297,13 +317,13 @@ stdenv.mkDerivation (finalAttrs: {
   YAML_CFLAGS = lib.optionalString (libyaml == null) "-I/definitely-missing-libmustache-yaml-headers";
   YAML_LIBS = lib.optionalString (libyaml == null) "-lmustache-disabled-yaml-must-not-link";
   CISTA_CFLAGS =
-    lib.optionalString (!cmakeSupport && archivedTemplateSupport && !useSystemCista)
+    lib.optionalString (!cmakeSupport && archivedTemplateSupport != false && zlib != null && !useSystemCista)
     "-include /definitely-missing-libmustache-system-cista-header";
   XXHASH_CFLAGS =
-    lib.optionalString (!cmakeSupport && archivedTemplateSupport && !useSystemXxhash)
+    lib.optionalString (!cmakeSupport && archivedTemplateSupport != false && zlib != null && !useSystemXxhash)
     "-I/definitely-missing-libmustache-system-xxhash-headers";
   XXHASH_LIBS =
-    lib.optionalString (!cmakeSupport && archivedTemplateSupport && !useSystemXxhash)
+    lib.optionalString (!cmakeSupport && archivedTemplateSupport != false && zlib != null && !useSystemXxhash)
     "-lmustache-vendored-xxhash-must-not-link";
 
   meta = {

@@ -309,12 +309,12 @@ AM_CONDITIONAL([MUSTACHE_SPEC_TEST_ENABLED],
      test "x$mustache_yaml_enabled" = "xyes"])
 
 AC_ARG_ENABLE([archived-templates],
-    [AS_HELP_STRING([--enable-archived-templates],
-        [build the experimental archived-template implementation @<:@default=no@:>@])],
-    [], [enable_archived_templates=no])
+    [AS_HELP_STRING([--enable-archived-templates@<:@=auto|yes|no@:>@],
+        [build archived-template support when zlib and private symbol visibility are available @<:@default=auto@:>@])],
+    [], [enable_archived_templates=auto])
 AS_CASE([$enable_archived_templates],
-    [yes|no], [],
-    [AC_MSG_ERROR([--enable-archived-templates accepts only yes or no])])
+    [auto|yes|no], [],
+    [AC_MSG_ERROR([--enable-archived-templates accepts only auto, yes, or no])])
 
 AC_ARG_WITH([system-cista],
     [AS_HELP_STRING([--with-system-cista],
@@ -324,8 +324,8 @@ AS_CASE([$with_system_cista],
     [yes|no], [],
     [AC_MSG_ERROR([--with-system-cista accepts only yes or no])])
 AS_IF([test "x$with_system_cista" = "xyes" &&
-        test "x$enable_archived_templates" != "xyes"], [
-    AC_MSG_ERROR([--with-system-cista requires --enable-archived-templates])
+        test "x$enable_archived_templates" = "xno"], [
+    AC_MSG_ERROR([--with-system-cista cannot be used with --disable-archived-templates])
 ])
 
 AC_ARG_WITH([system-xxhash],
@@ -336,17 +336,38 @@ AS_CASE([$with_system_xxhash],
     [yes|no], [],
     [AC_MSG_ERROR([--with-system-xxhash accepts only yes or no])])
 AS_IF([test "x$with_system_xxhash" = "xyes" &&
-        test "x$enable_archived_templates" != "xyes"], [
-    AC_MSG_ERROR([--with-system-xxhash requires --enable-archived-templates])
+        test "x$enable_archived_templates" = "xno"], [
+    AC_MSG_ERROR([--with-system-xxhash cannot be used with --disable-archived-templates])
 ])
 
 AC_ARG_VAR([CISTA_CFLAGS],
     [C++ preprocessor flags for a system Cista installation])
-AS_IF([test "x$enable_archived_templates" = "xyes"], [
-    AS_IF([test "x$mustache_cv_cxx_visibility_hidden" != "xyes"], [
-        AC_MSG_ERROR([archived-template support requires private C++ symbol visibility])
+mustache_archived_templates_requested=$enable_archived_templates
+enable_archived_templates=no
+AS_IF([test "x$mustache_archived_templates_requested" != "xno"], [
+    AS_IF([test "x$mustache_cv_cxx_visibility_hidden" = "xyes"], [
+        PKG_CHECK_MODULES([ZLIB], [zlib], [
+            enable_archived_templates=yes
+        ], [
+            AS_IF([test "x$mustache_archived_templates_requested" = "xyes"], [
+                AC_MSG_ERROR([zlib is required for --enable-archived-templates])
+            ])
+        ])
+    ], [
+        AS_IF([test "x$mustache_archived_templates_requested" = "xyes"], [
+            AC_MSG_ERROR([archived-template support requires private C++ symbol visibility])
+        ])
     ])
-    PKG_CHECK_MODULES([ZLIB], [zlib])
+])
+AS_IF([test "x$enable_archived_templates" != "xyes" &&
+        test "x$with_system_cista" = "xyes"], [
+    AC_MSG_ERROR([--with-system-cista requires archived-template support, zlib, and private C++ symbol visibility])
+])
+AS_IF([test "x$enable_archived_templates" != "xyes" &&
+        test "x$with_system_xxhash" = "xyes"], [
+    AC_MSG_ERROR([--with-system-xxhash requires archived-template support, zlib, and private C++ symbol visibility])
+])
+AS_IF([test "x$enable_archived_templates" = "xyes"], [
     MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE="$MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE zlib"
 
     AS_IF([test "x$with_system_xxhash" = "xyes"], [

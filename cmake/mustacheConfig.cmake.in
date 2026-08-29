@@ -37,7 +37,7 @@ if(static IN_LIST mustache_FIND_COMPONENTS)
         endif()
     endif()
 
-    if(@MUSTACHE_ENABLE_ARCHIVED_TEMPLATES@)
+    if(@MUSTACHE_HAVE_ARCHIVED_TEMPLATES@)
         find_package(ZLIB QUIET)
         if(NOT TARGET ZLIB::ZLIB)
             set(_mustache_static_dependencies_found FALSE)

@@ -1,0 +1,5 @@
+InheritParentConfig: true
+# Cista models serialization modes as enum-class bit flags. Clang's optional
+# enum-range analyzer rejects valid combined modes at our instantiation sites
+# and throughout Cista's inline implementation; keep every other parent check.
+Checks: '-clang-analyzer-optin.core.EnumCastOutOfRange'

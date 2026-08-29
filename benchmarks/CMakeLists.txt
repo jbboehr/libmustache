@@ -8,7 +8,7 @@ target_link_libraries(mustache_ast_cache_vs_source PRIVATE mustache_static)
 mustache_apply_build_options(mustache_ast_cache_vs_source)
 mustache_enable_clang_tidy(mustache_ast_cache_vs_source)
 
-if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
     add_library(mustache_cista_archive_experiment INTERFACE)
     target_include_directories(mustache_cista_archive_experiment INTERFACE
         "${CMAKE_CURRENT_SOURCE_DIR}")

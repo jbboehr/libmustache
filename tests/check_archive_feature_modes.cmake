@@ -1,0 +1,99 @@
+cmake_minimum_required(VERSION 3.18)
+
+foreach(MUSTACHE_REQUIRED_VARIABLE IN ITEMS
+        MUSTACHE_TEST_SOURCE_DIR
+        MUSTACHE_TEST_BINARY_ROOT
+        MUSTACHE_TEST_GENERATOR
+        MUSTACHE_TEST_CXX_COMPILER)
+    if(NOT DEFINED ${MUSTACHE_REQUIRED_VARIABLE} OR
+            "${${MUSTACHE_REQUIRED_VARIABLE}}" STREQUAL "")
+        message(FATAL_ERROR "${MUSTACHE_REQUIRED_VARIABLE} is required")
+    endif()
+endforeach()
+
+set(MUSTACHE_GENERATOR_ARGUMENTS -G "${MUSTACHE_TEST_GENERATOR}")
+if(DEFINED MUSTACHE_TEST_GENERATOR_PLATFORM AND
+        NOT MUSTACHE_TEST_GENERATOR_PLATFORM STREQUAL "")
+    list(APPEND MUSTACHE_GENERATOR_ARGUMENTS
+        -A "${MUSTACHE_TEST_GENERATOR_PLATFORM}")
+endif()
+if(DEFINED MUSTACHE_TEST_GENERATOR_TOOLSET AND
+        NOT MUSTACHE_TEST_GENERATOR_TOOLSET STREQUAL "")
+    list(APPEND MUSTACHE_GENERATOR_ARGUMENTS
+        -T "${MUSTACHE_TEST_GENERATOR_TOOLSET}")
+endif()
+
+function(mustache_configure_archive_mode NAME MODE)
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}"
+            -S "${MUSTACHE_TEST_SOURCE_DIR}"
+            -B "${MUSTACHE_TEST_BINARY_ROOT}/${NAME}"
+            ${MUSTACHE_GENERATOR_ARGUMENTS}
+            "-DCMAKE_CXX_COMPILER=${MUSTACHE_TEST_CXX_COMPILER}"
+            -DMUSTACHE_BUILD_CLI=OFF
+            -DMUSTACHE_ENABLE_TESTS=OFF
+            -DMUSTACHE_ENABLE_HARDENING=OFF
+            -DMUSTACHE_ENABLE_JSON=OFF
+            -DMUSTACHE_ENABLE_YAML=OFF
+            "-DMUSTACHE_ENABLE_ARCHIVED_TEMPLATES=${MODE}"
+            -DMUSTACHE_ARCHIVE_VISIBILITY_HIDDEN_SUPPORTED=OFF
+            -DMUSTACHE_ARCHIVE_VISIBILITY_INLINES_HIDDEN_SUPPORTED=OFF
+        RESULT_VARIABLE MUSTACHE_CONFIGURE_RESULT
+        OUTPUT_VARIABLE MUSTACHE_CONFIGURE_OUTPUT
+        ERROR_VARIABLE MUSTACHE_CONFIGURE_ERROR)
+    set(MUSTACHE_CONFIGURE_RESULT "${MUSTACHE_CONFIGURE_RESULT}" PARENT_SCOPE)
+    set(MUSTACHE_CONFIGURE_LOG
+        "${MUSTACHE_CONFIGURE_OUTPUT}${MUSTACHE_CONFIGURE_ERROR}"
+        PARENT_SCOPE)
+endfunction()
+
+mustache_configure_archive_mode(auto_without_visibility AUTO)
+if(NOT MUSTACHE_CONFIGURE_RESULT EQUAL 0)
+    message(FATAL_ERROR
+        "AUTO should configure without private visibility:\n${MUSTACHE_CONFIGURE_LOG}")
+endif()
+file(READ
+    "${MUSTACHE_TEST_BINARY_ROOT}/auto_without_visibility/src/mustache_config.h"
+    MUSTACHE_AUTO_CONFIG_HEADER)
+if(MUSTACHE_AUTO_CONFIG_HEADER MATCHES
+        "#define MUSTACHE_HAVE_ARCHIVED_TEMPLATES 1")
+    message(FATAL_ERROR
+        "AUTO enabled archived templates without private visibility")
+endif()
+
+mustache_configure_archive_mode(on_without_visibility ON)
+if(MUSTACHE_CONFIGURE_RESULT EQUAL 0 OR
+        NOT MUSTACHE_CONFIGURE_LOG MATCHES
+            "archived-template support requires private C\\+\\+ symbol visibility")
+    message(FATAL_ERROR
+        "ON did not reject missing private visibility:\n${MUSTACHE_CONFIGURE_LOG}")
+endif()
+
+mustache_configure_archive_mode(legacy_true_without_visibility TRUE)
+if(MUSTACHE_CONFIGURE_RESULT EQUAL 0 OR
+        NOT MUSTACHE_CONFIGURE_LOG MATCHES
+            "archived-template support requires private C\\+\\+ symbol visibility")
+    message(FATAL_ERROR
+        "legacy TRUE was not interpreted as ON:\n${MUSTACHE_CONFIGURE_LOG}")
+endif()
+
+mustache_configure_archive_mode(legacy_false FALSE)
+if(NOT MUSTACHE_CONFIGURE_RESULT EQUAL 0)
+    message(FATAL_ERROR
+        "legacy FALSE was not interpreted as OFF:\n${MUSTACHE_CONFIGURE_LOG}")
+endif()
+file(READ
+    "${MUSTACHE_TEST_BINARY_ROOT}/legacy_false/src/mustache_config.h"
+    MUSTACHE_FALSE_CONFIG_HEADER)
+if(MUSTACHE_FALSE_CONFIG_HEADER MATCHES
+        "#define MUSTACHE_HAVE_ARCHIVED_TEMPLATES 1")
+    message(FATAL_ERROR "legacy FALSE enabled archived templates")
+endif()
+
+mustache_configure_archive_mode(invalid_value FOO)
+if(MUSTACHE_CONFIGURE_RESULT EQUAL 0 OR
+        NOT MUSTACHE_CONFIGURE_LOG MATCHES
+            "must be AUTO, ON, or OFF")
+    message(FATAL_ERROR
+        "invalid archive mode was not rejected:\n${MUSTACHE_CONFIGURE_LOG}")
+endif()

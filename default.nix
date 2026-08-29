@@ -31,7 +31,7 @@ in
     sanitizerSupport ? false,
     fuzzSupport ? false,
     clangTidySupport ? false,
-    archivedTemplateSupport ? false,
+    archivedTemplateSupport ? null,
     useSystemCista ? false,
     useSystemXxhash ? false,
     cistaBenchmarkSupport ? false,

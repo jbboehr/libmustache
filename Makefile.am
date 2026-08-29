@@ -9,6 +9,7 @@ EXTRA_DIST = \
 	README.md \
 	LICENSE.md \
 	benchmarks/CMakeLists.txt \
+	benchmarks/.clang-tidy \
 	benchmarks/ast-cache-vs-source.cpp \
 	benchmarks/ast-cache-vs-source.php \
 	benchmarks/cista-archive.cpp \
@@ -31,6 +32,7 @@ EXTRA_DIST = \
 	nix/derivation.nix \
 	scripts/check-version-consistency.sh \
 	spec/specs \
+	tests/check_archive_feature_modes.cmake \
 	tests/check_windows_exports.cmake \
 	tests/cmake-consumer/CMakeLists.txt \
 	tests/cmake-consumer/main.cpp \

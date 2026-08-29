@@ -6,8 +6,11 @@ format before Cista is entered; Cista remains responsible for native type
 compatibility, integrity, and structural validation. No `cista::*` type appears
 in the installed API.
 
-This format remains experimental and default-off. Generation 1 is pinned now so
-dependency changes and future API work cannot silently change cache bytes.
+This format remains experimental and optional. CMake and Autotools enable it
+automatically when zlib and the required private-symbol controls are available,
+while explicit require and disable modes remain available. Generation 1 is
+pinned so dependency changes and future API work cannot silently change cache
+bytes.
 
 ## Preamble layout
 

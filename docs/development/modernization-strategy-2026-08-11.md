@@ -659,17 +659,17 @@ compile-and-serialize comparison subsequently placed the selected Cista writer
 microseconds to 5.1 milliseconds. That is acceptable for the intended
 write-once, render-many lifecycle.
 
-Before crossing the PHP boundary, finish the libmustache experiment behind an
-optional, default-off `MUSTACHE_ENABLE_ARCHIVED_TEMPLATES` feature. Keep Cista
-private and expose a libmustache-owned `ArchivedTemplateView` beside the normal
-owned `Node`/`CompiledTemplate` path. Both representations should use one
-renderer algorithm through internal node-view adapters; callers must not first
-reconstruct a `Node` tree merely to render a checked archive. Complete lambda
-and inline-partial semantics, configure Cista with the pinned modern XXH3
-implementation, require `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` plus
-libmustache semantic validation, and fuzz validation and rendering before the
-one-fetch/one-render PHP/APCu experiment. XXH3 detects accidental corruption;
-it does not authenticate hostile cache contents.
+The completed libmustache experiment remains optional under
+`MUSTACHE_ENABLE_ARCHIVED_TEMPLATES`. After its native security, compatibility,
+and platform gates passed, CMake and Autotools changed the default to `AUTO`:
+zlib and private-symbol-control availability enable the feature without making
+zlib mandatory or widening the shared-library ABI. Cista remains private behind
+the libmustache-owned `ArchivedTemplateView`; owned and archived representations
+share one renderer algorithm without reconstructing a `Node` tree. The
+supported path includes lambda and inline-partial semantics, pinned modern XXH3,
+`WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY`, libmustache semantic validation,
+and archive validation/render fuzzing. XXH3 detects accidental corruption; it
+does not authenticate hostile cache contents.
 
 The implementation vendors reviewed, pinned Cista and xxHash snapshots with
 their licenses as private implementation dependencies. Their provenance and

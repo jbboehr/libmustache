@@ -330,12 +330,15 @@ A matched native writer comparison found the selected Cista format 16% to 33%
 slower than legacy compile plus serialization, or about 25 microseconds to 5.1
 milliseconds per write. That is acceptable for a write-once, render-many cache.
 
-The next slice belongs in libmustache: implement the optional, default-off
-archived-template view with the same complete semantics as owned nodes, keep
-Cista private, require versioning, deep checking, and libmustache semantic
-validation, configure Cista with the pinned modern XXH3 implementation, and
-use `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` by default before fuzzing the
-archive boundary. Only after that gate passes should php-mustache add a
+The native libmustache slice is complete. Its optional archived-template view
+has the same rendering semantics as owned nodes, keeps Cista private, requires
+versioning, deep checking, integrity, and libmustache semantic validation, and
+uses pinned modern XXH3. The archive boundary has sanitizer-backed fuzz,
+platform, installed-consumer, and export-boundary coverage. Build systems now
+default to automatic detection of zlib and the required private-symbol controls
+rather than requiring the feature.
+
+The next slice belongs in php-mustache: add a narrow experimental bridge and a
 one-fetch/one-render APCu experiment. That experiment
 must measure the actual Zend-string lifetime, alignment or aligned-copy cost,
 PHP serialization, APCu copying, payload size, peak memory, and writer cost;

@@ -123,6 +123,7 @@
             cmakeSupport = false;
             nlohmann_json = null;
             libyaml = null;
+            zlib = null;
           };
           libmustache-cmake-no-yaml = makePackage {
             cmakeSupport = true;
@@ -132,6 +133,7 @@
             cmakeSupport = true;
             nlohmann_json = null;
             libyaml = null;
+            zlib = null;
           };
           libmustache-cista-benchmark = makePackage {
             cmakeSupport = true;
@@ -151,6 +153,7 @@
             cista = null;
             xxhash = null;
             zlib = pkgs.zlib;
+            archivedTemplateSupport = false;
             cistaBenchmarkSupport = true;
             cistaBuiltinXxh3Support = true;
           };
@@ -173,7 +176,7 @@
             cista = pkgs.cista;
             xxhash = pkgs.xxhash;
             zlib = pkgs.zlib;
-            archivedTemplateSupport = true;
+            archivedTemplateSupport = null;
             useSystemCista = true;
             useSystemXxhash = true;
           };

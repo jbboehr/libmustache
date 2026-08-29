@@ -196,8 +196,10 @@ Enabling the benchmark selects Cista's native
 default. Omit either system override to use the corresponding pinned private
 snapshot in `vendor/cista` or `vendor/xxhash`; the explicit system overrides
 above reproduce the recorded nixpkgs environment. Pass
+`-DMUSTACHE_ENABLE_ARCHIVED_TEMPLATES=OFF` together with
 `-DMUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3=OFF` only to reproduce the historical
-static-version/FNV-1a comparison.
+static-version/FNV-1a comparison; the production archive selected by `AUTO`
+always uses the supported runtime-version/XXH3 policy.
 
 The 2026-08-25 checksum runs used `nice -n 10` without CPU affinity on a shared
 workstation. To reduce ordering bias, every sample rotates which security mode
@@ -470,8 +472,12 @@ render-many design decision.
 
 If the feasibility work continues, use this integration policy:
 
-- Keep archived templates optional and default off initially, under
-  `MUSTACHE_ENABLE_ARCHIVED_TEMPLATES`.
+- Keep archived templates optional under
+  `MUSTACHE_ENABLE_ARCHIVED_TEMPLATES`. The feasibility phase kept them
+  default-off; after the native security, compatibility, and platform gates
+  completed, the build default changed to `AUTO` so zlib and private-symbol
+  controls select the feature without making zlib mandatory or leaking private
+  implementation symbols.
 - Vendor reviewed and pinned Cista and xxHash snapshots as private
   implementation dependencies, together with their
   [MIT license](https://github.com/felixguendling/cista/blob/master/LICENSE),
@@ -602,9 +608,10 @@ Recommended follow-up:
 1. Document cached source as the default persistent PHP cache value.
 2. Refactor libmustache so owned nodes and an archived-template view share one
    rendering algorithm without exposing Cista types in public headers.
-3. Keep archived-template support optional and default off. Vendor a reviewed,
-   pinned Cista snapshot and license by default; consider a separately tested,
-   default-off system-package override for packagers.
+3. Keep archived-template support optional. It was default-off during the
+   feasibility phase and now defaults to dependency-based automatic detection.
+   Vendor a reviewed, pinned Cista snapshot and license by default; retain
+   separately tested, default-off system-package overrides for packagers.
 4. Retain the completed lambda, inline-partial, format-preamble, golden,
    corruption, alignment, and selected
    `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` coverage using pinned modern

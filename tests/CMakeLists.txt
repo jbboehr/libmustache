@@ -66,19 +66,19 @@ if(NOT MSVC)
         -Wno-mismatched-new-delete)
 endif()
 
-if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
+if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
     add_executable(test_cista_archive
         "${CMAKE_CURRENT_SOURCE_DIR}/../benchmarks/test-cista-archive.cpp")
     target_link_libraries(test_cista_archive PRIVATE
         mustache_cista_archive_experiment)
-    if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES OR
+    if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES OR
             MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3)
         target_compile_definitions(test_cista_archive PRIVATE
             MUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1)
     endif()
     mustache_apply_build_options(test_cista_archive)
 endif()
-if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
     add_executable(test_archived_template test_archived_template.cpp)
     target_link_libraries(test_archived_template PRIVATE mustache_static)
     mustache_apply_build_options(test_archived_template)
@@ -125,7 +125,7 @@ if(MSVC)
         COMMAND "${CMAKE_COMMAND}"
             "-DEXPORT_INSPECTOR=${MUSTACHE_EXPORT_INSPECTOR}"
             "-DMUSTACHE_DLL=$<TARGET_FILE:mustache>"
-            "-DMUSTACHE_ARCHIVED_TEMPLATES=${MUSTACHE_ENABLE_ARCHIVED_TEMPLATES}"
+            "-DMUSTACHE_ARCHIVED_TEMPLATES=${MUSTACHE_HAVE_ARCHIVED_TEMPLATES}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/check_windows_exports.cmake")
 endif()
 include("${CMAKE_CURRENT_SOURCE_DIR}/select_unix_export_format.cmake")
@@ -158,7 +158,7 @@ if(MUSTACHE_UNIX_EXPORT_FORMAT)
         COMMAND "${CMAKE_COMMAND}"
             "-DEXPORT_INSPECTOR=${MUSTACHE_UNIX_EXPORT_INSPECTOR}"
             "-DMUSTACHE_LIBRARY=$<TARGET_FILE:mustache>"
-            "-DMUSTACHE_ARCHIVED_TEMPLATES=${MUSTACHE_ENABLE_ARCHIVED_TEMPLATES}"
+            "-DMUSTACHE_ARCHIVED_TEMPLATES=${MUSTACHE_HAVE_ARCHIVED_TEMPLATES}"
             "-DMUSTACHE_OBJECT_FORMAT=${MUSTACHE_UNIX_EXPORT_FORMAT}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/check_unix_exports.cmake")
 endif()
@@ -177,12 +177,23 @@ add_test(NAME tokenizer_safety COMMAND test_tokenizer_safety)
 add_test(NAME compiled_template COMMAND test_compiled_template)
 add_test(NAME renderer_safety COMMAND test_renderer_safety)
 add_test(NAME allocation_failure COMMAND test_allocation_failure)
-if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
+if(MUSTACHE_IS_TOP_LEVEL AND NOT MSVC)
+    add_test(NAME cmake_archive_feature_modes
+        COMMAND "${CMAKE_COMMAND}"
+            "-DMUSTACHE_TEST_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
+            "-DMUSTACHE_TEST_BINARY_ROOT=${CMAKE_CURRENT_BINARY_DIR}/archive-feature-modes"
+            "-DMUSTACHE_TEST_GENERATOR=${CMAKE_GENERATOR}"
+            "-DMUSTACHE_TEST_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}"
+            "-DMUSTACHE_TEST_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}"
+            "-DMUSTACHE_TEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/check_archive_feature_modes.cmake")
+endif()
+if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
     add_test(NAME cista_archive COMMAND test_cista_archive)
     set_tests_properties(cista_archive PROPERTIES
         ENVIRONMENT "top_srcdir=${CMAKE_CURRENT_SOURCE_DIR}/..")
 endif()
-if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
     add_test(NAME archived_template COMMAND test_archived_template)
 
     # Exercise the installed shared library only when the configuration can
@@ -285,7 +296,7 @@ if(MUSTACHE_ENABLE_FUZZING)
     add_executable(fuzz_tokenizer fuzz_tokenizer.cpp)
     mustache_configure_fuzz_target(fuzz_tokenizer)
 
-    if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+    if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
         add_executable(fuzz_cista_archive fuzz_cista_archive.cpp)
         mustache_configure_fuzz_target(fuzz_cista_archive)
         target_link_libraries(fuzz_cista_archive PRIVATE
@@ -309,7 +320,7 @@ if(MUSTACHE_ENABLE_FUZZING)
         "${CMAKE_CURRENT_BINARY_DIR}/fuzz-corpus/tokenizer")
     set(MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS
         "${CMAKE_CURRENT_BINARY_DIR}/fuzz-artifacts/tokenizer")
-    if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+    if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
         set(MUSTACHE_CISTA_FUZZ_CORPUS_SOURCE
             "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus/cista_archive")
         set(MUSTACHE_CISTA_FUZZ_SEED_CORPUS
@@ -326,7 +337,7 @@ if(MUSTACHE_ENABLE_FUZZING)
         "${MUSTACHE_FUZZ_ARTIFACTS}"
         "${MUSTACHE_TOKENIZER_FUZZ_CORPUS_BINARY}"
         "${MUSTACHE_TOKENIZER_FUZZ_ARTIFACTS}")
-    if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+    if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
         file(MAKE_DIRECTORY
             "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}"
             "${MUSTACHE_CISTA_FUZZ_SCRATCH_PARENT}"
@@ -374,7 +385,7 @@ if(MUSTACHE_ENABLE_FUZZING)
         RUN_SERIAL TRUE
         TIMEOUT 30)
 
-    if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+    if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
         file(REMOVE_RECURSE "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}")
         file(MAKE_DIRECTORY "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}")
         file(COPY "${MUSTACHE_CISTA_FUZZ_CORPUS_SOURCE}/"

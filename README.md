@@ -15,7 +15,7 @@ as an ordinary C++ library.
 - A C++17 compiler and standard library with floating-point `std::to_chars`
 - nlohmann/json 3.10.5 or newer for JSON input (optional; build only)
 - libyaml for YAML input (optional)
-- zlib for experimental archived templates (optional)
+- zlib for experimental archived templates (optional; auto-detected)
 - xxHash 0.8 or newer when selecting a system xxHash installation (optional)
 - CMake 3.18 or Autoconf 2.69 with Automake and Libtool
 
@@ -61,9 +61,11 @@ cmake -S . -B build \
 The accepted values are `AUTO`, `ON`, and `OFF`. A format set to `ON` makes
 configuration fail if its dependency is unavailable.
 
-Experimental archived-template support is default-off. It uses pinned private
-Cista and xxHash snapshots by default; packagers can
-independently select system installations:
+Experimental archived-template support also defaults to `AUTO`: it is built
+when zlib and the required private-symbol controls are available, and omitted
+otherwise. Use `ON` to require both capabilities or `OFF` to disable the API
+explicitly. The feature uses pinned private Cista and xxHash snapshots by
+default; packagers can independently select system installations:
 
 ```sh
 cmake -S . -B build \
@@ -141,11 +143,13 @@ JSON and YAML support are independently auto-detected by default. Use
 `--with-json=yes` or `--with-yaml=yes` to require the corresponding dependency,
 and `--without-json` or `--without-yaml` to disable an adapter explicitly.
 
-Use `--enable-archived-templates` for the experimental archived-template API
-and tests. This selects the bundled Cista and xxHash snapshots; add
-`--with-system-cista` and/or `--with-system-xxhash` to require system
-installations instead. Use `CISTA_CFLAGS`, `XXHASH_CFLAGS` and `XXHASH_LIBS`,
-or `PKG_CONFIG_PATH` for custom locations.
+Archived-template support is auto-detected through zlib and private-symbol
+controls by default. Use `--enable-archived-templates` to require the feature
+or `--disable-archived-templates` to omit it explicitly. Enabling it selects
+the bundled Cista and xxHash snapshots; add `--with-system-cista` and/or
+`--with-system-xxhash` to require system installations instead. Use
+`CISTA_CFLAGS`, `XXHASH_CFLAGS` and `XXHASH_LIBS`, or `PKG_CONFIG_PATH` for
+custom locations.
 
 ## Nix
 
@@ -159,9 +163,12 @@ nix run .#mustachec -- -v
 The default Nix package uses Autotools; `libmustache-cmake` exercises the CMake
 packaging path. When importing `default.nix`, pass `nlohmann_json = null` or
 `libyaml = null` to omit that dependency and explicitly disable the
-corresponding adapter. Set `archivedTemplateSupport = true` to exercise the
-experimental archive implementation, and set `useSystemCista = true` only when
-supplying a non-null `cista` package; the bundled snapshot is the default.
+corresponding adapter. `archivedTemplateSupport = null` selects automatic
+detection and is the default; because the default `zlib` argument is non-null,
+the standard packages include the archived-template API. Pass
+`archivedTemplateSupport = false` or `zlib = null` to omit it, or `true` to
+require it. Set `useSystemCista = true` with automatic or explicit archive
+support and a non-null `cista` package; the bundled snapshot is the default.
 Likewise, `useSystemXxhash = true` requires a non-null `xxhash`; pass
 `xxhash = null` to exercise the bundled default.
 `cistaBenchmarkSupport` is CMake-only and requires `cmakeSupport = true`.

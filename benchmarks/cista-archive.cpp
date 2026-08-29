@@ -387,7 +387,7 @@ class ArchiveBuilder {
         ArchivePartial archived{};
         archived.name = appendString(partial.first);
         archived.root = appendNode(*partial.second);
-        graph_.partials.push_back(std::move(archived));
+        graph_.partials.push_back(archived);
       }
       return std::move(graph_);
     }
@@ -566,7 +566,7 @@ class ArchiveBuilder {
         }
         previousChild = childIndex;
       }
-      graph_.nodes[index] = std::move(archived);
+      graph_.nodes[index] = archived;
       return index;
     }
 

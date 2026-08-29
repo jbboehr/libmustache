@@ -9,7 +9,7 @@ set(MUSTACHE_SOURCES
     tokenizer.cpp
     utils.cpp
 )
-if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
     set(MUSTACHE_CISTA_ARCHIVE_SOURCE
         "${PROJECT_SOURCE_DIR}/benchmarks/cista-archive.cpp")
     set(MUSTACHE_CISTA_XXH3_SOURCE
@@ -17,13 +17,15 @@ if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
     list(APPEND MUSTACHE_SOURCES
         "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
         "${MUSTACHE_CISTA_XXH3_SOURCE}")
-    set_property(SOURCE
-        "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
-        "${MUSTACHE_CISTA_XXH3_SOURCE}"
-        APPEND PROPERTY COMPILE_OPTIONS
-            "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility=hidden>"
-            "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility-inlines-hidden>"
-    )
+    if(NOT MSVC)
+        set_property(SOURCE
+            "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
+            "${MUSTACHE_CISTA_XXH3_SOURCE}"
+            APPEND PROPERTY COMPILE_OPTIONS
+                -fvisibility=hidden
+                -fvisibility-inlines-hidden
+        )
+    endif()
     set_property(SOURCE "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
         APPEND PROPERTY COMPILE_DEFINITIONS
             CISTA_XXH3=1
@@ -68,7 +70,7 @@ if(MUSTACHE_HAVE_LIBYAML)
     list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES
         ${MUSTACHE_YAML_TARGET})
 endif()
-if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
     list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES ZLIB::ZLIB)
     if(MUSTACHE_USE_SYSTEM_XXHASH)
         list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES ${MUSTACHE_XXHASH_TARGET})
@@ -103,7 +105,7 @@ function(mustache_configure_library target)
         PRIVATE
             ${MUSTACHE_PRIVATE_DEPENDENCIES}
     )
-    if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+    if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
         target_include_directories(${target} BEFORE PRIVATE
             "${PROJECT_SOURCE_DIR}/benchmarks/cista-xxh3")
         if(MUSTACHE_USE_SYSTEM_CISTA)
@@ -129,7 +131,7 @@ set_target_properties(mustache PROPERTIES
     VERSION "${MUSTACHE_ABI_VERSION}.0.0"
     SOVERSION "${MUSTACHE_ABI_VERSION}"
 )
-if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
+if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
     # Shared consumers do not import private archive dependencies. Preserve
     # their non-system link directories in the installed library instead.
     set_property(TARGET mustache PROPERTY INSTALL_RPATH_USE_LINK_PATH TRUE)
