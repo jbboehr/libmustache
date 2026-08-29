@@ -125,6 +125,7 @@ if(MSVC)
         COMMAND "${CMAKE_COMMAND}"
             "-DEXPORT_INSPECTOR=${MUSTACHE_EXPORT_INSPECTOR}"
             "-DMUSTACHE_DLL=$<TARGET_FILE:mustache>"
+            "-DMUSTACHE_ARCHIVED_TEMPLATES=${MUSTACHE_ENABLE_ARCHIVED_TEMPLATES}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/check_windows_exports.cmake")
 endif()
 add_test(NAME utils COMMAND test_utils)

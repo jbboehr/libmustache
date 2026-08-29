@@ -23,6 +23,15 @@ enum class CistaSecurityMode {
   DeepCheckAndIntegrity,
 };
 
+#if defined(_MSC_VER) && defined(_M_IX86)
+namespace detail {
+
+//! Returns the native ArchiveGraph offset of the explicit Win32 padding field.
+std::size_t win32ArchiveGraphReservedMemberOffset() noexcept;
+
+} // namespace detail
+#endif
+
 const char * cistaSecurityModeName(CistaSecurityMode mode) noexcept;
 
 const char * cistaVersionModeName() noexcept;

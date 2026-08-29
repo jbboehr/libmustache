@@ -20,6 +20,7 @@ namespace mustache {
 
 class Data;
 class Mustache;
+class ArchivedTemplateView;
 
 //! Resource limits applied while creating or validating an archived template.
 struct ArchivedTemplateLimits {
@@ -30,6 +31,20 @@ struct ArchivedTemplateLimits {
     std::size_t maxDataPartsPerNode = 256;
     std::size_t maxDataParts = 100000;
 };
+
+//! Copies archive bytes into owned storage and validates them once.
+MUSTACHE_API ArchivedTemplateView loadArchivedTemplate(
+    const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits = ArchivedTemplateLimits());
+
+//! Copies archive bytes into owned storage and validates them once.
+MUSTACHE_API ArchivedTemplateView loadArchivedTemplate(
+    std::string_view bytes, const ArchivedTemplateLimits& limits = ArchivedTemplateLimits());
+
+//! Renders a previously validated archived template.
+MUSTACHE_API std::string render(const ArchivedTemplateView& archived, const Data& data);
+
+//! Renders a previously validated archived template with resource limits.
+MUSTACHE_API std::string render(const ArchivedTemplateView& archived, const Data& data, const RenderLimits& limits);
 
 /*! \class ArchivedTemplateView
     \brief Opaque, immutable handle over one validated archived template.
@@ -61,30 +76,18 @@ class ArchivedTemplateView {
 
     std::shared_ptr<const State> state;
 
-    friend ArchivedTemplateView loadArchivedTemplate(
+    friend MUSTACHE_API ArchivedTemplateView loadArchivedTemplate(
         const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits);
-    friend ArchivedTemplateView loadArchivedTemplate(std::string_view bytes, const ArchivedTemplateLimits& limits);
-    friend std::string render(const ArchivedTemplateView& archived, const Data& data, const RenderLimits& limits);
+    friend MUSTACHE_API ArchivedTemplateView loadArchivedTemplate(
+        std::string_view bytes, const ArchivedTemplateLimits& limits);
+    friend MUSTACHE_API std::string render(
+        const ArchivedTemplateView& archived, const Data& data, const RenderLimits& limits);
     friend class Mustache;
 };
 
 //! Serializes a Node graph using the protected archived-template format.
 MUSTACHE_API std::vector<std::uint8_t> serializeArchivedTemplate(const Node& root,
     const Node::Partials& partials = Node::Partials(), const ArchivedTemplateLimits& limits = ArchivedTemplateLimits());
-
-//! Copies archive bytes into owned storage and validates them once.
-MUSTACHE_API ArchivedTemplateView loadArchivedTemplate(
-    const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits = ArchivedTemplateLimits());
-
-//! Copies archive bytes into owned storage and validates them once.
-MUSTACHE_API ArchivedTemplateView loadArchivedTemplate(
-    std::string_view bytes, const ArchivedTemplateLimits& limits = ArchivedTemplateLimits());
-
-//! Renders a previously validated archived template.
-MUSTACHE_API std::string render(const ArchivedTemplateView& archived, const Data& data);
-
-//! Renders a previously validated archived template with resource limits.
-MUSTACHE_API std::string render(const ArchivedTemplateView& archived, const Data& data, const RenderLimits& limits);
 
 } // namespace mustache
 

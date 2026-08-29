@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 
 #include "mustache.hpp"
@@ -51,7 +52,18 @@ int main()
       "de_DE.UTF-8", "de_DE.utf8", "de_DE", "fr_FR.UTF-8", "fr_FR.utf8", "fr_FR", "de-DE", "fr-FR"};
   bool commaLocaleAvailable = false;
   int result = 0;
+#if defined(_MSC_VER)
+  char * requestedLocaleBuffer = nullptr;
+  std::size_t requestedLocaleSize = 0;
+  if (_dupenv_s(&requestedLocaleBuffer, &requestedLocaleSize, "MUSTACHE_TEST_NUMERIC_LOCALE") != 0) {
+    std::fprintf(stderr, "could not read MUSTACHE_TEST_NUMERIC_LOCALE\n");
+    return 1;
+  }
+  const std::unique_ptr<char, decltype(&std::free)> ownedRequestedLocale(requestedLocaleBuffer, &std::free);
+  const char * requestedLocale = ownedRequestedLocale.get();
+#else
   const char * requestedLocale = std::getenv("MUSTACHE_TEST_NUMERIC_LOCALE");
+#endif
   if (requestedLocale != NULL) {
     if (requestedLocale[0] == '\0') {
       std::fprintf(stderr, "MUSTACHE_TEST_NUMERIC_LOCALE must not be empty\n");

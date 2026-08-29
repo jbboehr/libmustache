@@ -496,7 +496,13 @@ Data Data::fromJSON(const char * string, const ParseLimits& limits)
   if (string == nullptr) {
     throw Exception("Missing JSON data");
   }
+#ifdef MUSTACHE_HAVE_LIBJSON
   return fromJSON(std::string_view(string), limits);
+#else
+  // Avoid MSVC diagnosing the delegated always-throwing path as unreachable under /WX.
+  static_cast<void>(limits);
+  throw Exception("JSON support is not available");
+#endif
 }
 
 Data Data::fromJSON(std::string_view string)
@@ -541,7 +547,13 @@ Data Data::fromYAML(const char * string, const ParseLimits& limits)
   if (string == nullptr) {
     throw Exception("Missing YAML data");
   }
+#ifdef MUSTACHE_HAVE_LIBYAML
   return fromYAML(std::string_view(string), limits);
+#else
+  // Avoid MSVC diagnosing the delegated always-throwing path as unreachable under /WX.
+  static_cast<void>(limits);
+  throw Exception("YAML support is not available");
+#endif
 }
 
 Data Data::fromYAML(std::string_view string)

@@ -403,6 +403,17 @@ ctest --test-dir build -C Release --output-on-failure
 cmake --install build --config Release --prefix artifacts
 ```
 
+The optional archived-template implementation is exercised on both Win32 and
+x64 with shared and static installed consumers. Enable the matching vcpkg
+manifest feature before configuring it:
+
+```bat
+vcpkg install --triplet x64-windows --x-feature=archived-templates
+cmake -S . -B build-archives -A x64 ^
+  -DCMAKE_TOOLCHAIN_FILE=C:\path\to\vcpkg\scripts\buildsystems\vcpkg.cmake ^
+  -DMUSTACHE_ENABLE_ARCHIVED_TEMPLATES=ON
+```
+
 ## Command-line use
 
 `mustachec` is a render-only command. It requires a template; when `-d` is

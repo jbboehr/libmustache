@@ -5,5 +5,13 @@
   "dependencies": [
     "nlohmann-json",
     "libyaml"
-  ]
+  ],
+  "features": {
+    "archived-templates": {
+      "description": "Dependencies for the optional archived-template implementation",
+      "dependencies": [
+        "zlib"
+      ]
+    }
+  }
 }

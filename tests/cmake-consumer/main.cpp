@@ -121,10 +121,31 @@ int main()
 
 #ifdef MUSTACHE_HAVE_ARCHIVED_TEMPLATES
   const std::vector<std::uint8_t> archiveBytes = mustache::serializeArchivedTemplate(parsed);
-  const mustache::ArchivedTemplateView archived = mustache::loadArchivedTemplate(archiveBytes);
+  mustache::ArchivedTemplateLimits archiveLimits;
+  const mustache::ArchivedTemplateView archived = mustache::loadArchivedTemplate(archiveBytes, archiveLimits);
+  const std::string_view archiveByteView(reinterpret_cast<const char *>(archiveBytes.data()), archiveBytes.size());
+  const mustache::ArchivedTemplateView archivedFromView =
+      mustache::loadArchivedTemplate(archiveByteView, archiveLimits);
+  mustache::ArchivedTemplateView archivedCopy(archived);
+  mustache::ArchivedTemplateView archivedCopyAssigned;
+  archivedCopyAssigned = archivedFromView;
+  mustache::ArchivedTemplateView archivedMoved(std::move(archivedCopy));
+  mustache::ArchivedTemplateView archivedMoveAssigned;
+  archivedMoveAssigned = std::move(archivedCopyAssigned);
+  const mustache::ArchivedTemplateView emptyArchive;
+  const bool archivedHandlesValid = static_cast<bool>(archived) && !archived.empty() &&
+      static_cast<bool>(archivedFromView) && !archivedFromView.empty() && static_cast<bool>(archivedMoved) &&
+      static_cast<bool>(archivedMoveAssigned) && emptyArchive.empty() && !static_cast<bool>(emptyArchive);
   const std::string archivedOutput = mustache.render(archived, scalar);
+  const std::string archivedLimitedOutput = mustache.render(archivedFromView, scalar, renderLimits);
+  const std::string archivedFreeOutput = mustache::render(archivedMoved, scalar);
+  const std::string archivedLimitedFreeOutput = mustache::render(archivedMoveAssigned, scalar, renderLimits);
 #else
+  const bool archivedHandlesValid = true;
   const std::string archivedOutput = "ok";
+  const std::string archivedLimitedOutput = "ok";
+  const std::string archivedFreeOutput = "ok";
+  const std::string archivedLimitedFreeOutput = "ok";
 #endif
 
   mustache::LambdaRenderContext inactiveContext;
@@ -138,7 +159,9 @@ int main()
   return decoded->type == mustache::Node::TypeRoot && decoded->children.size() == 1 &&
           decoded->children.front()->data.has_value() && *decoded->children.front()->data == "owned" &&
           nodeTemplate == "owned" && compiledOutput == "[compiled]" && lambdaOutput == "consumer-lambda" &&
-          archivedOutput == "ok" && !inactiveContext.active() && inactiveContextRejected
+          archivedHandlesValid && archivedOutput == "ok" && archivedLimitedOutput == "ok" &&
+          archivedFreeOutput == "ok" && archivedLimitedFreeOutput == "ok" && !inactiveContext.active() &&
+          inactiveContextRejected
       ? 0
       : 1;
 }

@@ -293,7 +293,17 @@ std::uint8_t hexNibble(char value)
 
 std::vector<std::uint8_t> readGoldenArchive()
 {
+#if defined(_MSC_VER)
+  char * environmentValue = nullptr;
+  std::size_t environmentValueSize = 0;
+  if (_dupenv_s(&environmentValue, &environmentValueSize, "top_srcdir") != 0) {
+    throw std::runtime_error("unable to read top_srcdir");
+  }
+  const std::unique_ptr<char, decltype(&std::free)> ownedEnvironmentValue(environmentValue, &std::free);
+  const char * topSourceDirectory = ownedEnvironmentValue.get();
+#else
   const char * topSourceDirectory = std::getenv("top_srcdir");
+#endif
   if (topSourceDirectory == nullptr || *topSourceDirectory == '\0') {
     throw std::runtime_error("top_srcdir is required to locate the golden Cista archive");
   }
@@ -568,6 +578,21 @@ template <typename Operation> void expectOperationRejected(Operation&& operation
   throw std::runtime_error(std::string("invalid Cista archive operation was accepted: ") + description);
 }
 
+void expectEqualArchives(
+    const std::vector<std::uint8_t>& first, const std::vector<std::uint8_t>& second, const char * description)
+{
+  if (first.size() != second.size()) {
+    throw std::runtime_error(
+        std::string(description) + ": sizes " + std::to_string(first.size()) + " and " + std::to_string(second.size()));
+  }
+  const auto mismatch = std::mismatch(first.begin(), first.end(), second.begin());
+  if (mismatch.first != first.end()) {
+    throw std::runtime_error(std::string(description) + " at byte " +
+        std::to_string(static_cast<std::size_t>(mismatch.first - first.begin())) + ": values " +
+        std::to_string(*mismatch.first) + " and " + std::to_string(*mismatch.second));
+  }
+}
+
 } // namespace
 
 int main()
@@ -634,8 +659,17 @@ int main()
           data, mode);
       expect(modeOutput == expected, "Cista security mode changed rendered output");
     }
-    expect(modeArchives[0] == modeArchives[1], "deep checking unexpectedly changed the serialized archive");
-    expect(modeArchives[2] == modeArchives[3], "deep checking changed the integrity-protected archive");
+#if defined(_MSC_VER) && defined(_M_IX86)
+    for (std::size_t repeat = 0; repeat < 64; ++repeat) {
+      for (std::size_t index = 0; index < securityModes.size(); ++index) {
+        expectEqualArchives(modeArchives[index],
+            mustache_benchmark::serializeCistaArchive(root, partials, securityModes[index]),
+            "Win32 archive serialization was not deterministic");
+      }
+    }
+#endif
+    expectEqualArchives(modeArchives[0], modeArchives[1], "deep checking unexpectedly changed the serialized archive");
+    expectEqualArchives(modeArchives[2], modeArchives[3], "deep checking changed the integrity-protected archive");
     expect(modeArchives[2].size() > modeArchives[0].size(), "integrity mode did not add archive framing");
     expect(mustache_benchmark::renderCistaArchive(
                std::string_view(reinterpret_cast<const char *>(modeArchives[0].data()), modeArchives[0].size()), data,
@@ -897,6 +931,39 @@ int main()
     testProtectedArchiveVectorValidation(modeArchives[2], data);
 
     std::vector<std::uint8_t> unprotectedMutation = modeArchives[0];
+#if defined(_MSC_VER) && defined(_M_IX86)
+    const std::size_t win32ArchiveGraphReservedMemberOffset =
+        mustache_benchmark::detail::win32ArchiveGraphReservedMemberOffset();
+    const std::size_t win32ArchiveGraphReservedOffset = archiveGraphOffset + win32ArchiveGraphReservedMemberOffset;
+    for (std::size_t offset = 0; offset < sizeof(std::uint32_t); ++offset) {
+      expect(unprotectedMutation.at(win32ArchiveGraphReservedOffset + offset) == 0,
+          "Win32 archive graph reserved bytes were not initialized");
+    }
+    unprotectedMutation.at(win32ArchiveGraphReservedOffset) = 1;
+    expectOperationRejected(
+        [&unprotectedMutation, &data]() {
+          (void)mustache_benchmark::renderCistaArchive(
+              std::string_view(reinterpret_cast<const char *>(unprotectedMutation.data()), unprotectedMutation.size()),
+              data, mustache_benchmark::CistaSecurityMode::Neither);
+        },
+        "Win32 graph reserved bytes without integrity");
+
+    constexpr std::size_t protectedArchiveGraphOffset = archiveGraphOffset + 8;
+    const std::size_t protectedWin32ArchiveGraphReservedOffset =
+        protectedArchiveGraphOffset + win32ArchiveGraphReservedMemberOffset;
+    for (std::size_t offset = 0; offset < sizeof(std::uint32_t); ++offset) {
+      expect(modeArchives[2].at(protectedWin32ArchiveGraphReservedOffset + offset) == 0,
+          "protected Win32 archive graph reserved bytes were not initialized");
+    }
+    expectProtectedMutationRejected(
+        modeArchives[2], protectedArchiveGraphOffset, data,
+        [protectedWin32ArchiveGraphReservedOffset](std::vector<std::uint8_t> * mutated) {
+          mutated->at(protectedWin32ArchiveGraphReservedOffset) = 1;
+        },
+        "Win32 graph reserved bytes with repaired integrity");
+
+    unprotectedMutation = modeArchives[0];
+#endif
     unprotectedMutation.at(archiveGraphOffset) ^= std::uint8_t{0x80};
     expectOperationRejected(
         [&unprotectedMutation, &data]() {
