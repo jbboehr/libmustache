@@ -128,6 +128,40 @@ if(MSVC)
             "-DMUSTACHE_ARCHIVED_TEMPLATES=${MUSTACHE_ENABLE_ARCHIVED_TEMPLATES}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/check_windows_exports.cmake")
 endif()
+include("${CMAKE_CURRENT_SOURCE_DIR}/select_unix_export_format.cmake")
+add_test(NAME unix_export_platform
+    COMMAND "${CMAKE_COMMAND}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/verify_unix_export_platform.cmake")
+mustache_select_unix_export_format(MUSTACHE_UNIX_EXPORT_FORMAT
+    "${CMAKE_SYSTEM_NAME}" "${APPLE}" "${UNIX}")
+if(MUSTACHE_UNIX_EXPORT_FORMAT)
+    if(CMAKE_NM AND EXISTS "${CMAKE_NM}")
+        set(MUSTACHE_UNIX_EXPORT_INSPECTOR "${CMAKE_NM}")
+    else()
+        set(MUSTACHE_UNIX_NM_NAMES)
+        if(CMAKE_NM AND NOT IS_ABSOLUTE "${CMAKE_NM}")
+            list(APPEND MUSTACHE_UNIX_NM_NAMES "${CMAKE_NM}")
+        endif()
+        if(CMAKE_CXX_COMPILER_TARGET)
+            list(APPEND MUSTACHE_UNIX_NM_NAMES
+                "${CMAKE_CXX_COMPILER_TARGET}-nm")
+        endif()
+        list(APPEND MUSTACHE_UNIX_NM_NAMES llvm-nm nm)
+        find_program(MUSTACHE_UNIX_EXPORT_INSPECTOR
+            NAMES ${MUSTACHE_UNIX_NM_NAMES})
+    endif()
+    if(NOT MUSTACHE_UNIX_EXPORT_INSPECTOR)
+        message(FATAL_ERROR
+            "nm is required to audit the Unix shared-library export boundary")
+    endif()
+    add_test(NAME unix_exports
+        COMMAND "${CMAKE_COMMAND}"
+            "-DEXPORT_INSPECTOR=${MUSTACHE_UNIX_EXPORT_INSPECTOR}"
+            "-DMUSTACHE_LIBRARY=$<TARGET_FILE:mustache>"
+            "-DMUSTACHE_ARCHIVED_TEMPLATES=${MUSTACHE_ENABLE_ARCHIVED_TEMPLATES}"
+            "-DMUSTACHE_OBJECT_FORMAT=${MUSTACHE_UNIX_EXPORT_FORMAT}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/check_unix_exports.cmake")
+endif()
 add_test(NAME utils COMMAND test_utils)
 add_test(NAME misc COMMAND test_misc)
 add_test(NAME data_behavior COMMAND test_data_behavior)

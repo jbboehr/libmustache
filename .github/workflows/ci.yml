@@ -252,6 +252,7 @@ jobs:
           cmake -S . -B build-cmake -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/libmustache" \
+            -DMUSTACHE_ENABLE_ARCHIVED_TEMPLATES=ON \
             -DMUSTACHE_WARNINGS_AS_ERRORS=ON
           cmake --build build-cmake --parallel
           ctest --test-dir build-cmake \

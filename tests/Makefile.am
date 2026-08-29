@@ -73,9 +73,12 @@ endif
 EXTRA_DIST = \
 	CMakeLists.txt \
 	check_installed_shared_consumer.cmake \
+	check_unix_exports.cmake \
 	run_fuzzer_smoke.cmake \
 	run_spec_crlf.cmake \
+	select_unix_export_format.cmake \
 	verify_fuzzer_smoke_safety.cmake \
+	verify_unix_export_platform.cmake \
 	fixtures/cista-archive-v1-x86_64-le-itanium.hex \
 	fuzz_node_unserialize.cpp \
 	fuzz_tokenizer.cpp \
