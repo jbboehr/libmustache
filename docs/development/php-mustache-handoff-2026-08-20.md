@@ -69,11 +69,11 @@ as a release commitment.
   require complete canonical input.
 - Follow the recorded [cache benchmark](ast-cache-benchmark-2026-08-22.md):
   persist source today and keep checked legacy reads only for the compatibility
-  window below. A Cista direct-view prototype passed the native performance
-  threshold, but its measurements did not enable Cista's deep-check or
-  integrity modes. It is not a production format unless a hardened native
-  rerun and a one-fetch/one-render PHP/APCu benchmark both pass and the
-  remaining semantic, compatibility, and security work is completed.
+  window below. The archived-template view subsequently passed the hardened
+  native performance, semantic, compatibility, fuzzing, and security gates
+  with versioning, deep checking, integrity, and modern XXH3 enabled. Do not
+  make archived bytes the default PHP cache value unless the remaining
+  one-fetch/one-render PHP/APCu benchmark also passes.
 - Keep Cista entirely inside libmustache. The extension should receive a
   libmustache-owned `ArchivedTemplateView`, not include Cista headers or expose
   Cista types in PHP-facing implementation interfaces. Ordinary inputs should
