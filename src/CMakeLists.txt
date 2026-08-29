@@ -10,16 +10,43 @@ set(MUSTACHE_SOURCES
     utils.cpp
 )
 if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
-    list(APPEND MUSTACHE_SOURCES
-        "${PROJECT_SOURCE_DIR}/benchmarks/cista-archive.cpp"
+    set(MUSTACHE_CISTA_ARCHIVE_SOURCE
+        "${PROJECT_SOURCE_DIR}/benchmarks/cista-archive.cpp")
+    set(MUSTACHE_CISTA_XXH3_SOURCE
         "${PROJECT_SOURCE_DIR}/benchmarks/cista-xxh3.cpp")
+    list(APPEND MUSTACHE_SOURCES
+        "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
+        "${MUSTACHE_CISTA_XXH3_SOURCE}")
     set_property(SOURCE
-        "${PROJECT_SOURCE_DIR}/benchmarks/cista-archive.cpp"
-        "${PROJECT_SOURCE_DIR}/benchmarks/cista-xxh3.cpp"
+        "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
+        "${MUSTACHE_CISTA_XXH3_SOURCE}"
         APPEND PROPERTY COMPILE_OPTIONS
             "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility=hidden>"
             "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility-inlines-hidden>"
     )
+    set_property(SOURCE "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
+        APPEND PROPERTY COMPILE_DEFINITIONS
+            CISTA_XXH3=1
+            MUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1)
+    if(MSVC)
+        set_property(SOURCE "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
+            APPEND PROPERTY COMPILE_OPTIONS /UCISTA_FMT)
+    else()
+        set_property(SOURCE "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
+            APPEND PROPERTY COMPILE_OPTIONS -UCISTA_FMT)
+    endif()
+    if(NOT MUSTACHE_USE_SYSTEM_CISTA)
+        set_property(SOURCE "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
+            APPEND PROPERTY COMPILE_DEFINITIONS
+                MUSTACHE_USE_VENDORED_CISTA=1)
+    endif()
+    if(NOT MUSTACHE_USE_SYSTEM_XXHASH)
+        set_property(SOURCE "${MUSTACHE_CISTA_XXH3_SOURCE}"
+            APPEND PROPERTY COMPILE_DEFINITIONS
+                XXH_IMPLEMENTATION=1
+                XXH_STATIC_LINKING_ONLY=1
+                XXH_NAMESPACE=MUSTACHE_CISTA_XXH_)
+    endif()
 endif()
 set(MUSTACHE_PRIVATE_HEADERS
     render_engine.hpp
@@ -43,10 +70,6 @@ if(MUSTACHE_HAVE_LIBYAML)
 endif()
 if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
     list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES ZLIB::ZLIB)
-    if(MUSTACHE_USE_SYSTEM_CISTA)
-        list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES
-            "$<BUILD_INTERFACE:${MUSTACHE_CISTA_TARGET}>")
-    endif()
     if(MUSTACHE_USE_SYSTEM_XXHASH)
         list(APPEND MUSTACHE_PRIVATE_DEPENDENCIES ${MUSTACHE_XXHASH_TARGET})
     endif()
@@ -83,27 +106,16 @@ function(mustache_configure_library target)
     if(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES)
         target_include_directories(${target} BEFORE PRIVATE
             "${PROJECT_SOURCE_DIR}/benchmarks/cista-xxh3")
-        target_compile_definitions(${target} PRIVATE
-            CISTA_XXH3=1
-            MUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1)
-        if(MSVC)
-            target_compile_options(${target} PRIVATE /UCISTA_FMT)
+        if(MUSTACHE_USE_SYSTEM_CISTA)
+            target_include_directories(${target} SYSTEM PRIVATE
+                "$<TARGET_PROPERTY:${MUSTACHE_CISTA_TARGET},INTERFACE_INCLUDE_DIRECTORIES>")
         else()
-            target_compile_options(${target} PRIVATE -UCISTA_FMT)
-        endif()
-        if(NOT MUSTACHE_USE_SYSTEM_CISTA)
             target_include_directories(${target} SYSTEM PRIVATE
                 "${PROJECT_SOURCE_DIR}/vendor/cista")
-            target_compile_definitions(${target} PRIVATE
-                MUSTACHE_USE_VENDORED_CISTA=1)
         endif()
         if(NOT MUSTACHE_USE_SYSTEM_XXHASH)
             target_include_directories(${target} SYSTEM PRIVATE
                 "${PROJECT_SOURCE_DIR}/vendor/xxhash")
-            target_compile_definitions(${target} PRIVATE
-                XXH_IMPLEMENTATION=1
-                XXH_STATIC_LINKING_ONLY=1
-                XXH_NAMESPACE=MUSTACHE_CISTA_XXH_)
         endif()
     endif()
     mustache_apply_build_options(${target})

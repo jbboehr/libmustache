@@ -2,9 +2,10 @@
 #define MUSTACHE_EXPORT_HPP
 
 /*
- * Public symbol visibility for the Windows DLL. Static consumers must define
- * MUSTACHE_STATIC_DEFINE; the exported CMake static target does this
- * automatically. The shared-library build defines MUSTACHE_BUILDING_LIBRARY.
+ * Public shared-library symbol visibility. Windows uses DLL import/export;
+ * GCC and Clang override the hidden implementation default for public APIs.
+ * Static consumers must define MUSTACHE_STATIC_DEFINE; the exported CMake
+ * static target does this automatically.
  */
 #if defined(_WIN32) || defined(__CYGWIN__)
 #if defined(MUSTACHE_STATIC_DEFINE)

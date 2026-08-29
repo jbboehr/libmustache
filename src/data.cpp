@@ -8,6 +8,7 @@
 #include <charconv>
 #include <cmath>
 #include <limits>
+#include <system_error>
 #include <unordered_set>
 #include <utility>
 #include <variant>

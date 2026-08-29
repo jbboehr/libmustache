@@ -343,6 +343,9 @@ AS_IF([test "x$with_system_xxhash" = "xyes" &&
 AC_ARG_VAR([CISTA_CFLAGS],
     [C++ preprocessor flags for a system Cista installation])
 AS_IF([test "x$enable_archived_templates" = "xyes"], [
+    AS_IF([test "x$mustache_cv_cxx_visibility_hidden" != "xyes"], [
+        AC_MSG_ERROR([archived-template support requires private C++ symbol visibility])
+    ])
     PKG_CHECK_MODULES([ZLIB], [zlib])
     MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE="$MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE zlib"
 
