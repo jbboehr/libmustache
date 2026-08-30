@@ -133,6 +133,15 @@ set_target_properties(mustache PROPERTIES
     VERSION "${MUSTACHE_ABI_VERSION}.0.0"
     SOVERSION "${MUSTACHE_ABI_VERSION}"
 )
+if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES AND
+        CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(MUSTACHE_ARCHIVE_PRIVATE_SYMBOLS_MAP
+        "${CMAKE_CURRENT_SOURCE_DIR}/archive/private_symbols.map")
+    target_link_options(mustache PRIVATE
+        "LINKER:--version-script=${MUSTACHE_ARCHIVE_PRIVATE_SYMBOLS_MAP}")
+    set_property(TARGET mustache APPEND PROPERTY LINK_DEPENDS
+        "${MUSTACHE_ARCHIVE_PRIVATE_SYMBOLS_MAP}")
+endif()
 if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES AND MUSTACHE_USE_SYSTEM_XXHASH)
     # Shared consumers do not import the private xxHash dependency. Preserve a
     # non-system link directory in the installed library instead.

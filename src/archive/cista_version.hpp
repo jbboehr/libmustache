@@ -109,7 +109,11 @@ template <typename Type> cista::hash_t archiveCanonicalTypeHash() noexcept
   const auto removeAll = [&canonicalName, &canonicalSize](std::string_view removed) noexcept {
     std::size_t position = 0;
     while (position + removed.size() <= canonicalSize) {
-      if (std::equal(removed.begin(), removed.end(), canonicalName.begin() + position)) {
+      std::size_t matched = 0;
+      while (matched < removed.size() && canonicalName[position + matched] == removed[matched]) {
+        ++matched;
+      }
+      if (matched == removed.size()) {
         for (std::size_t source = position + removed.size(); source < canonicalSize; ++source) {
           canonicalName[source - removed.size()] = canonicalName[source];
         }

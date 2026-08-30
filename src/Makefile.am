@@ -1,5 +1,5 @@
 
-EXTRA_DIST = CMakeLists.txt stack.cpp
+EXTRA_DIST = CMakeLists.txt stack.cpp archive/private_symbols.map
 CLEANFILES = mustache_config.h
 
 # include_HEADERS = mustache.hpp mustache_config.h
@@ -97,11 +97,14 @@ libmustache_la_SOURCES = \
 	utils.hpp
 
 libmustache_la_LIBADD = $(YAML_LIBS)
+libmustache_la_DEPENDENCIES =
 if MUSTACHE_JSON_ENABLED
 libmustache_la_LIBADD += libmustache_json_adapter.la
+libmustache_la_DEPENDENCIES += libmustache_json_adapter.la
 endif
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
 libmustache_la_LIBADD += libmustache_archive_adapter.la
+libmustache_la_DEPENDENCIES += libmustache_archive_adapter.la
 if MUSTACHE_SYSTEM_XXHASH
 libmustache_la_LIBADD += $(XXHASH_LIBS)
 endif
@@ -111,6 +114,12 @@ endif
 libmustache_la_LDFLAGS = \
 	-no-undefined \
 	-version-info 6:0:0
+if MUSTACHE_ARCHIVE_ELF_EXPORT_BOUNDARY
+libmustache_la_LDFLAGS += \
+	-Wl,--version-script=$(top_srcdir)/src/archive/private_symbols.map
+libmustache_la_DEPENDENCIES += \
+	$(top_srcdir)/src/archive/private_symbols.map
+endif
 
 AM_CXXFLAGS = @MUSTACHE_CXXFLAGS@
 AM_CPPFLAGS = \

@@ -436,6 +436,14 @@ AM_CONDITIONAL([MUSTACHE_ZLIB_AVAILABLE],
     [test "x$mustache_have_zlib" = "xyes"])
 AM_CONDITIONAL([MUSTACHE_ARCHIVED_TEMPLATES_ENABLED],
     [test "x$enable_archived_templates" = "xyes"])
+mustache_archive_elf_export_boundary=no
+AS_IF([test "x$enable_archived_templates" = "xyes"], [
+    AS_CASE([$host_os], [linux*], [
+        mustache_archive_elf_export_boundary=yes
+    ])
+])
+AM_CONDITIONAL([MUSTACHE_ARCHIVE_ELF_EXPORT_BOUNDARY],
+    [test "x$mustache_archive_elf_export_boundary" = "xyes"])
 AS_IF([test "x$enable_archived_templates" = "xyes"], [
     AC_DEFINE([HAVE_ARCHIVED_TEMPLATES], [1],
         [Define if archived-template support is enabled])
