@@ -46,6 +46,41 @@ struct CompiledPartialSource {
 
 namespace {
 
+enum class ArchiveFailureReason {
+  InvalidArchive,
+  UnsupportedFormat,
+  LimitExceeded,
+};
+
+enum class ArchiveFailureContext {
+  Loading,
+  Writing,
+};
+
+class ArchiveReadException final : public mustache::Exception {
+  public:
+    ArchiveReadException(ArchiveFailureReason reason, const std::string& desc) :
+        mustache::Exception(desc),
+        reason_(reason)
+    {}
+
+    ArchiveFailureReason reason() const noexcept
+    {
+      return reason_;
+    }
+
+  private:
+    ArchiveFailureReason reason_;
+};
+
+[[noreturn]] void failArchive(ArchiveFailureContext context, ArchiveFailureReason reason, const char * message)
+{
+  if (context == ArchiveFailureContext::Loading) {
+    throw ArchiveReadException(reason, message);
+  }
+  throw mustache::Exception(message);
+}
+
 constexpr std::size_t archivePreambleSize = 24;
 constexpr std::array<std::uint8_t, 8> archivePreambleMagic = {'M', 'U', 'S', 'T', 'A', 'R', 'C', 0};
 constexpr std::uint64_t archiveFormatGeneration = 2;
@@ -152,26 +187,31 @@ template <cista::mode Mode>
 std::string_view readArchivePreamble(std::string_view bytes, const CistaArchiveLimits& limits)
 {
   if (bytes.empty()) {
-    throw mustache::Exception("Empty Cista archive");
+    failArchive(ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Empty Cista archive");
   }
   if (bytes.size() > limits.maxArchiveBytes) {
-    throw mustache::Exception("Cista archive input byte limit exceeded");
+    failArchive(
+        ArchiveFailureContext::Loading, ArchiveFailureReason::LimitExceeded, "Cista archive input byte limit exceeded");
   }
   if (bytes.size() < archivePreambleSize) {
-    throw mustache::Exception("Truncated Cista archive preamble");
+    failArchive(
+        ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Truncated Cista archive preamble");
   }
   if (std::memcmp(bytes.data(), archivePreambleMagic.data(), archivePreambleMagic.size()) != 0) {
-    throw mustache::Exception("Invalid Cista archive preamble magic");
+    failArchive(
+        ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Invalid Cista archive preamble magic");
   }
   if (readLittleEndian<std::uint64_t>(bytes, archiveFormatGenerationOffset) != archiveFormatGeneration) {
-    throw mustache::Exception("Unsupported libmustache archive format generation");
+    failArchive(ArchiveFailureContext::Loading, ArchiveFailureReason::UnsupportedFormat,
+        "Unsupported libmustache archive format generation");
   }
   if (readLittleEndian<std::uint64_t>(bytes, archiveCompatibilityFingerprintOffset) !=
       archiveCompatibilityFingerprint<Mode>()) {
-    throw mustache::Exception("Unsupported libmustache archive compatibility");
+    failArchive(ArchiveFailureContext::Loading, ArchiveFailureReason::UnsupportedFormat,
+        "Unsupported libmustache archive compatibility");
   }
   if (bytes.size() == archivePreambleSize) {
-    throw mustache::Exception("Empty Cista archive payload");
+    failArchive(ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Empty Cista archive payload");
   }
   return bytes.substr(archivePreambleSize);
 }
@@ -188,24 +228,24 @@ template <cista::mode Mode> std::uint64_t archiveTypeVersion() noexcept
     // Cista's runtime helper allocates a std::map. Reproduce its canonical
     // type walk with fixed storage so the public noexcept tag remains safe.
     return archiveRuntimeTypeVersion();
-  }
-  if constexpr (cista::is_mode_enabled(Mode, cista::mode::WITH_STATIC_VERSION)) {
+  } else if constexpr (cista::is_mode_enabled(Mode, cista::mode::WITH_STATIC_VERSION)) {
     return static_cast<std::uint64_t>(cista::static_type_hash<ArchiveGraph>());
+  } else {
+    return 0;
   }
-  return 0;
 }
 
-template <cista::mode Mode> void validateArchiveTypeVersion(std::string_view payload)
+template <cista::mode Mode> void validateArchiveTypeVersion(std::string_view payload, ArchiveFailureContext context)
 {
   if constexpr (cista::is_mode_enabled(Mode, cista::mode::WITH_VERSION) ||
       cista::is_mode_enabled(Mode, cista::mode::WITH_STATIC_VERSION)) {
     if (payload.size() < sizeof(cista::hash_t)) {
-      throw mustache::Exception("Truncated Cista archive type version");
+      failArchive(context, ArchiveFailureReason::InvalidArchive, "Truncated Cista archive type version");
     }
     cista::hash_t serializedVersion = 0;
     std::memcpy(&serializedVersion, payload.data(), sizeof(serializedVersion));
     if (static_cast<std::uint64_t>(cista::convert_endian<Mode>(serializedVersion)) != archiveTypeVersion<Mode>()) {
-      throw mustache::Exception("Unsupported Cista archive type version");
+      failArchive(context, ArchiveFailureReason::UnsupportedFormat, "Unsupported Cista archive type version");
     }
   }
 }
@@ -358,7 +398,8 @@ template <typename Field> Field readNativeArchiveField(std::string_view payload,
 {
   static_assert(std::is_trivially_copyable_v<Field>, "serialized Cista fields must be trivially copyable");
   if (offset > payload.size() || sizeof(Field) > payload.size() - offset) {
-    throw mustache::Exception("Truncated Cista archive graph header");
+    failArchive(
+        ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Truncated Cista archive graph header");
   }
   Field value{};
   std::memcpy(&value, payload.data() + offset, sizeof(value));
@@ -389,16 +430,19 @@ void validateSerializedVector(std::string_view payload, std::size_t graphOffset,
       payload, serializedVectorOffset + cista_member_offset(Vector, self_allocated_));
 
   if (selfAllocated != 0 || allocatedSizeField != usedSizeField) {
-    throw mustache::Exception("Invalid Cista archive vector header");
+    failArchive(
+        ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Invalid Cista archive vector header");
   }
   if (relativeOffset == cista::NULLPTR_OFFSET) {
     if (usedSizeField != 0) {
-      throw mustache::Exception("Invalid Cista archive null vector");
+      failArchive(
+          ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Invalid Cista archive null vector");
     }
     return;
   }
   if (usedSizeField == 0) {
-    throw mustache::Exception("Invalid Cista archive empty vector pointer");
+    failArchive(ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive,
+        "Invalid Cista archive empty vector pointer");
   }
 
   std::size_t dataOffset = 0;
@@ -406,27 +450,32 @@ void validateSerializedVector(std::string_view payload, std::size_t graphOffset,
     const std::uintmax_t magnitude =
         static_cast<std::uintmax_t>(-(relativeOffset + 1)) + static_cast<std::uintmax_t>(1);
     if (magnitude > pointerOffset) {
-      throw mustache::Exception("Invalid Cista archive vector pointer");
+      failArchive(
+          ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Invalid Cista archive vector pointer");
     }
     dataOffset = pointerOffset - static_cast<std::size_t>(magnitude);
   } else {
     const std::uintmax_t distance = static_cast<std::uintmax_t>(relativeOffset);
     if (distance > payload.size() - pointerOffset) {
-      throw mustache::Exception("Invalid Cista archive vector pointer");
+      failArchive(
+          ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Invalid Cista archive vector pointer");
     }
     dataOffset = pointerOffset + static_cast<std::size_t>(distance);
   }
 
   const std::size_t usedSize = static_cast<std::size_t>(usedSizeField);
   if (usedSize > std::numeric_limits<std::size_t>::max() / sizeof(Element)) {
-    throw mustache::Exception("Invalid Cista archive vector size");
+    failArchive(
+        ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Invalid Cista archive vector size");
   }
   const std::size_t byteSize = usedSize * sizeof(Element);
   if (dataOffset > payload.size() || byteSize > payload.size() - dataOffset) {
-    throw mustache::Exception("Invalid Cista archive vector range");
+    failArchive(
+        ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Invalid Cista archive vector range");
   }
   if (reinterpret_cast<std::uintptr_t>(payload.data() + dataOffset) % alignof(Element) != 0) {
-    throw mustache::Exception("Invalid Cista archive vector alignment");
+    failArchive(
+        ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Invalid Cista archive vector alignment");
   }
 }
 
@@ -436,7 +485,8 @@ template <cista::mode Mode> void validateArchiveGraphLayout(std::string_view pay
   static_assert(graphOffsetField >= 0, "Cista graph offset must be non-negative");
   constexpr std::size_t graphOffset = static_cast<std::size_t>(graphOffsetField);
   if (graphOffset > payload.size() || sizeof(ArchiveGraph) > payload.size() - graphOffset) {
-    throw mustache::Exception("Truncated Cista archive graph header");
+    failArchive(
+        ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Truncated Cista archive graph header");
   }
   validateSerializedVector<ArchiveNode>(payload, graphOffset, cista_member_offset(ArchiveGraph, nodes));
   validateSerializedVector<ArchivePartial>(payload, graphOffset, cista_member_offset(ArchiveGraph, partials));
@@ -760,33 +810,38 @@ class ArchiveBuilder {
 
 class ArchiveValidator {
   public:
-    ArchiveValidator(const ArchiveGraph& graph, const CistaArchiveLimits& limits, std::size_t inputBytes = 0) :
+    ArchiveValidator(const ArchiveGraph& graph, const CistaArchiveLimits& limits, std::size_t inputBytes = 0,
+        ArchiveFailureContext context = ArchiveFailureContext::Writing) :
         graph_(graph),
         limits_(limits),
         inputBytes_(inputBytes),
+        context_(context),
         nodes_(0),
         dataParts_(0)
     {}
 
     void validate()
     {
-      if (graph_.magic != archiveGraphMagic || graph_.version != archiveSchemaVersion || graph_.nodes.empty()) {
-        throw mustache::Exception("Invalid Cista archive header");
+      if (graph_.magic != archiveGraphMagic || graph_.nodes.empty()) {
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive header");
+      }
+      if (graph_.version != archiveSchemaVersion) {
+        fail(ArchiveFailureReason::UnsupportedFormat, "Unsupported Cista archive schema version");
       }
 #if defined(_MSC_VER) && defined(_M_IX86)
       if (graph_.reserved != 0) {
-        throw mustache::Exception("Invalid Cista archive reserved bytes");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive reserved bytes");
       }
 #endif
       if (graph_.nodes.size() > limits_.maxNodes) {
-        throw mustache::Exception("Cista archive node count limit exceeded");
+        fail(ArchiveFailureReason::LimitExceeded, "Cista archive node count limit exceeded");
       }
       states_.assign(graph_.nodes.size(), 0);
       if (inputBytes_ != 0 && graph_.serializedSize != inputBytes_) {
-        throw mustache::Exception("Invalid Cista archive encoded length");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive encoded length");
       }
       if (graph_.strings.size() > limits_.maxTotalStringBytes) {
-        throw mustache::Exception("Cista archive string byte limit exceeded");
+        fail(ArchiveFailureReason::LimitExceeded, "Cista archive string byte limit exceeded");
       }
       validateRoot(graph_.root);
       std::string_view previousName;
@@ -794,25 +849,30 @@ class ArchiveValidator {
       for (const ArchivePartial& partial : graph_.partials) {
         const std::string_view name = validateString(partial.name);
         if (name.empty()) {
-          throw mustache::Exception("Invalid empty Cista archive partial name");
+          fail(ArchiveFailureReason::InvalidArchive, "Invalid empty Cista archive partial name");
         }
         if (hasPreviousName && !(previousName < name)) {
-          throw mustache::Exception("Cista archive partial names are not canonical");
+          fail(ArchiveFailureReason::InvalidArchive, "Cista archive partial names are not canonical");
         }
         previousName = name;
         hasPreviousName = true;
         validatePartial(partial.root);
       }
       if (nodes_ != graph_.nodes.size()) {
-        throw mustache::Exception("Unreachable Cista archive node");
+        fail(ArchiveFailureReason::InvalidArchive, "Unreachable Cista archive node");
       }
     }
 
   private:
+    [[noreturn]] void fail(ArchiveFailureReason reason, const char * message) const
+    {
+      failArchive(context_, reason, message);
+    }
+
     std::string_view validateString(const ArchiveSlice& value) const
     {
       if (value.offset > graph_.strings.size() || value.length > graph_.strings.size() - value.offset) {
-        throw mustache::Exception("Invalid Cista archive string range");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive string range");
       }
       return archiveSliceView(graph_, value);
     }
@@ -820,10 +880,10 @@ class ArchiveValidator {
     void validateRoot(std::uint32_t index)
     {
       if (index >= graph_.nodes.size() || graph_.nodes[index].type != mustache::Node::TypeRoot) {
-        throw mustache::Exception("Invalid Cista archive root");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive root");
       }
       if (graph_.nodes[index].nextSibling != invalidIndex) {
-        throw mustache::Exception("Invalid Cista archive root sibling");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive root sibling");
       }
       validateNode(index, 0, false);
     }
@@ -831,10 +891,10 @@ class ArchiveValidator {
     void validatePartial(std::uint32_t index)
     {
       if (index >= graph_.nodes.size()) {
-        throw mustache::Exception("Invalid Cista archive partial root");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive partial root");
       }
       if (graph_.nodes[index].nextSibling != invalidIndex) {
-        throw mustache::Exception("Invalid Cista archive partial root sibling");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive partial root sibling");
       }
       validateNode(index, 0, false);
     }
@@ -842,23 +902,23 @@ class ArchiveValidator {
     void validateNode(std::uint32_t index, std::size_t depth, bool partialIndentationMetadata)
     {
       if (index >= graph_.nodes.size()) {
-        throw mustache::Exception("Invalid Cista archive node index");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive node index");
       }
       if (depth >= limits_.maxNestingDepth || depth >= renderNestingCeiling) {
-        throw mustache::Exception("Cista archive nesting limit exceeded");
+        fail(ArchiveFailureReason::LimitExceeded, "Cista archive nesting limit exceeded");
       }
       if (nodes_ >= limits_.maxNodes) {
-        throw mustache::Exception("Cista archive node count limit exceeded");
+        fail(ArchiveFailureReason::LimitExceeded, "Cista archive node count limit exceeded");
       }
       if (states_[index] != 0) {
-        throw mustache::Exception("Cista archive nodes must form disjoint trees");
+        fail(ArchiveFailureReason::InvalidArchive, "Cista archive nodes must form disjoint trees");
       }
       states_[index] = 1;
       ++nodes_;
 
       const ArchiveNode& node = graph_.nodes[index];
       if (!isSerializableType(static_cast<NodeTypeValue>(node.type))) {
-        throw mustache::Exception("Invalid Cista archive node type");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive node type");
       }
       const mustache::Node::Type type = static_cast<mustache::Node::Type>(node.type);
       const std::uint16_t validFlags = static_cast<std::uint16_t>(
@@ -871,28 +931,28 @@ class ArchiveValidator {
           ((node.flags & mustache::Node::FlagPartialIndent) != 0 &&
               (type != mustache::Node::TypeOutput ||
                   node.flags != (mustache::Node::FlagLambdaOnly | mustache::Node::FlagPartialIndent)))) {
-        throw mustache::Exception("Invalid Cista archive node flags");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive node flags");
       }
       if ((node.flags & mustache::Node::FlagPartialIndent) != 0 && !partialIndentationMetadata) {
-        throw mustache::Exception("Invalid Cista archive partial indentation metadata");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive partial indentation metadata");
       }
       if ((node.presence & ~(HasData | HasStartSequence | HasStopSequence)) != 0) {
-        throw mustache::Exception("Invalid Cista archive node presence bits");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive node presence bits");
       }
       if (node.reserved0 != 0 || node.reserved1 != 0 || node.reserved2 != 0) {
-        throw mustache::Exception("Invalid Cista archive reserved bytes");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive reserved bytes");
       }
 
       const bool hasData = (node.presence & HasData) != 0;
       if ((type == mustache::Node::TypeRoot && hasData) || (type != mustache::Node::TypeRoot && !hasData)) {
-        throw mustache::Exception("Invalid Cista archive node data");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive node data");
       }
       const std::string_view data = validateString(node.data);
       if (!hasData && (node.data.offset != 0 || node.data.length != 0)) {
-        throw mustache::Exception("Invalid absent Cista archive node data");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid absent Cista archive node data");
       }
       if (node.firstChild != invalidIndex && !typeAllowsChildren(type)) {
-        throw mustache::Exception("Invalid Cista archive node children");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive node children");
       }
 
       const bool hasStart = (node.presence & HasStartSequence) != 0;
@@ -903,7 +963,7 @@ class ArchiveValidator {
           (!hasStart &&
               (node.startSequence.offset != 0 || node.startSequence.length != 0 || node.stopSequence.offset != 0 ||
                   node.stopSequence.length != 0))) {
-        throw mustache::Exception("Invalid Cista archive section delimiters");
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive section delimiters");
       }
 
       validateDataParts(node, type, data);
@@ -919,9 +979,12 @@ class ArchiveValidator {
       const std::size_t dots = static_cast<std::size_t>(std::count(data.begin(), data.end(), '.'));
       const std::size_t parts = dots + 1;
       if (parts > limits_.maxDataPartsPerNode) {
-        throw mustache::Exception("Cista archive per-node data-part limit exceeded");
+        fail(ArchiveFailureReason::LimitExceeded, "Cista archive per-node data-part limit exceeded");
       }
-      addBounded(parts, limits_.maxTotalDataParts, &dataParts_, "Cista archive data-part limit exceeded");
+      if (dataParts_ > limits_.maxTotalDataParts || parts > limits_.maxTotalDataParts - dataParts_) {
+        fail(ArchiveFailureReason::LimitExceeded, "Cista archive data-part limit exceeded");
+      }
+      dataParts_ += parts;
     }
 
     void validateChildren(const ArchiveNode& node, std::size_t depth)
@@ -929,19 +992,19 @@ class ArchiveValidator {
       std::uint32_t childIndex = node.firstChild;
       while (childIndex != invalidIndex) {
         if (childIndex >= graph_.nodes.size()) {
-          throw mustache::Exception("Invalid Cista archive child index");
+          fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive child index");
         }
         const ArchiveNode& child = graph_.nodes[childIndex];
         const std::uint32_t nextSibling = child.nextSibling;
         if (nextSibling != invalidIndex && nextSibling >= graph_.nodes.size()) {
-          throw mustache::Exception("Invalid Cista archive sibling index");
+          fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive sibling index");
         }
         bool indentationMetadata = false;
         if ((child.flags & mustache::Node::FlagPartialIndent) != 0) {
           if (child.type != mustache::Node::TypeOutput ||
               child.flags != (mustache::Node::FlagLambdaOnly | mustache::Node::FlagPartialIndent) ||
               (child.presence & HasData) == 0 || nextSibling == invalidIndex) {
-            throw mustache::Exception("Invalid Cista archive partial indentation metadata");
+            fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive partial indentation metadata");
           }
           const std::string_view indentation = validateString(child.data);
           if (!std::all_of(indentation.begin(), indentation.end(),
@@ -949,7 +1012,7 @@ class ArchiveValidator {
                     return value == ' ' || value == '\t';
                   }) ||
               graph_.nodes[nextSibling].type != mustache::Node::TypePartial) {
-            throw mustache::Exception("Invalid Cista archive partial indentation metadata");
+            fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive partial indentation metadata");
           }
           indentationMetadata = true;
         }
@@ -961,6 +1024,7 @@ class ArchiveValidator {
     const ArchiveGraph& graph_;
     const CistaArchiveLimits& limits_;
     std::size_t inputBytes_;
+    ArchiveFailureContext context_;
     std::vector<std::uint8_t> states_;
     std::size_t nodes_;
     std::size_t dataParts_;
@@ -1308,9 +1372,9 @@ template <cista::mode Mode> const ArchiveGraph& readArchive(std::string_view byt
   static_assert(cista::integrity_start(executionMode) == cista::integrity_start(Mode),
       "the allocation-free Cista reader must preserve the integrity offset");
   const std::string_view payload = readArchivePreamble<Mode>(bytes, limits);
-  validateArchiveTypeVersion<Mode>(payload);
+  validateArchiveTypeVersion<Mode>(payload, ArchiveFailureContext::Loading);
   if (reinterpret_cast<std::uintptr_t>(payload.data()) % alignof(ArchiveGraph) != 0) {
-    throw mustache::Exception("Unaligned Cista archive buffer");
+    failArchive(ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Unaligned Cista archive buffer");
   }
   validateArchiveGraphLayout<Mode>(payload);
   const ArchiveGraph * graph = nullptr;
@@ -1321,12 +1385,12 @@ template <cista::mode Mode> const ArchiveGraph& readArchive(std::string_view byt
     // gates without risking termination under allocation failure.
     graph = cista::deserialize<ArchiveGraph, executionMode>(payload);
   } catch (const cista::cista_exception& exception) {
-    throw mustache::Exception(exception.what());
+    failArchive(ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, exception.what());
   }
   if (graph == nullptr) {
-    throw mustache::Exception("Invalid Cista archive root");
+    failArchive(ArchiveFailureContext::Loading, ArchiveFailureReason::InvalidArchive, "Invalid Cista archive root");
   }
-  ArchiveValidator(*graph, limits, payload.size()).validate();
+  ArchiveValidator(*graph, limits, payload.size(), ArchiveFailureContext::Loading).validate();
   return *graph;
 }
 
@@ -1354,7 +1418,8 @@ std::vector<std::uint8_t> serializeCistaArchiveWithMode(
   writeArchiveTypeVersion<Mode>(buffer);
   cista::serialize<executionMode>(buffer, graph);
   std::vector<std::uint8_t> payload = buffer.release();
-  validateArchiveTypeVersion<Mode>(std::string_view(reinterpret_cast<const char *>(payload.data()), payload.size()));
+  validateArchiveTypeVersion<Mode>(
+      std::string_view(reinterpret_cast<const char *>(payload.data()), payload.size()), ArchiveFailureContext::Writing);
   return frameArchive<Mode>(std::move(payload), archiveLimits);
 }
 
@@ -1379,9 +1444,26 @@ std::string renderCistaArchiveWithMode(std::string_view bytes, const mustache::D
 }
 
 #if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
+mustache::ArchivedTemplateError publicArchiveError(ArchiveFailureReason reason) noexcept
+{
+  switch (reason) {
+    case ArchiveFailureReason::InvalidArchive:
+      return mustache::ArchivedTemplateError::InvalidArchive;
+    case ArchiveFailureReason::UnsupportedFormat:
+      return mustache::ArchivedTemplateError::UnsupportedFormat;
+    case ArchiveFailureReason::LimitExceeded:
+      return mustache::ArchivedTemplateError::LimitExceeded;
+  }
+  return mustache::ArchivedTemplateError::InvalidArchive;
+}
+
 const void * validateProtectedArchive(std::string_view bytes, const mustache::ArchivedTemplateLimits& limits)
 {
-  return &readArchive<archiveModeDeepCheckAndIntegrity>(bytes, limits);
+  try {
+    return &readArchive<archiveModeDeepCheckAndIntegrity>(bytes, limits);
+  } catch (const ArchiveReadException& exception) {
+    throw mustache::ArchivedTemplateException(publicArchiveError(exception.reason()), exception.what());
+  }
 }
 
 std::string renderProtectedArchive(
@@ -1563,6 +1645,16 @@ std::string renderCistaArchive(std::string_view bytes, const mustache::Data& dat
 #if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
 namespace mustache {
 
+ArchivedTemplateException::ArchivedTemplateException(ArchivedTemplateError reason, const std::string& desc) :
+    Exception(desc),
+    reason_(reason)
+{}
+
+ArchivedTemplateError ArchivedTemplateException::reason() const noexcept
+{
+  return reason_;
+}
+
 ArchivedTemplateLimits::ArchivedTemplateLimits() :
     maxArchiveBytes(std::size_t{64} * 1024 * 1024),
     maxNestingDepth(64),
@@ -1638,7 +1730,7 @@ std::vector<std::uint8_t> serializeArchivedTemplate(
 ArchivedTemplate loadArchivedTemplate(const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits)
 {
   if (bytes.size() > limits.maxArchiveBytes) {
-    throw Exception("Cista archive input byte limit exceeded");
+    throw ArchivedTemplateException(ArchivedTemplateError::LimitExceeded, "Cista archive input byte limit exceeded");
   }
   std::shared_ptr<ArchivedTemplate::State> loaded =
       std::make_shared<ArchivedTemplate::State>(std::vector<std::uint8_t>(bytes));
@@ -1651,7 +1743,7 @@ ArchivedTemplate loadArchivedTemplate(const std::vector<std::uint8_t>& bytes, co
 ArchivedTemplate loadArchivedTemplate(std::string_view bytes, const ArchivedTemplateLimits& limits)
 {
   if (bytes.size() > limits.maxArchiveBytes) {
-    throw Exception("Cista archive input byte limit exceeded");
+    throw ArchivedTemplateException(ArchivedTemplateError::LimitExceeded, "Cista archive input byte limit exceeded");
   }
   std::vector<std::uint8_t> ownedBytes(bytes.size());
   if (!bytes.empty()) {

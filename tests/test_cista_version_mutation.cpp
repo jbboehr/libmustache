@@ -79,8 +79,9 @@ int reject(const char * archivePath, const char * tagPath)
 
   try {
     static_cast<void>(mustache::loadArchivedTemplate(archive));
-  } catch (const mustache::Exception& exception) {
-    if (std::string_view(exception.what()) == "Unsupported libmustache archive compatibility") {
+  } catch (const mustache::ArchivedTemplateException& exception) {
+    if (exception.reason() == mustache::ArchivedTemplateError::UnsupportedFormat &&
+        std::string_view(exception.what()) == "Unsupported libmustache archive compatibility") {
       return 0;
     }
     std::fprintf(stderr, "the foreign native archive was rejected at the wrong boundary: %s\n", exception.what());

@@ -53,10 +53,18 @@ endfunction()
 
 require_export_count("^_?mustache_version$" 1 "mustache_version")
 require_export_count("^_?mustache_version_int$" 1 "mustache_version_int")
+require_export_count("^_?_ZTIN8mustache9ExceptionE$" 1 "Exception RTTI")
+require_export_count("^_?_ZTVN8mustache9ExceptionE$" 1 "Exception vtable")
 if(MUSTACHE_ARCHIVED_TEMPLATES)
     require_export_count(
         "^_?_ZN8mustache22ArchivedTemplateLimitsC1Ev$" 1
         "ArchivedTemplateLimits default constructor")
+    require_export_count(
+        "^_?_ZN8mustache25ArchivedTemplateExceptionC1ENS_21ArchivedTemplateErrorERK.*$" 1
+        "ArchivedTemplateException constructor")
+    require_export_count(
+        "^_?_ZNK8mustache25ArchivedTemplateException6reasonEv$" 1
+        "ArchivedTemplateException reason method")
     require_export_count(
         "^_?_ZN8mustache16ArchivedTemplateC1Ev$" 1
         "ArchivedTemplate default constructor")

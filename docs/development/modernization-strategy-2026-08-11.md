@@ -698,7 +698,11 @@ The optional public API now exposes an opaque, owning `ArchivedTemplate`.
 archive once in its final aligned storage, and retains that private immutable
 backing across cheap handle copies. Rendering walks the already validated graph
 through the shared renderer without reconstructing `Node` objects or borrowing
-the caller's buffer.
+the caller's buffer. Load failures now surface as
+`ArchivedTemplateException`, derived from the existing `mustache::Exception`,
+with machine-readable `InvalidArchive`, `UnsupportedFormat`, and
+`LimitExceeded` reasons. Serialization and render errors retain the general
+exception path.
 
 The archive fuzzer, `fuzz_cista_archive`, now drives arbitrary framed bytes
 through the default protected reader and renderer. It also recomputes XXH3 for

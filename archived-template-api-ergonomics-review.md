@@ -264,9 +264,9 @@ as a defect below, but it contributes to the lifecycle and error-model tradeoff.
 
   ```cpp
   enum class ArchivedTemplateError {
-      invalidArchive,
-      unsupportedFormat,
-      limitExceeded
+      InvalidArchive,
+      UnsupportedFormat,
+      LimitExceeded
   };
 
   class ArchivedTemplateException : public Exception {
@@ -280,8 +280,14 @@ as a defect below, but it contributes to the lifecycle and error-model tradeoff.
 - **Compatibility:** An additive derived exception preserves existing
   `catch (const mustache::Exception&)` behavior. The reason values become part of
   the source contract and should remain open to compatible additions.
-- **Confidence:** High for the current undifferentiated error model; medium that
-  consumers require more than a single “archive miss” recovery policy.
+- **Resolution:** Implemented before ABI 6 release. Both loader overloads now
+  throw `ArchivedTemplateException` with `InvalidArchive`,
+  `UnsupportedFormat`, or `LimitExceeded`, while serialization and rendering
+  retain the generic exception path. The exception remains derived from
+  `mustache::Exception`, and the public guidance tells exhaustive switches to
+  retain a default branch for future categories.
+- **Confidence:** High. Unit and installed-consumer coverage distinguish every
+  category, preserve the base catch, and keep writer/render failures generic.
 
 ## Lens summary
 
@@ -294,12 +300,12 @@ This table reflects the current contract after the recorded resolutions.
 | Naming and symmetry | Strong | `ArchivedTemplate` parallels `CompiledTemplate`, and `load`/`serialize`/`render` use one vocabulary. |
 | Signatures | Strong | Modern and advanced writer overloads compose predictably, and archive limits require named field configuration. |
 | Type and IDE experience | Strong | Opaque compiled templates and typed partial maps flow directly into the archive writer without exposing Cista. |
-| Error model | Mixed | Exceptions are consistent with libmustache, but archive load reasons are not machine-readable. |
+| Error model | Strong | Load failures have stable machine-readable categories while preserving the existing general exception catch. |
 | Lifecycle | Strong to mixed | Ownership and cheap copies are explicit, but a default-constructed empty handle remains fallible only when used. |
 | Defaults | Strong | Defaults are conservative, bounded, library-owned, and named consistently across writer and loader paths. |
 | Composability | Strong | `CompiledTemplate` and `PartialMap` feed the writer directly while `Node` remains an advanced path. |
 | Progressive disclosure | Strong | The common path stays opaque; callers encounter the low-level AST only when deliberately selecting it. |
-| Discoverability | Strong to mixed | Names expose ownership and cache compatibility, while limit and failure details still require documentation. |
+| Discoverability | Strong | Names and types expose ownership, cache compatibility, limits, and load-failure categories without implementation-source lookup. |
 | Evolution | Strong to mixed | The format and cache domain are versioned and limit defaults are library-owned; public struct fields and layout remain compatibility-sensitive. |
 
 Asynchronous operation and cancellation are not applicable: compilation,

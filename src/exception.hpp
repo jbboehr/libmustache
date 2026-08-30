@@ -2,6 +2,8 @@
 #ifndef MUSTACHE_EXCEPTION_HPP
 #define MUSTACHE_EXCEPTION_HPP
 
+#include "mustache_export.hpp"
+
 #include <exception>
 #include <stdexcept>
 #include <string>
@@ -13,12 +15,23 @@ namespace mustache {
 
     Exceptions thrown will be of this class.
 */
-class Exception : public std::runtime_error {
+#if defined(_MSC_VER)
+// MSVC warns for every exported standard-library exception base even though
+// exceptions are a supported DLL boundary. Export this public base so derived
+// libmustache exceptions share RTTI with consumers, and scope the exemption to
+// the one inheritance declaration that requires it.
+#pragma warning(push)
+#pragma warning(disable : 4275)
+#endif
+class MUSTACHE_API Exception : public std::runtime_error {
   public:
     Exception(const std::string& desc) :
         std::runtime_error(desc)
     {}
 };
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 /*! \class TokenizerException
     \brief Exception class

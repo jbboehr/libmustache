@@ -85,6 +85,12 @@ as a release commitment.
   aligned storage. The resulting immutable handle validates once and remains
   valid independently of the input buffer, so the extension must not create a
   separate borrowed Cista view over Zend memory.
+- Catch `ArchivedTemplateException` at the persistent-cache boundary and branch
+  on `reason()` rather than parsing `what()`. `InvalidArchive` and
+  `UnsupportedFormat` identify entries that may be evicted and recompiled;
+  `LimitExceeded` is a policy/configuration failure and must not become a
+  repeated cache-miss loop. Retain a default switch branch for future reason
+  values and a generic `mustache::Exception` catch for non-loading operations.
 - Include `archivedTemplateCompatibilityTag()` verbatim in every persistent
   archive cache namespace. Do not derive a key from libmustache versions,
   architecture names, or private Cista details; the library-owned opaque tag

@@ -7,6 +7,7 @@
 #if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
 
 #include "compiled_template.hpp"
+#include "exception.hpp"
 #include "node.hpp"
 #include "renderer.hpp"
 
@@ -22,6 +23,31 @@ namespace mustache {
 class Data;
 class Mustache;
 class ArchivedTemplate;
+
+//! Stable categories for failures while loading archived-template bytes.
+enum class ArchivedTemplateError {
+  InvalidArchive,
+  UnsupportedFormat,
+  LimitExceeded,
+};
+
+/*! A categorized failure raised only while loading an archived template.
+
+    Existing callers may continue catching mustache::Exception. New callers
+    can catch this derived type and inspect reason() without parsing what().
+    Callers should retain a default branch when switching on the reason so
+    future categories can be added compatibly.
+*/
+class MUSTACHE_API ArchivedTemplateException : public Exception {
+  public:
+    ArchivedTemplateException(ArchivedTemplateError reason, const std::string& desc);
+
+    //! Returns the stable category without parsing the diagnostic message.
+    ArchivedTemplateError reason() const noexcept;
+
+  private:
+    ArchivedTemplateError reason_;
+};
 
 /*! Resource limits applied while creating or validating an archived template.
 
@@ -45,11 +71,19 @@ struct ArchivedTemplateLimits {
 //! Returns an opaque identifier suitable for archived-template cache keys.
 MUSTACHE_API std::string_view archivedTemplateCompatibilityTag() noexcept;
 
-//! Copies archive bytes into owned storage and validates them once.
+/*! Copies archive bytes into owned storage and validates them once.
+
+    \throws ArchivedTemplateException with a machine-readable loading failure
+    category. Allocation failures continue to propagate as std::bad_alloc.
+*/
 MUSTACHE_API ArchivedTemplate loadArchivedTemplate(
     const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits = ArchivedTemplateLimits());
 
-//! Copies archive bytes into owned storage and validates them once.
+/*! Copies archive bytes into owned storage and validates them once.
+
+    \throws ArchivedTemplateException with a machine-readable loading failure
+    category. Allocation failures continue to propagate as std::bad_alloc.
+*/
 MUSTACHE_API ArchivedTemplate loadArchivedTemplate(
     std::string_view bytes, const ArchivedTemplateLimits& limits = ArchivedTemplateLimits());
 

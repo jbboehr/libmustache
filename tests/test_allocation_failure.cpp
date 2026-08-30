@@ -359,7 +359,7 @@ int runArchiveAllocationProbe(std::string_view operation, const char * failAtTex
 
   mustache::Node root = makeSerializableTree();
   std::vector<std::uint8_t> archive;
-  if (operation == "load") {
+  if (operation == "load" || operation == "load-view") {
     archive = mustache::serializeArchivedTemplate(root);
   } else if (operation != "serialize") {
     std::fprintf(stderr, "invalid archive allocation operation\n");
@@ -369,6 +369,9 @@ int runArchiveAllocationProbe(std::string_view operation, const char * failAtTex
   try {
     if (operation == "serialize") {
       static_cast<void>(mustache::serializeArchivedTemplate(root));
+    } else if (operation == "load-view") {
+      const std::string_view archivedBytes(reinterpret_cast<const char *>(archive.data()), archive.size());
+      static_cast<void>(mustache::loadArchivedTemplate(archivedBytes));
     } else {
       static_cast<void>(mustache::loadArchivedTemplate(archive));
     }

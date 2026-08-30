@@ -64,6 +64,10 @@ static_assert(std::is_copy_constructible<mustache::LambdaRenderContext>::value,
     "installed lambda context must be safely retainable by value");
 static_assert(std::is_nothrow_move_constructible<mustache::LambdaRenderContext>::value,
     "installed lambda context must be nothrow movable");
+#ifdef MUSTACHE_HAVE_ARCHIVED_TEMPLATES
+static_assert(std::is_base_of<mustache::Exception, mustache::ArchivedTemplateException>::value,
+    "installed archive load errors must preserve the generic exception catch");
+#endif
 
 class ConsumerLambda final : public mustache::Lambda {
   public:
@@ -143,6 +147,14 @@ int main()
   const std::string archivedLimitedOutput = mustache.render(archivedFromView, scalar, renderLimits);
   const std::string archivedFreeOutput = mustache::render(archivedMoved, scalar);
   const std::string archivedLimitedFreeOutput = mustache::render(archivedMoveAssigned, scalar, renderLimits);
+  std::vector<std::uint8_t> corruptArchiveBytes(archiveBytes);
+  corruptArchiveBytes.back() ^= std::uint8_t{0xFF};
+  bool archiveErrorCategoryValid = false;
+  try {
+    static_cast<void>(mustache::loadArchivedTemplate(corruptArchiveBytes));
+  } catch (const mustache::ArchivedTemplateException& exception) {
+    archiveErrorCategoryValid = exception.reason() == mustache::ArchivedTemplateError::InvalidArchive;
+  }
   const std::string expectedArchivedOutput = "[compiled]";
 #else
   const bool archiveCompatibilityTagValid = true;
@@ -151,6 +163,7 @@ int main()
   const std::string archivedLimitedOutput = "ok";
   const std::string archivedFreeOutput = "ok";
   const std::string archivedLimitedFreeOutput = "ok";
+  const bool archiveErrorCategoryValid = true;
   const std::string expectedArchivedOutput = "ok";
 #endif
 
@@ -167,7 +180,8 @@ int main()
           nodeTemplate == "owned" && compiledOutput == "[compiled]" && lambdaOutput == "consumer-lambda" &&
           archiveCompatibilityTagValid && archivedHandlesValid && archivedOutput == expectedArchivedOutput &&
           archivedLimitedOutput == expectedArchivedOutput && archivedFreeOutput == expectedArchivedOutput &&
-          archivedLimitedFreeOutput == expectedArchivedOutput && !inactiveContext.active() && inactiveContextRejected
+          archivedLimitedFreeOutput == expectedArchivedOutput && archiveErrorCategoryValid &&
+          !inactiveContext.active() && inactiveContextRejected
       ? 0
       : 1;
 }

@@ -182,8 +182,9 @@ void testArchiveCompatibilityPreamble()
   bool rejected = false;
   try {
     static_cast<void>(mustache::loadArchivedTemplate(previousGeneration));
-  } catch (const mustache::Exception& exception) {
-    rejected = std::string_view(exception.what()) == "Unsupported libmustache archive format generation";
+  } catch (const mustache::ArchivedTemplateException& exception) {
+    rejected = exception.reason() == mustache::ArchivedTemplateError::UnsupportedFormat &&
+        std::string_view(exception.what()) == "Unsupported libmustache archive format generation";
   }
   expect(rejected, "an archive from a different format generation was not rejected at the preamble boundary");
 
@@ -192,10 +193,67 @@ void testArchiveCompatibilityPreamble()
   rejected = false;
   try {
     static_cast<void>(mustache::loadArchivedTemplate(incompatible));
-  } catch (const mustache::Exception& exception) {
-    rejected = std::string_view(exception.what()) == "Unsupported libmustache archive compatibility";
+  } catch (const mustache::ArchivedTemplateException& exception) {
+    rejected = exception.reason() == mustache::ArchivedTemplateError::UnsupportedFormat &&
+        std::string_view(exception.what()) == "Unsupported libmustache archive compatibility";
   }
   expect(rejected, "an incompatible native archive was not rejected at the preamble boundary");
+}
+
+void testLoadingErrorCategories()
+{
+  const std::vector<std::uint8_t> serialized = mustache::serializeArchivedTemplate(mustache::compile("categorized"));
+
+  std::vector<std::uint8_t> corrupted(serialized);
+  corrupted.back() ^= std::uint8_t{0xFF};
+  bool invalidArchive = false;
+  try {
+    static_cast<void>(mustache::loadArchivedTemplate(corrupted));
+  } catch (const mustache::ArchivedTemplateException& exception) {
+    invalidArchive = exception.reason() == mustache::ArchivedTemplateError::InvalidArchive;
+  }
+  expect(invalidArchive, "corrupt archive bytes did not report InvalidArchive");
+
+  mustache::ArchivedTemplateLimits limits;
+  limits.maxArchiveBytes = serialized.size() - 1;
+  const std::string_view serializedView(reinterpret_cast<const char *>(serialized.data()), serialized.size());
+  bool limitExceeded = false;
+  try {
+    static_cast<void>(mustache::loadArchivedTemplate(serializedView, limits));
+  } catch (const mustache::ArchivedTemplateException& exception) {
+    limitExceeded = exception.reason() == mustache::ArchivedTemplateError::LimitExceeded;
+  }
+  expect(limitExceeded, "an archive loading limit did not report LimitExceeded");
+
+  bool caughtByLegacyBase = false;
+  try {
+    static_cast<void>(mustache::loadArchivedTemplate(corrupted));
+  } catch (const mustache::Exception&) {
+    caughtByLegacyBase = true;
+  }
+  expect(caughtByLegacyBase, "a categorized load error was not catchable as mustache::Exception");
+
+  limits = mustache::ArchivedTemplateLimits();
+  limits.maxArchiveBytes = 0;
+  bool writerUsedGenericError = false;
+  try {
+    static_cast<void>(mustache::serializeArchivedTemplate(mustache::compile("writer"), mustache::PartialMap(), limits));
+  } catch (const mustache::ArchivedTemplateException&) {
+    writerUsedGenericError = false;
+  } catch (const mustache::Exception&) {
+    writerUsedGenericError = true;
+  }
+  expect(writerUsedGenericError, "archive serialization unexpectedly used a loading error category");
+
+  bool rendererUsedGenericError = false;
+  try {
+    static_cast<void>(mustache::render(mustache::ArchivedTemplate(), mustache::Data::object()));
+  } catch (const mustache::ArchivedTemplateException&) {
+    rendererUsedGenericError = false;
+  } catch (const mustache::Exception&) {
+    rendererUsedGenericError = true;
+  }
+  expect(rendererUsedGenericError, "archived-template rendering unexpectedly used a loading error category");
 }
 
 void testOwnershipAndRendering()
@@ -444,8 +502,8 @@ void testLoadingLimits()
     bool rejected = false;
     try {
       (void)mustache::loadArchivedTemplate(serialized, limits);
-    } catch (const mustache::Exception&) {
-      rejected = true;
+    } catch (const mustache::ArchivedTemplateException& exception) {
+      rejected = exception.reason() == mustache::ArchivedTemplateError::LimitExceeded;
     }
     expect(rejected, message);
   };
@@ -499,12 +557,17 @@ static_assert(noexcept(mustache::archivedTemplateCompatibilityTag()),
     "the archived-template compatibility tag query must be non-throwing");
 static_assert(!std::is_aggregate<mustache::ArchivedTemplateLimits>::value,
     "archived-template limits must reject positional aggregate initialization");
+static_assert(std::is_base_of<mustache::Exception, mustache::ArchivedTemplateException>::value,
+    "archived-template loading errors must remain catchable as mustache::Exception");
+static_assert(noexcept(std::declval<const mustache::ArchivedTemplateException&>().reason()),
+    "reading an archived-template error reason must be non-throwing");
 
 int main()
 {
   try {
     testPublicArchiveGolden();
     testArchiveCompatibilityPreamble();
+    testLoadingErrorCategories();
     testOwnershipAndRendering();
     testCopiedInputCannotMutateValidatedState();
     testPartialsAndLambdas();

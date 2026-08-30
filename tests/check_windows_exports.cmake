@@ -24,6 +24,8 @@ endif()
 
 set(required_exports
     "mustache_version"
+    "??1Exception@mustache@@"
+    "??_7Exception@mustache@@6B@"
     "?empty@CompiledTemplate@mustache@@"
     "?fromJSON@Data@mustache@@"
     "?active@LambdaRenderContext@mustache@@"
@@ -47,6 +49,12 @@ if(MUSTACHE_ARCHIVED_TEMPLATES)
     endfunction()
 
     require_archive_export_count("\\?\\?0ArchivedTemplateLimits@mustache@@" 1 "limits constructor")
+    require_archive_export_count(
+        "\\?\\?0ArchivedTemplateException@mustache@@[^\n]*ArchivedTemplateError@" 1
+        "load exception constructor")
+    require_archive_export_count(
+        "\\?reason@ArchivedTemplateException@mustache@@" 1
+        "load exception reason method")
     require_archive_export_count("\\?\\?0ArchivedTemplate@mustache@@" 3 "constructors")
     require_archive_export_count("\\?\\?1ArchivedTemplate@mustache@@" 1 "destructor")
     require_archive_export_count("\\?\\?4ArchivedTemplate@mustache@@" 2 "assignment operators")

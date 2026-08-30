@@ -113,6 +113,34 @@ an already validated graph. The handle keeps its private immutable backing alive
 across cheap copies and renders directly from it; it does not rebuild an owned
 `Node` tree or borrow the caller's input buffer.
 
+Archive loading reports `ArchivedTemplateException`, which remains catchable as
+the general `mustache::Exception`. Its `reason()` is `InvalidArchive`,
+`UnsupportedFormat`, or `LimitExceeded`, so cache integrations can recover
+without parsing `what()`. Keep a default branch when switching on the reason to
+allow future categories:
+
+```cpp
+mustache::ArchivedTemplate archived;
+try {
+  archived = mustache::loadArchivedTemplate(bytes, limits);
+} catch (const mustache::ArchivedTemplateException& exception) {
+  switch (exception.reason()) {
+    case mustache::ArchivedTemplateError::InvalidArchive:
+    case mustache::ArchivedTemplateError::UnsupportedFormat:
+      evictCachedArchive();
+      break;
+    case mustache::ArchivedTemplateError::LimitExceeded:
+      reportArchivePolicyFailure(exception.what());
+      break;
+    default:
+      throw;
+  }
+}
+```
+
+Serialization and rendering continue to use the existing general exception
+path; the archive-specific categories describe loading failures only.
+
 Installed CMake packages expose separate components. The shared component is
 the default and does not require dependency development packages at consume
 time:
