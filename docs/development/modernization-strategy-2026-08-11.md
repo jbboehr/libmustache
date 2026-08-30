@@ -665,7 +665,7 @@ and platform gates passed, CMake and Autotools changed the default to `AUTO`:
 private-symbol-control availability enables the feature without widening the
 shared-library ABI. Production archives do not depend on zlib; it remains only
 in the explicit CRC-32 benchmark. Cista remains private behind
-the libmustache-owned `ArchivedTemplateView`; owned and archived representations
+the libmustache-owned `ArchivedTemplate`; owned and archived representations
 share one renderer algorithm without reconstructing a `Node` tree. The
 supported path includes lambda and inline-partial semantics, pinned modern XXH3,
 `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY`, libmustache semantic validation,
@@ -693,7 +693,7 @@ Cista updates and schema changes
 require explicit compatibility review and deliberate format-generation or
 golden-fixture changes rather than silently changing existing cache bytes.
 
-The optional public API now exposes an opaque, owning `ArchivedTemplateView`.
+The optional public API now exposes an opaque, owning `ArchivedTemplate`.
 `loadArchivedTemplate()` defensively copies bytes, validates the protected
 archive once in its final aligned storage, and retains that private immutable
 backing across cheap handle copies. Rendering walks the already validated graph

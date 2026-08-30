@@ -125,17 +125,16 @@ int main()
       archiveCompatibilityTag.substr(0, std::string_view("libmustache-cista-v2-").size()) == "libmustache-cista-v2-";
   const std::vector<std::uint8_t> archiveBytes = mustache::serializeArchivedTemplate(compiled, partials);
   mustache::ArchivedTemplateLimits archiveLimits;
-  const mustache::ArchivedTemplateView archived = mustache::loadArchivedTemplate(archiveBytes, archiveLimits);
+  const mustache::ArchivedTemplate archived = mustache::loadArchivedTemplate(archiveBytes, archiveLimits);
   const std::string_view archiveByteView(reinterpret_cast<const char *>(archiveBytes.data()), archiveBytes.size());
-  const mustache::ArchivedTemplateView archivedFromView =
-      mustache::loadArchivedTemplate(archiveByteView, archiveLimits);
-  mustache::ArchivedTemplateView archivedCopy(archived);
-  mustache::ArchivedTemplateView archivedCopyAssigned;
+  const mustache::ArchivedTemplate archivedFromView = mustache::loadArchivedTemplate(archiveByteView, archiveLimits);
+  mustache::ArchivedTemplate archivedCopy(archived);
+  mustache::ArchivedTemplate archivedCopyAssigned;
   archivedCopyAssigned = archivedFromView;
-  mustache::ArchivedTemplateView archivedMoved(std::move(archivedCopy));
-  mustache::ArchivedTemplateView archivedMoveAssigned;
+  mustache::ArchivedTemplate archivedMoved(std::move(archivedCopy));
+  mustache::ArchivedTemplate archivedMoveAssigned;
   archivedMoveAssigned = std::move(archivedCopyAssigned);
-  const mustache::ArchivedTemplateView emptyArchive;
+  const mustache::ArchivedTemplate emptyArchive;
   const bool archivedHandlesValid = static_cast<bool>(archived) && !archived.empty() &&
       static_cast<bool>(archivedFromView) && !archivedFromView.empty() && static_cast<bool>(archivedMoved) &&
       static_cast<bool>(archivedMoveAssigned) && emptyArchive.empty() && !static_cast<bool>(emptyArchive);

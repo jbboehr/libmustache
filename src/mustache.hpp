@@ -84,11 +84,11 @@ class Mustache {
 
 #if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
     //! Renders a previously validated archived template
-    MUSTACHE_API std::string render(const ArchivedTemplateView& archived, const Data& data) const;
+    MUSTACHE_API std::string render(const ArchivedTemplate& archived, const Data& data) const;
 
     //! Renders a previously validated archived template with resource limits
     MUSTACHE_API std::string render(
-        const ArchivedTemplateView& archived, const Data& data, const RenderLimits& limits) const;
+        const ArchivedTemplate& archived, const Data& data, const RenderLimits& limits) const;
 #endif
 
     //! Utility method for Tokenizer::setStartSequence()

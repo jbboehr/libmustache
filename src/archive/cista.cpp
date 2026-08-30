@@ -1563,7 +1563,7 @@ std::string renderCistaArchive(std::string_view bytes, const mustache::Data& dat
 #if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
 namespace mustache {
 
-struct ArchivedTemplateView::State {
+struct ArchivedTemplate::State {
     explicit State(std::vector<std::uint8_t> archiveBytes) :
         bytes(std::move(archiveBytes)),
         graph(nullptr)
@@ -1573,28 +1573,28 @@ struct ArchivedTemplateView::State {
     const void * graph;
 };
 
-ArchivedTemplateView::ArchivedTemplateView() noexcept = default;
+ArchivedTemplate::ArchivedTemplate() noexcept = default;
 
-ArchivedTemplateView::ArchivedTemplateView(const ArchivedTemplateView& other) noexcept = default;
+ArchivedTemplate::ArchivedTemplate(const ArchivedTemplate& other) noexcept = default;
 
-ArchivedTemplateView& ArchivedTemplateView::operator=(const ArchivedTemplateView& other) noexcept = default;
+ArchivedTemplate& ArchivedTemplate::operator=(const ArchivedTemplate& other) noexcept = default;
 
-ArchivedTemplateView::ArchivedTemplateView(ArchivedTemplateView&& other) noexcept = default;
+ArchivedTemplate::ArchivedTemplate(ArchivedTemplate&& other) noexcept = default;
 
-ArchivedTemplateView& ArchivedTemplateView::operator=(ArchivedTemplateView&& other) noexcept = default;
+ArchivedTemplate& ArchivedTemplate::operator=(ArchivedTemplate&& other) noexcept = default;
 
-ArchivedTemplateView::~ArchivedTemplateView() = default;
+ArchivedTemplate::~ArchivedTemplate() = default;
 
-ArchivedTemplateView::ArchivedTemplateView(std::shared_ptr<const State> state) noexcept :
+ArchivedTemplate::ArchivedTemplate(std::shared_ptr<const State> state) noexcept :
     state(std::move(state))
 {}
 
-bool ArchivedTemplateView::empty() const noexcept
+bool ArchivedTemplate::empty() const noexcept
 {
   return !state;
 }
 
-ArchivedTemplateView::operator bool() const noexcept
+ArchivedTemplate::operator bool() const noexcept
 {
   return !empty();
 }
@@ -1626,20 +1626,20 @@ std::vector<std::uint8_t> serializeArchivedTemplate(
       *root, partialSource, limits);
 }
 
-ArchivedTemplateView loadArchivedTemplate(const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits)
+ArchivedTemplate loadArchivedTemplate(const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits)
 {
   if (bytes.size() > limits.maxInputBytes) {
     throw Exception("Cista archive input byte limit exceeded");
   }
-  std::shared_ptr<ArchivedTemplateView::State> loaded =
-      std::make_shared<ArchivedTemplateView::State>(std::vector<std::uint8_t>(bytes));
+  std::shared_ptr<ArchivedTemplate::State> loaded =
+      std::make_shared<ArchivedTemplate::State>(std::vector<std::uint8_t>(bytes));
   const char * data = loaded->bytes.empty() ? "" : reinterpret_cast<const char *>(loaded->bytes.data());
   const std::string_view archivedBytes(data, loaded->bytes.size());
   loaded->graph = mustache_benchmark::validateProtectedArchive(archivedBytes, limits);
-  return ArchivedTemplateView(std::move(loaded));
+  return ArchivedTemplate(std::move(loaded));
 }
 
-ArchivedTemplateView loadArchivedTemplate(std::string_view bytes, const ArchivedTemplateLimits& limits)
+ArchivedTemplate loadArchivedTemplate(std::string_view bytes, const ArchivedTemplateLimits& limits)
 {
   if (bytes.size() > limits.maxInputBytes) {
     throw Exception("Cista archive input byte limit exceeded");
@@ -1648,20 +1648,19 @@ ArchivedTemplateView loadArchivedTemplate(std::string_view bytes, const Archived
   if (!bytes.empty()) {
     std::memcpy(ownedBytes.data(), bytes.data(), bytes.size());
   }
-  std::shared_ptr<ArchivedTemplateView::State> loaded =
-      std::make_shared<ArchivedTemplateView::State>(std::move(ownedBytes));
+  std::shared_ptr<ArchivedTemplate::State> loaded = std::make_shared<ArchivedTemplate::State>(std::move(ownedBytes));
   const char * data = loaded->bytes.empty() ? "" : reinterpret_cast<const char *>(loaded->bytes.data());
   const std::string_view archivedBytes(data, loaded->bytes.size());
   loaded->graph = mustache_benchmark::validateProtectedArchive(archivedBytes, limits);
-  return ArchivedTemplateView(std::move(loaded));
+  return ArchivedTemplate(std::move(loaded));
 }
 
-std::string render(const ArchivedTemplateView& archived, const Data& data)
+std::string render(const ArchivedTemplate& archived, const Data& data)
 {
   return render(archived, data, RenderLimits());
 }
 
-std::string render(const ArchivedTemplateView& archived, const Data& data, const RenderLimits& limits)
+std::string render(const ArchivedTemplate& archived, const Data& data, const RenderLimits& limits)
 {
   if (archived.empty()) {
     throw Exception("Empty archived template");
@@ -1669,12 +1668,12 @@ std::string render(const ArchivedTemplateView& archived, const Data& data, const
   return mustache_benchmark::renderProtectedArchive(archived.state->graph, data, limits);
 }
 
-std::string Mustache::render(const ArchivedTemplateView& archived, const Data& data) const
+std::string Mustache::render(const ArchivedTemplate& archived, const Data& data) const
 {
   return mustache::render(archived, data);
 }
 
-std::string Mustache::render(const ArchivedTemplateView& archived, const Data& data, const RenderLimits& limits) const
+std::string Mustache::render(const ArchivedTemplate& archived, const Data& data, const RenderLimits& limits) const
 {
   return mustache::render(archived, data, limits);
 }

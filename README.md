@@ -94,7 +94,7 @@ mustache::CompiledTemplate compiled = mustache::compile("Hello {{name}}");
 
 std::string_view cacheNamespace = mustache::archivedTemplateCompatibilityTag();
 std::vector<std::uint8_t> bytes = mustache::serializeArchivedTemplate(compiled);
-mustache::ArchivedTemplateView archived =
+mustache::ArchivedTemplate archived =
     mustache::loadArchivedTemplate(bytes);
 std::string output = mustache::render(archived, data);
 ```

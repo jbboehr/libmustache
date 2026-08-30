@@ -46,21 +46,21 @@ if(MUSTACHE_ARCHIVED_TEMPLATES)
         endif()
     endfunction()
 
-    require_archive_export_count("\\?\\?0ArchivedTemplateView@mustache@@" 3 "constructors")
-    require_archive_export_count("\\?\\?1ArchivedTemplateView@mustache@@" 1 "destructor")
-    require_archive_export_count("\\?\\?4ArchivedTemplateView@mustache@@" 2 "assignment operators")
-    require_archive_export_count("\\?\\?BArchivedTemplateView@mustache@@" 1 "bool conversion")
-    require_archive_export_count("\\?empty@ArchivedTemplateView@mustache@@" 1 "empty method")
+    require_archive_export_count("\\?\\?0ArchivedTemplate@mustache@@" 3 "constructors")
+    require_archive_export_count("\\?\\?1ArchivedTemplate@mustache@@" 1 "destructor")
+    require_archive_export_count("\\?\\?4ArchivedTemplate@mustache@@" 2 "assignment operators")
+    require_archive_export_count("\\?\\?BArchivedTemplate@mustache@@" 1 "bool conversion")
+    require_archive_export_count("\\?empty@ArchivedTemplate@mustache@@" 1 "empty method")
     require_archive_export_count("\\?loadArchivedTemplate@mustache@@" 2 "load overloads")
     require_archive_export_count("\\?serializeArchivedTemplate@mustache@@" 2 "serialize overloads")
     require_archive_export_count(
         "\\?archivedTemplateCompatibilityTag@mustache@@" 1
         "compatibility tag query")
     require_archive_export_count(
-        "\\?render@Mustache@mustache@@[^\n]*ArchivedTemplateView@" 2
+        "\\?render@Mustache@mustache@@[^\n]*ArchivedTemplate@" 2
         "member render overloads")
     require_archive_export_count(
-        "\\?render@mustache@@[^\n]*ArchivedTemplateView@" 2
+        "\\?render@mustache@@[^\n]*ArchivedTemplate@" 2
         "free render overloads")
 endif()
 foreach(required_export IN LISTS required_exports)
@@ -91,6 +91,7 @@ set(forbidden_exports
     "?resetMovedFrom@Node@")
 if(MUSTACHE_ARCHIVED_TEMPLATES)
     list(APPEND forbidden_exports
+        "ArchivedTemplateView@"
         "@cista@@"
         "MUSTACHE_CISTA_XXH_"
         "mustache_cista_xxh3_64bits_with_seed")

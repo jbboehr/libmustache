@@ -69,18 +69,18 @@ as a release commitment.
   require complete canonical input.
 - Follow the recorded [cache benchmark](ast-cache-benchmark-2026-08-22.md):
   persist source today and keep checked legacy reads only for the compatibility
-  window below. The archived-template view subsequently passed the hardened
-  native performance, semantic, compatibility, fuzzing, and security gates
-  with versioning, deep checking, integrity, and modern XXH3 enabled. Do not
-  make archived bytes the default PHP cache value unless the remaining
+  window below. The archived-template representation subsequently passed the
+  hardened native performance, semantic, compatibility, fuzzing, and security
+  gates with versioning, deep checking, integrity, and modern XXH3 enabled. Do
+  not make archived bytes the default PHP cache value unless the remaining
   one-fetch/one-render PHP/APCu benchmark also passes.
 - Keep Cista entirely inside libmustache. The extension should receive a
-  libmustache-owned `ArchivedTemplateView`, not include Cista headers or expose
+  libmustache-owned `ArchivedTemplate`, not include Cista headers or expose
   Cista types in PHP-facing implementation interfaces. Ordinary inputs should
   continue through the owned `Node`/`CompiledTemplate` path; cached archive
-  bytes may use the checked view path. Both paths must share rendering
+  bytes may use the checked archive path. Both paths must share rendering
   semantics inside libmustache.
-- Construct archived views through `loadArchivedTemplate()`. Its byte-vector
+- Construct archived templates through `loadArchivedTemplate()`. Its byte-vector
   and `std::string_view` overloads defensively copy Zend/APCu bytes into private
   aligned storage. The resulting immutable handle validates once and remains
   valid independently of the input buffer, so the extension must not create a
@@ -334,11 +334,12 @@ A matched native writer comparison found the selected Cista format 16% to 33%
 slower than legacy compile plus serialization, or about 25 microseconds to 5.1
 milliseconds per write. That is acceptable for a write-once, render-many cache.
 
-The native libmustache slice is complete. Its optional archived-template view
-has the same rendering semantics as owned nodes, keeps Cista private, requires
-versioning, deep checking, integrity, and libmustache semantic validation, and
-uses pinned modern XXH3. The archive boundary has sanitizer-backed fuzz,
-platform, installed-consumer, and export-boundary coverage. Build systems now
+The native libmustache slice is complete. Its optional archived-template
+representation has the same rendering semantics as owned nodes, keeps Cista
+private, requires versioning, deep checking, integrity, and libmustache
+semantic validation, and uses pinned modern XXH3. The archive boundary has
+sanitizer-backed fuzz, platform, installed-consumer, and export-boundary
+coverage. Build systems now
 default to automatic detection of the required private-symbol controls. The
 production archive implementation has no zlib dependency; zlib remains only in
 the explicit CRC-32 benchmark.

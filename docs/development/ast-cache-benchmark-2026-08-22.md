@@ -496,7 +496,7 @@ If the feasibility work continues, use this integration policy:
   overrides support non-standard dependency prefixes without adding another
   project-specific path option.
 - Do not expose `cista::*` in installed headers. Expose a libmustache-owned
-  `ArchivedTemplateView` alongside the ordinary owned `Node`/`CompiledTemplate`
+  `ArchivedTemplate` alongside the ordinary owned `Node`/`CompiledTemplate`
   path, and route both through a shared renderer algorithm using internal view
   adapters. Rendering a checked archive must not require rebuilding a `Node`
   tree first. This API now defensively copies archive bytes, validates them once
@@ -611,8 +611,8 @@ can erase part of that gain.
 Recommended follow-up:
 
 1. Document cached source as the default persistent PHP cache value.
-2. Refactor libmustache so owned nodes and an archived-template view share one
-   rendering algorithm without exposing Cista types in public headers.
+2. Refactor libmustache so owned nodes and an archived-template representation
+   share one rendering algorithm without exposing Cista types in public headers.
 3. Keep archived-template support optional. It was default-off during the
    feasibility phase and now defaults to dependency-based automatic detection.
    Vendor a reviewed, pinned Cista snapshot and license by default; retain

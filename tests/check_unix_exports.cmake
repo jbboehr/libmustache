@@ -55,29 +55,29 @@ require_export_count("^_?mustache_version$" 1 "mustache_version")
 require_export_count("^_?mustache_version_int$" 1 "mustache_version_int")
 if(MUSTACHE_ARCHIVED_TEMPLATES)
     require_export_count(
-        "^_?_ZN8mustache20ArchivedTemplateViewC1Ev$" 1
-        "ArchivedTemplateView default constructor")
+        "^_?_ZN8mustache16ArchivedTemplateC1Ev$" 1
+        "ArchivedTemplate default constructor")
     require_export_count(
-        "^_?_ZN8mustache20ArchivedTemplateViewC1ERKS0_$" 1
-        "ArchivedTemplateView copy constructor")
+        "^_?_ZN8mustache16ArchivedTemplateC1ERKS0_$" 1
+        "ArchivedTemplate copy constructor")
     require_export_count(
-        "^_?_ZN8mustache20ArchivedTemplateViewC1EOS0_$" 1
-        "ArchivedTemplateView move constructor")
+        "^_?_ZN8mustache16ArchivedTemplateC1EOS0_$" 1
+        "ArchivedTemplate move constructor")
     require_export_count(
-        "^_?_ZN8mustache20ArchivedTemplateViewD1Ev$" 1
-        "ArchivedTemplateView destructor")
+        "^_?_ZN8mustache16ArchivedTemplateD1Ev$" 1
+        "ArchivedTemplate destructor")
     require_export_count(
-        "^_?_ZN8mustache20ArchivedTemplateViewaSERKS0_$" 1
-        "ArchivedTemplateView copy assignment")
+        "^_?_ZN8mustache16ArchivedTemplateaSERKS0_$" 1
+        "ArchivedTemplate copy assignment")
     require_export_count(
-        "^_?_ZN8mustache20ArchivedTemplateViewaSEOS0_$" 1
-        "ArchivedTemplateView move assignment")
+        "^_?_ZN8mustache16ArchivedTemplateaSEOS0_$" 1
+        "ArchivedTemplate move assignment")
     require_export_count(
-        "^_?_ZNK8mustache20ArchivedTemplateView5emptyEv$" 1
-        "ArchivedTemplateView empty method")
+        "^_?_ZNK8mustache16ArchivedTemplate5emptyEv$" 1
+        "ArchivedTemplate empty method")
     require_export_count(
-        "^_?_ZNK8mustache20ArchivedTemplateViewcvbEv$" 1
-        "ArchivedTemplateView bool conversion")
+        "^_?_ZNK8mustache16ArchivedTemplatecvbEv$" 1
+        "ArchivedTemplate bool conversion")
     require_export_count(
         "^_?_ZN8mustache20loadArchivedTemplate.*$" 2
         "loadArchivedTemplate overloads")
@@ -88,14 +88,15 @@ if(MUSTACHE_ARCHIVED_TEMPLATES)
         "^_?_ZN8mustache32archivedTemplateCompatibilityTagEv$" 1
         "archivedTemplateCompatibilityTag")
     require_export_count(
-        "^_?_ZN8mustache6render.*20ArchivedTemplateView.*$" 2
+        "^_?_ZN8mustache6render.*16ArchivedTemplate.*$" 2
         "archived-template free render overloads")
     require_export_count(
-        "^_?_ZNK8mustache8Mustache6render.*20ArchivedTemplateView.*$" 2
+        "^_?_ZNK8mustache8Mustache6render.*16ArchivedTemplate.*$" 2
         "archived-template member render overloads")
 endif()
 
 set(forbidden_exports
+    "ArchivedTemplateView"
     "N5cista"
     "archivedTemplateRoot"
     "MUSTACHE_CISTA_XXH_"

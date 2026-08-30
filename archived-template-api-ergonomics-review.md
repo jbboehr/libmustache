@@ -35,58 +35,50 @@ model.
 
 ### Current happy path
 
-The documented path works, but it enters through the retained low-level AST
-surface:
+The preferred path now stays on the opaque compiled-template surface:
 
 ```cpp
-mustache::Node root;
-mustache::Mustache engine;
-engine.tokenize("Hello {{name}}", &root);
-
+mustache::CompiledTemplate compiled =
+    mustache::compile("Hello {{name}}");
 std::vector<std::uint8_t> bytes =
-    mustache::serializeArchivedTemplate(root);
-mustache::ArchivedTemplateView archived =
+    mustache::serializeArchivedTemplate(compiled);
+mustache::ArchivedTemplate archived =
     mustache::loadArchivedTemplate(bytes);
-std::string output = engine.render(archived, data);
+std::string output = mustache::render(archived, data);
 ```
 
 ### Advanced composed use
 
-Persisting partials requires independently tokenizing nodes and constructing a
-move-only owning map before archive-specific limits can be applied:
+Compiled partials compose with the same archive writer:
 
 ```cpp
-mustache::Node root;
-mustache::Node card;
-engine.tokenize("{{> card}}", &root);
-engine.tokenize("Hello {{name}}", &card);
-
-mustache::Node::Partials partials;
-partials.emplace("card", std::make_unique<mustache::Node>(std::move(card)));
+mustache::CompiledTemplate compiled = mustache::compile("{{> card}}");
+mustache::PartialMap partials;
+partials.emplace("card", mustache::compile("Hello {{name}}"));
 
 mustache::ArchivedTemplateLimits limits;
 limits.maxInputBytes = 1024 * 1024;
 std::vector<std::uint8_t> bytes =
-    mustache::serializeArchivedTemplate(root, partials, limits);
+    mustache::serializeArchivedTemplate(compiled, partials, limits);
 ```
 
-### Plausible near-miss
+### Resolved near-miss
 
-A caller following the preferred ABI 6 API naturally writes:
+At review time, a caller following the preferred ABI 6 API naturally wrote:
 
 ```cpp
 auto compiled = mustache::compile("Hello {{name}}");
 auto bytes = mustache::serializeArchivedTemplate(compiled);
 ```
 
-This does not compile. A focused compiler probe failed because
+This did not compile. A focused compiler probe failed because
 `serializeArchivedTemplate()` requires `const Node&`, not
-`const CompiledTemplate&`.
+`const CompiledTemplate&`. Issue 1 added that composition point.
 
 Another legal but fallible state is:
 
 ```cpp
-mustache::ArchivedTemplateView archived;
+mustache::ArchivedTemplate archived;
 // A failed or skipped assignment leaves archived empty.
 std::string output = mustache::render(archived, data);
 ```
@@ -106,7 +98,7 @@ as a defect below, but it contributes to the lifecycle and error-model tradeoff.
   retained compatibility surface.
 - **Consumer scenario:** An application or extension compiles templates through
   the modern opaque handle, then tries to persist the result.
-- **Evidence:** The compiler rejects
+- **Evidence:** At review time, the compiler rejected
   `serializeArchivedTemplate(compiled)` with an invalid conversion from
   `CompiledTemplate` to `const Node&`. The README therefore teaches manual
   `Node` tokenization instead of the preferred API.
@@ -129,6 +121,9 @@ as a defect below, but it contributes to the lifecycle and error-model tradeoff.
 - **Compatibility:** This is additive if the existing overload remains. Because
   ABI 6 is unreleased, the low-level overload can still be renamed or hidden
   without breaking a released contract.
+- **Resolution:** Implemented with a `CompiledTemplate` plus `PartialMap`
+  overload. The README and installed-consumer path use the opaque compiled
+  representation; the `Node` overload remains the advanced compatibility path.
 - **Confidence:** High. The declaration, migration policy, README, and compiler
   result agree.
 
@@ -195,6 +190,9 @@ as a defect below, but it contributes to the lifecycle and error-model tradeoff.
 - **Compatibility:** Renaming the class changes C++ symbols and source. Do it
   before ABI 6 is released rather than retaining a misleading name or a permanent
   alias.
+- **Resolution:** Renamed to `ArchivedTemplate` without retaining an alias. The
+  load operation, owning shared state, copy/move behavior, and render semantics
+  are unchanged.
 - **Confidence:** High. The public declaration and implementation describe
   unambiguous owning semantics.
 
@@ -282,20 +280,22 @@ as a defect below, but it contributes to the lifecycle and error-model tradeoff.
 
 ## Lens summary
 
+This table reflects the current contract after the recorded resolutions.
+
 | Lens | Assessment | Reason |
 |---|---|---|
-| Obvious path | Weak | The documented writer starts with low-level `Node` rather than the preferred compiled handle. |
+| Obvious path | Strong | The documented path compiles, serializes, loads, and renders through opaque owning handles. |
 | Misuse resistance | Mixed | Validation and immutable ownership are strong, but raw archive bytes, nullable handles, and six positional limit values allow plausible near-misses. |
-| Naming and symmetry | Mixed | `load`/`serialize`/`render` are coherent, but owning `ArchivedTemplateView` conflicts with `CompiledTemplate` and C++ view vocabulary. |
-| Signatures | Mixed | Free and member render overloads align; the writer does not accept the modern type or modern partial map. |
-| Type and IDE experience | Weak | The compiler correctly rejects the unsupported composed call, but completion offers no modern alternative. |
+| Naming and symmetry | Strong | `ArchivedTemplate` parallels `CompiledTemplate`, and `load`/`serialize`/`render` use one vocabulary. |
+| Signatures | Mixed | Modern and advanced writer overloads compose predictably, but aggregate archive limits still permit positional mistakes. |
+| Type and IDE experience | Strong | Opaque compiled templates and typed partial maps flow directly into the archive writer without exposing Cista. |
 | Error model | Mixed | Exceptions are consistent with libmustache, but archive load reasons are not machine-readable. |
-| Lifecycle | Strong to mixed | Defensive copying and shared immutable ownership are excellent; the name and explicit empty state make the lifecycle less obvious than the implementation. |
+| Lifecycle | Strong to mixed | Ownership and cheap copies are explicit, but a default-constructed empty handle remains fallible only when used. |
 | Defaults | Mixed | Defaults are conservative and bounded, but are embedded inline in consumer code and one byte-limit name changes meaning by operation. |
-| Composability | Weak | `CompiledTemplate`/`PartialMap` output cannot flow into the archive writer. |
-| Progressive disclosure | Weak | The persistent high-level feature requires learning the retained low-level AST model. |
-| Discoverability | Mixed | Core verbs are discoverable, but ownership and native compatibility require documentation/source reading. |
-| Evolution | Weak to mixed | The format is explicitly versioned, but there is no public compatibility tag and the unreleased naming/layout choices should be corrected before ABI freeze. |
+| Composability | Strong | `CompiledTemplate` and `PartialMap` feed the writer directly while `Node` remains an advanced path. |
+| Progressive disclosure | Strong | The common path stays opaque; callers encounter the low-level AST only when deliberately selecting it. |
+| Discoverability | Strong to mixed | Names expose ownership and cache compatibility, while limit and failure details still require documentation. |
+| Evolution | Mixed | The format and cache domain are versioned, but aggregate limits still bake defaults into callers before ABI freeze. |
 
 Asynchronous operation and cancellation are not applicable: compilation,
 archive loading, and rendering are intentionally synchronous CPU-bound library
@@ -322,9 +322,9 @@ operations under caller-controlled resource limits.
 Before php-mustache or another consumer treats ABI 6 as stable:
 
 1. Rename `ArchivedTemplateView` to `ArchivedTemplate` so ownership is visible
-   from the type name.
+   from the type name. Completed before ABI 6 release.
 2. Add the `CompiledTemplate` plus `PartialMap` archive-writer overload and make
-   it the primary example and integration path.
+   it the primary example and integration path. Completed.
 3. Give `ArchivedTemplateLimits` an exported constructor, rename
    `maxInputBytes` to `maxArchiveBytes`, and clarify aggregate total fields.
 4. Expose a library-owned archive compatibility tag for cache keys and embed
@@ -344,11 +344,11 @@ regularize resource policy before ABI 6 freezes.
 
 - Public declarations, README examples, installed-consumer usage, exception
   types, format documentation, and ABI-6 migration policy were inspected.
-- A disposable compiler probe confirmed that the preferred
-  `CompiledTemplate` call does not compile.
+- A disposable compiler probe confirmed that, at review time, the preferred
+  `CompiledTemplate` call did not compile.
 - A second disposable compiler probe confirmed that `ArchivedTemplateLimits`
-  is an aggregate and accepts positional initialization, and that
-  `ArchivedTemplateView` is publicly default-constructible.
+  is an aggregate and accepts positional initialization, and that the archived
+  template handle is publicly default-constructible.
 - The repository's existing consumer and archive tests provide executable
   evidence for the current happy path, owning-copy behavior, empty-handle
   rejection, resource limits, and free/member render symmetry.

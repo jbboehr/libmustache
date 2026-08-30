@@ -21,7 +21,7 @@ namespace mustache {
 
 class Data;
 class Mustache;
-class ArchivedTemplateView;
+class ArchivedTemplate;
 
 //! Resource limits applied while creating or validating an archived template.
 struct ArchivedTemplateLimits {
@@ -37,20 +37,20 @@ struct ArchivedTemplateLimits {
 MUSTACHE_API std::string_view archivedTemplateCompatibilityTag() noexcept;
 
 //! Copies archive bytes into owned storage and validates them once.
-MUSTACHE_API ArchivedTemplateView loadArchivedTemplate(
+MUSTACHE_API ArchivedTemplate loadArchivedTemplate(
     const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits = ArchivedTemplateLimits());
 
 //! Copies archive bytes into owned storage and validates them once.
-MUSTACHE_API ArchivedTemplateView loadArchivedTemplate(
+MUSTACHE_API ArchivedTemplate loadArchivedTemplate(
     std::string_view bytes, const ArchivedTemplateLimits& limits = ArchivedTemplateLimits());
 
 //! Renders a previously validated archived template.
-MUSTACHE_API std::string render(const ArchivedTemplateView& archived, const Data& data);
+MUSTACHE_API std::string render(const ArchivedTemplate& archived, const Data& data);
 
 //! Renders a previously validated archived template with resource limits.
-MUSTACHE_API std::string render(const ArchivedTemplateView& archived, const Data& data, const RenderLimits& limits);
+MUSTACHE_API std::string render(const ArchivedTemplate& archived, const Data& data, const RenderLimits& limits);
 
-/*! \class ArchivedTemplateView
+/*! \class ArchivedTemplate
     \brief Opaque, immutable handle over one validated archived template.
 
     The handle owns its archive backing through immutable shared state. Loading
@@ -58,14 +58,14 @@ MUSTACHE_API std::string render(const ArchivedTemplateView& archived, const Data
     validates them once. Copies are inexpensive and remain valid independently
     of the input buffer used to load the archive.
 */
-class ArchivedTemplateView {
+class ArchivedTemplate {
   public:
-    MUSTACHE_API ArchivedTemplateView() noexcept;
-    MUSTACHE_API ArchivedTemplateView(const ArchivedTemplateView& other) noexcept;
-    MUSTACHE_API ArchivedTemplateView& operator=(const ArchivedTemplateView& other) noexcept;
-    MUSTACHE_API ArchivedTemplateView(ArchivedTemplateView&& other) noexcept;
-    MUSTACHE_API ArchivedTemplateView& operator=(ArchivedTemplateView&& other) noexcept;
-    MUSTACHE_API ~ArchivedTemplateView();
+    MUSTACHE_API ArchivedTemplate() noexcept;
+    MUSTACHE_API ArchivedTemplate(const ArchivedTemplate& other) noexcept;
+    MUSTACHE_API ArchivedTemplate& operator=(const ArchivedTemplate& other) noexcept;
+    MUSTACHE_API ArchivedTemplate(ArchivedTemplate&& other) noexcept;
+    MUSTACHE_API ArchivedTemplate& operator=(ArchivedTemplate&& other) noexcept;
+    MUSTACHE_API ~ArchivedTemplate();
 
     //! Returns true when this handle contains no archived template.
     MUSTACHE_API bool empty() const noexcept;
@@ -76,16 +76,16 @@ class ArchivedTemplateView {
   private:
     struct State;
 
-    explicit ArchivedTemplateView(std::shared_ptr<const State> state) noexcept;
+    explicit ArchivedTemplate(std::shared_ptr<const State> state) noexcept;
 
     std::shared_ptr<const State> state;
 
-    friend MUSTACHE_API ArchivedTemplateView loadArchivedTemplate(
+    friend MUSTACHE_API ArchivedTemplate loadArchivedTemplate(
         const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits);
-    friend MUSTACHE_API ArchivedTemplateView loadArchivedTemplate(
+    friend MUSTACHE_API ArchivedTemplate loadArchivedTemplate(
         std::string_view bytes, const ArchivedTemplateLimits& limits);
     friend MUSTACHE_API std::string render(
-        const ArchivedTemplateView& archived, const Data& data, const RenderLimits& limits);
+        const ArchivedTemplate& archived, const Data& data, const RenderLimits& limits);
     friend class Mustache;
 };
 

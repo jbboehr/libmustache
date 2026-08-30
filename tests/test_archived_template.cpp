@@ -210,7 +210,7 @@ void testOwnershipAndRendering()
     throw std::runtime_error(std::string("public serialization failed: ") + exception.what());
   }
 
-  mustache::ArchivedTemplateView archived;
+  mustache::ArchivedTemplate archived;
   expect(archived.empty() && !archived, "a default archived template was not empty");
   {
     std::vector<std::uint8_t> unaligned(serialized.size() + 1);
@@ -224,8 +224,8 @@ void testOwnershipAndRendering()
     std::fill(unaligned.begin(), unaligned.end(), std::uint8_t{0});
   }
 
-  mustache::ArchivedTemplateView copy(archived);
-  mustache::ArchivedTemplateView moved(std::move(archived));
+  mustache::ArchivedTemplate copy(archived);
+  mustache::ArchivedTemplate moved(std::move(archived));
   expect(archived.empty(), "a moved-from archived template was not empty");
   expect(copy && moved, "copying or moving lost the archived template");
 
@@ -234,7 +234,7 @@ void testOwnershipAndRendering()
   expect(mustache::render(copy, first) == "Hello Ada", "an archived template did not own copied input bytes");
   expect(engine.render(moved, second) == "Hello Grace", "an archived template was not reusable");
 
-  mustache::ArchivedTemplateView temporaryBytes =
+  mustache::ArchivedTemplate temporaryBytes =
       mustache::loadArchivedTemplate(std::vector<std::uint8_t>(serialized.begin(), serialized.end()));
   expect(mustache::render(temporaryBytes, first) == "Hello Ada", "copied archive bytes did not render");
 
@@ -250,7 +250,7 @@ void testOwnershipAndRendering()
 
   rejected = false;
   try {
-    (void)mustache::render(mustache::ArchivedTemplateView(), first);
+    (void)mustache::render(mustache::ArchivedTemplate(), first);
   } catch (const mustache::Exception&) {
     rejected = true;
   }
@@ -292,7 +292,7 @@ void testCopiedInputCannotMutateValidatedState()
 
   const std::size_t markerOffset = static_cast<std::size_t>(markerPosition - serialized.begin());
   std::uint8_t * const callerAlias = serialized.data();
-  const mustache::ArchivedTemplateView archived = mustache::loadArchivedTemplate(serialized);
+  const mustache::ArchivedTemplate archived = mustache::loadArchivedTemplate(serialized);
 
   // Loading defensively copies the caller's bytes, so later caller mutations
   // must not change the already validated private archive.
@@ -313,7 +313,7 @@ void testPartialsAndLambdas()
   partials.emplace("card", std::move(card));
 
   const std::vector<std::uint8_t> serialized = mustache::serializeArchivedTemplate(root, partials);
-  const mustache::ArchivedTemplateView archived = mustache::loadArchivedTemplate(serialized);
+  const mustache::ArchivedTemplate archived = mustache::loadArchivedTemplate(serialized);
 
   mustache::Data ownedData = mustache::Data::object();
   ownedData.set("name", mustache::Data::string("Ada"));
@@ -350,7 +350,7 @@ void testCompiledTemplateSerialization()
   partials.emplace("value", mustache::compile("{{.}}"));
 
   const std::vector<std::uint8_t> serialized = mustache::serializeArchivedTemplate(compiled, partials);
-  const mustache::ArchivedTemplateView archived = mustache::loadArchivedTemplate(serialized);
+  const mustache::ArchivedTemplate archived = mustache::loadArchivedTemplate(serialized);
 
   expect(mustache::render(archived, mustache::Data::string("compiled")) == "[compiled]",
       "compiled templates and partials did not compose with archived serialization");
@@ -446,12 +446,11 @@ void testSerializationLimits()
 } // namespace
 
 static_assert(
-    std::is_copy_constructible<mustache::ArchivedTemplateView>::value, "archived templates must be copy constructible");
-static_assert(
-    std::is_copy_assignable<mustache::ArchivedTemplateView>::value, "archived templates must be copy assignable");
-static_assert(std::is_nothrow_move_constructible<mustache::ArchivedTemplateView>::value,
+    std::is_copy_constructible<mustache::ArchivedTemplate>::value, "archived templates must be copy constructible");
+static_assert(std::is_copy_assignable<mustache::ArchivedTemplate>::value, "archived templates must be copy assignable");
+static_assert(std::is_nothrow_move_constructible<mustache::ArchivedTemplate>::value,
     "archived templates must be nothrow move constructible");
-static_assert(std::is_nothrow_move_assignable<mustache::ArchivedTemplateView>::value,
+static_assert(std::is_nothrow_move_assignable<mustache::ArchivedTemplate>::value,
     "archived templates must be nothrow move assignable");
 static_assert(noexcept(mustache::archivedTemplateCompatibilityTag()),
     "the archived-template compatibility tag query must be non-throwing");
