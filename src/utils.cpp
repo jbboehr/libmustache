@@ -47,28 +47,7 @@ void htmlspecialchars(std::string * str)
 {
   std::string tmp;
   tmp.reserve(str->size());
-  for (const char chr : *str) {
-    switch (chr) {
-      case '&':
-        tmp.append("&amp;");
-        break;
-      case '"':
-        tmp.append("&quot;");
-        break;
-      case '\'':
-        tmp.append("&#039;");
-        break;
-      case '<':
-        tmp.append("&lt;");
-        break;
-      case '>':
-        tmp.append("&gt;");
-        break;
-      default:
-        tmp.append(1, chr);
-        break;
-    }
-  }
+  htmlspecialchars_append(*str, &tmp);
   str->swap(tmp);
 }
 
