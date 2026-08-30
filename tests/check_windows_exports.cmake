@@ -54,6 +54,9 @@ if(MUSTACHE_ARCHIVED_TEMPLATES)
     require_archive_export_count("\\?loadArchivedTemplate@mustache@@" 2 "load overloads")
     require_archive_export_count("\\?serializeArchivedTemplate@mustache@@" 2 "serialize overloads")
     require_archive_export_count(
+        "\\?archivedTemplateCompatibilityTag@mustache@@" 1
+        "compatibility tag query")
+    require_archive_export_count(
         "\\?render@Mustache@mustache@@[^\n]*ArchivedTemplateView@" 2
         "member render overloads")
     require_archive_export_count(

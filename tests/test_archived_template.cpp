@@ -28,6 +28,10 @@ namespace {
 
 int failures = 0;
 
+constexpr std::size_t archivePreambleSize = 24;
+constexpr std::size_t archiveFormatGenerationOffset = 8;
+constexpr std::size_t archiveCompatibilityFingerprintOffset = 16;
+
 class FixedLambda final : public mustache::Lambda {
   public:
     explicit FixedLambda(std::string value) :
@@ -49,6 +53,18 @@ void expect(bool condition, const char * message)
     std::fprintf(stderr, "%s\n", message);
     ++failures;
   }
+}
+
+std::uint64_t readLittleEndian(const std::vector<std::uint8_t>& bytes, std::size_t offset)
+{
+  if (offset > bytes.size() || sizeof(std::uint64_t) > bytes.size() - offset) {
+    throw std::runtime_error("archive preamble field is out of bounds");
+  }
+  std::uint64_t value = 0;
+  for (std::size_t index = 0; index < sizeof(value); ++index) {
+    value |= static_cast<std::uint64_t>(bytes[offset + index]) << (index * 8);
+  }
+  return value;
 }
 
 bool isGoldenPlatform(std::size_t pointerBytes) noexcept
@@ -92,7 +108,7 @@ std::vector<std::uint8_t> readGoldenArchive()
   if (topSourceDirectory == nullptr || *topSourceDirectory == '\0') {
     throw std::runtime_error("top_srcdir is required to locate the golden archive");
   }
-  const std::string path = std::string(topSourceDirectory) + "/tests/fixtures/cista-archive-v1-x86_64-le-itanium.hex";
+  const std::string path = std::string(topSourceDirectory) + "/tests/fixtures/cista-archive-v2-x86_64-le-itanium.hex";
   std::ifstream stream(path);
   if (!stream) {
     throw std::runtime_error("unable to open the golden archive");
@@ -127,9 +143,59 @@ void testPublicArchiveGolden()
   partials.emplace("card", std::make_unique<mustache::Node>(std::move(card)));
 
   const std::vector<std::uint8_t> archive = mustache::serializeArchivedTemplate(root, partials);
-  expect(archive == readGoldenArchive(), "the public archive API changed the version 1 golden fixture");
+  expect(archive == readGoldenArchive(), "the public archive API changed the version 2 golden fixture");
   expect(static_cast<bool>(mustache::loadArchivedTemplate(archive)),
       "the public archive API did not load the golden fixture");
+}
+
+void testArchiveCompatibilityPreamble()
+{
+  const mustache::CompiledTemplate compiled = mustache::compile("compatibility");
+  const std::vector<std::uint8_t> archive = mustache::serializeArchivedTemplate(compiled);
+  expect(archive.size() > archivePreambleSize, "the compatibility preamble has no archive payload");
+  expect(readLittleEndian(archive, archiveFormatGenerationOffset) == 2,
+      "the archived-template API did not select format generation 2");
+  const std::uint64_t compatibilityFingerprint = readLittleEndian(archive, archiveCompatibilityFingerprintOffset);
+  expect(compatibilityFingerprint != 0, "the archived-template compatibility fingerprint is empty");
+
+  const std::string_view compatibilityTag = mustache::archivedTemplateCompatibilityTag();
+  constexpr std::string_view compatibilityTagPrefix = "libmustache-cista-v2-";
+  expect(compatibilityTag.size() == compatibilityTagPrefix.size() + 16,
+      "the archived-template compatibility tag has an unexpected size");
+  expect(compatibilityTag.substr(0, compatibilityTagPrefix.size()) == compatibilityTagPrefix,
+      "the archived-template compatibility tag has an unexpected prefix");
+  std::uint64_t taggedFingerprint = 0;
+  if (compatibilityTag.size() == compatibilityTagPrefix.size() + 16) {
+    for (const char digit : compatibilityTag.substr(compatibilityTagPrefix.size())) {
+      taggedFingerprint = (taggedFingerprint << 4) | hexNibble(digit);
+    }
+  }
+  expect(taggedFingerprint == compatibilityFingerprint,
+      "the public compatibility tag does not identify the serialized archive representation");
+  if (isGoldenPlatform(sizeof(void *))) {
+    expect(compatibilityTag == "libmustache-cista-v2-cb437bcd4adcbe5d",
+        "the x86-64 little-endian Itanium compatibility tag changed");
+  }
+
+  std::vector<std::uint8_t> previousGeneration = archive;
+  previousGeneration[archiveFormatGenerationOffset] = 1;
+  bool rejected = false;
+  try {
+    static_cast<void>(mustache::loadArchivedTemplate(previousGeneration));
+  } catch (const mustache::Exception& exception) {
+    rejected = std::string_view(exception.what()) == "Unsupported libmustache archive format generation";
+  }
+  expect(rejected, "an archive from a different format generation was not rejected at the preamble boundary");
+
+  std::vector<std::uint8_t> incompatible = archive;
+  incompatible[archiveCompatibilityFingerprintOffset] ^= std::uint8_t{1};
+  rejected = false;
+  try {
+    static_cast<void>(mustache::loadArchivedTemplate(incompatible));
+  } catch (const mustache::Exception& exception) {
+    rejected = std::string_view(exception.what()) == "Unsupported libmustache archive compatibility";
+  }
+  expect(rejected, "an incompatible native archive was not rejected at the preamble boundary");
 }
 
 void testOwnershipAndRendering()
@@ -387,11 +453,14 @@ static_assert(std::is_nothrow_move_constructible<mustache::ArchivedTemplateView>
     "archived templates must be nothrow move constructible");
 static_assert(std::is_nothrow_move_assignable<mustache::ArchivedTemplateView>::value,
     "archived templates must be nothrow move assignable");
+static_assert(noexcept(mustache::archivedTemplateCompatibilityTag()),
+    "the archived-template compatibility tag query must be non-throwing");
 
 int main()
 {
   try {
     testPublicArchiveGolden();
+    testArchiveCompatibilityPreamble();
     testOwnershipAndRendering();
     testCopiedInputCannotMutateValidatedState();
     testPartialsAndLambdas();

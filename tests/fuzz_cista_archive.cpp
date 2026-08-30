@@ -17,7 +17,7 @@
 namespace {
 
 constexpr std::size_t maxFuzzInputBytes = 4096;
-constexpr std::size_t archivePreambleSize = 16;
+constexpr std::size_t archivePreambleSize = 24;
 constexpr std::size_t cistaVersionFieldSize = 8;
 constexpr std::size_t cistaIntegrityFieldSize = 8;
 constexpr std::size_t cistaIntegrityFieldOffset = archivePreambleSize + cistaVersionFieldSize;

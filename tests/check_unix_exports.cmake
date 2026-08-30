@@ -85,6 +85,9 @@ if(MUSTACHE_ARCHIVED_TEMPLATES)
         "^_?_ZN8mustache25serializeArchivedTemplate.*$" 2
         "serializeArchivedTemplate overloads")
     require_export_count(
+        "^_?_ZN8mustache32archivedTemplateCompatibilityTagEv$" 1
+        "archivedTemplateCompatibilityTag")
+    require_export_count(
         "^_?_ZN8mustache6render.*20ArchivedTemplateView.*$" 2
         "archived-template free render overloads")
     require_export_count(

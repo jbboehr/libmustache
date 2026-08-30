@@ -82,6 +82,13 @@ if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
     add_executable(test_archived_template test_archived_template.cpp)
     target_link_libraries(test_archived_template PRIVATE mustache_static)
     mustache_apply_build_options(test_archived_template)
+    if(MUSTACHE_TEST_CISTA_VERSION_MUTATION)
+        add_executable(test_cista_version_mutation
+            test_cista_version_mutation.cpp)
+        target_link_libraries(test_cista_version_mutation PRIVATE
+            mustache_static)
+        mustache_apply_build_options(test_cista_version_mutation)
+    endif()
 endif()
 
 if(MUSTACHE_BUILD_CLI)
@@ -177,6 +184,12 @@ add_test(NAME tokenizer_safety COMMAND test_tokenizer_safety)
 add_test(NAME compiled_template COMMAND test_compiled_template)
 add_test(NAME renderer_safety COMMAND test_renderer_safety)
 add_test(NAME allocation_failure COMMAND test_allocation_failure)
+if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES AND NOT CMAKE_CROSSCOMPILING)
+    add_test(NAME archive_allocation_failure
+        COMMAND "${CMAKE_COMMAND}"
+            "-DMUSTACHE_TEST_ALLOCATION_FAILURE_EXECUTABLE=$<TARGET_FILE:test_allocation_failure>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/check_archive_allocation_failure.cmake")
+endif()
 add_test(NAME archive_runtime_dependency_names
     COMMAND "${CMAKE_COMMAND}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/verify_archive_runtime_dependency_names.cmake")
@@ -205,6 +218,40 @@ if(MUSTACHE_IS_TOP_LEVEL AND NOT MSVC)
             "-DMUSTACHE_TEST_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}"
             "-DMUSTACHE_TEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/check_archive_feature_modes.cmake")
+endif()
+if(MUSTACHE_IS_TOP_LEVEL AND MUSTACHE_HAVE_ARCHIVED_TEMPLATES AND
+        NOT CMAKE_CROSSCOMPILING)
+    add_test(NAME cista_version_mutation
+        COMMAND "${CMAKE_COMMAND}"
+            "-DMUSTACHE_TEST_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
+            "-DMUSTACHE_TEST_BINARY_ROOT=${CMAKE_CURRENT_BINARY_DIR}/cista-version-mutation"
+            "-DMUSTACHE_TEST_GENERATOR=${CMAKE_GENERATOR}"
+            "-DMUSTACHE_TEST_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}"
+            "-DMUSTACHE_TEST_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}"
+            "-DMUSTACHE_TEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+            "-DMUSTACHE_TEST_CXX_COMPILER_ARG1=${CMAKE_CXX_COMPILER_ARG1}"
+            "-DMUSTACHE_TEST_CXX_COMPILER_TARGET=${CMAKE_CXX_COMPILER_TARGET}"
+            "-DMUSTACHE_TEST_CXX_COMPILER_EXTERNAL_TOOLCHAIN=${CMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN}"
+            "-DMUSTACHE_TEST_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
+            "-DMUSTACHE_TEST_SYSROOT=${CMAKE_SYSROOT}"
+            "-DMUSTACHE_TEST_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}"
+            "-DMUSTACHE_TEST_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}"
+            "-DMUSTACHE_TEST_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}"
+            "-DMUSTACHE_TEST_GENERATOR_INSTANCE=${CMAKE_GENERATOR_INSTANCE}"
+            "-DMUSTACHE_TEST_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+            "-DMUSTACHE_TEST_CXX_FLAGS=${CMAKE_CXX_FLAGS}"
+            "-DMUSTACHE_TEST_CXX_FLAGS_DEBUG=${CMAKE_CXX_FLAGS_DEBUG}"
+            "-DMUSTACHE_TEST_CXX_FLAGS_RELEASE=${CMAKE_CXX_FLAGS_RELEASE}"
+            "-DMUSTACHE_TEST_CXX_FLAGS_RELWITHDEBINFO=${CMAKE_CXX_FLAGS_RELWITHDEBINFO}"
+            "-DMUSTACHE_TEST_CXX_FLAGS_MINSIZEREL=${CMAKE_CXX_FLAGS_MINSIZEREL}"
+            "-DMUSTACHE_TEST_EXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
+            "-DMUSTACHE_TEST_EXE_LINKER_FLAGS_DEBUG=${CMAKE_EXE_LINKER_FLAGS_DEBUG}"
+            "-DMUSTACHE_TEST_EXE_LINKER_FLAGS_RELEASE=${CMAKE_EXE_LINKER_FLAGS_RELEASE}"
+            "-DMUSTACHE_TEST_EXE_LINKER_FLAGS_RELWITHDEBINFO=${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO}"
+            "-DMUSTACHE_TEST_EXE_LINKER_FLAGS_MINSIZEREL=${CMAKE_EXE_LINKER_FLAGS_MINSIZEREL}"
+            "-DMUSTACHE_TEST_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+            "-DMUSTACHE_TEST_CONFIG=$<CONFIG>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/check_cista_version_mutation.cmake")
 endif()
 if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
     add_test(NAME cista_archive COMMAND test_cista_archive)
@@ -339,11 +386,11 @@ if(MUSTACHE_ENABLE_FUZZING)
         file(COPY "${MUSTACHE_CISTA_FUZZ_CORPUS_SOURCE}/"
             DESTINATION "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}")
         file(READ
-            "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/cista-archive-v1-x86_64-le-itanium.hex"
+            "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/cista-archive-v2-x86_64-le-itanium.hex"
             MUSTACHE_CISTA_GOLDEN_HEX)
-        file(WRITE "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}/golden-v1"
+        file(WRITE "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}/golden-v2"
             "hex:${MUSTACHE_CISTA_GOLDEN_HEX}")
-        file(WRITE "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}/integrity-repair-v1"
+        file(WRITE "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}/integrity-repair-v2"
             "corrupt-integrity:${MUSTACHE_CISTA_GOLDEN_HEX}")
         add_test(NAME fuzz_cista_archive_smoke
             COMMAND "${CMAKE_COMMAND}"

@@ -145,6 +145,12 @@ if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
     set(MUSTACHE_NEED_CISTA ON)
 endif()
 
+set(MUSTACHE_NEED_CISTA_RUNTIME_VERSION_WITNESS OFF)
+if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES OR
+        MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3)
+    set(MUSTACHE_NEED_CISTA_RUNTIME_VERSION_WITNESS ON)
+endif()
+
 if(MUSTACHE_USE_SYSTEM_CISTA AND NOT MUSTACHE_NEED_CISTA)
     message(FATAL_ERROR
         "MUSTACHE_USE_SYSTEM_CISTA requires archived-template support "
@@ -255,6 +261,80 @@ if(MUSTACHE_NEED_CISTA)
             "${CMAKE_CURRENT_SOURCE_DIR}/vendor/cista")
         target_compile_features(mustache_cista_headers INTERFACE cxx_std_17)
         set(MUSTACHE_CISTA_TARGET mustache_cista_headers)
+    endif()
+
+    if(MUSTACHE_NEED_CISTA_RUNTIME_VERSION_WITNESS)
+        if(CMAKE_CROSSCOMPILING AND NOT CMAKE_CROSSCOMPILING_EMULATOR)
+            set(MUSTACHE_CISTA_VERSION_ALGORITHM_VERIFIED OFF CACHE BOOL
+                "Matching native build verified the selected Cista type-version algorithm")
+            mark_as_advanced(MUSTACHE_CISTA_VERSION_ALGORITHM_VERIFIED)
+            if(NOT MUSTACHE_CISTA_VERSION_ALGORITHM_VERIFIED)
+                message(FATAL_ERROR
+                    "Cross-compiling Cista runtime-version support requires CMAKE_CROSSCOMPILING_EMULATOR or MUSTACHE_CISTA_VERSION_ALGORITHM_VERIFIED=ON from a matching native dependency witness")
+            endif()
+            message(STATUS
+                "Using the cached matching-native Cista version-algorithm witness while cross-compiling")
+        else()
+            set(MUSTACHE_CISTA_VERSION_PROBE_DEFINITIONS
+                -DCISTA_XXH3=1
+                -DMUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1)
+            set(MUSTACHE_CISTA_VERSION_PROBE_INCLUDE_DIRECTORIES
+                "${CMAKE_CURRENT_SOURCE_DIR}/src/archive/xxh3")
+            set(MUSTACHE_CISTA_VERSION_PROBE_LINK_LIBRARIES)
+            if(MUSTACHE_USE_SYSTEM_CISTA)
+                get_target_property(MUSTACHE_CISTA_VERSION_PROBE_CISTA_INCLUDES
+                    ${MUSTACHE_CISTA_TARGET} INTERFACE_INCLUDE_DIRECTORIES)
+                list(APPEND MUSTACHE_CISTA_VERSION_PROBE_INCLUDE_DIRECTORIES
+                    ${MUSTACHE_CISTA_VERSION_PROBE_CISTA_INCLUDES})
+            else()
+                list(APPEND MUSTACHE_CISTA_VERSION_PROBE_DEFINITIONS
+                    -DMUSTACHE_USE_VENDORED_CISTA=1)
+                list(APPEND MUSTACHE_CISTA_VERSION_PROBE_INCLUDE_DIRECTORIES
+                    "${CMAKE_CURRENT_SOURCE_DIR}/vendor/cista")
+            endif()
+            if(MUSTACHE_USE_SYSTEM_XXHASH)
+                list(APPEND MUSTACHE_CISTA_VERSION_PROBE_LINK_LIBRARIES
+                    ${MUSTACHE_XXHASH_TARGET})
+            else()
+                list(APPEND MUSTACHE_CISTA_VERSION_PROBE_DEFINITIONS
+                    -DXXH_IMPLEMENTATION=1
+                    -DXXH_STATIC_LINKING_ONLY=1
+                    -DXXH_NAMESPACE=MUSTACHE_CISTA_XXH_)
+                list(APPEND MUSTACHE_CISTA_VERSION_PROBE_INCLUDE_DIRECTORIES
+                    "${CMAKE_CURRENT_SOURCE_DIR}/vendor/xxhash")
+            endif()
+            # try_run stores both results in the persistent CMake cache. Recheck on
+            # every configure so an in-place system dependency update cannot reuse
+            # a stale successful witness.
+            unset(MUSTACHE_CISTA_VERSION_PROBE_RESULT CACHE)
+            unset(MUSTACHE_CISTA_VERSION_PROBE_COMPILED CACHE)
+            try_run(
+                MUSTACHE_CISTA_VERSION_PROBE_RESULT
+                MUSTACHE_CISTA_VERSION_PROBE_COMPILED
+                "${CMAKE_CURRENT_BINARY_DIR}/cista-version-algorithm-probe"
+                SOURCES
+                    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_cista_version_algorithm.cpp"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/src/archive/xxh3.cpp"
+                CMAKE_FLAGS
+                    "-DCMAKE_CXX_STANDARD=17"
+                    "-DCMAKE_CXX_STANDARD_REQUIRED=ON"
+                    "-DCMAKE_CXX_EXTENSIONS=OFF"
+                    "-DINCLUDE_DIRECTORIES=${MUSTACHE_CISTA_VERSION_PROBE_INCLUDE_DIRECTORIES}"
+                COMPILE_DEFINITIONS
+                    ${MUSTACHE_CISTA_VERSION_PROBE_DEFINITIONS}
+                LINK_LIBRARIES
+                    ${MUSTACHE_CISTA_VERSION_PROBE_LINK_LIBRARIES}
+                COMPILE_OUTPUT_VARIABLE MUSTACHE_CISTA_VERSION_PROBE_COMPILE_OUTPUT
+                RUN_OUTPUT_VARIABLE MUSTACHE_CISTA_VERSION_PROBE_OUTPUT)
+            if(NOT MUSTACHE_CISTA_VERSION_PROBE_COMPILED)
+                message(FATAL_ERROR
+                    "Compiling the Cista runtime type-version algorithm witness failed:\n${MUSTACHE_CISTA_VERSION_PROBE_COMPILE_OUTPUT}")
+            endif()
+            if(NOT MUSTACHE_CISTA_VERSION_PROBE_RESULT EQUAL 0)
+                message(FATAL_ERROR
+                    "The selected Cista runtime type-version algorithm does not match libmustache's allocation-free generation-2 adapter")
+            endif()
+        endif()
     endif()
 endif()
 

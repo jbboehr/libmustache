@@ -14,7 +14,7 @@ EXTRA_DIST = \
 	benchmarks/cista-archive.hpp \
 	benchmarks/test-cista-archive.cpp \
 	docs/development/abi-6-source-migration-2026-08-20.md \
-	docs/development/cista-archive-format-v1.md \
+	docs/development/cista-archive-format-v2.md \
 	CMakeLists.txt \
 	.clang-tidy \
 	.appveyor.yml \
@@ -22,6 +22,7 @@ EXTRA_DIST = \
 	.github/workflows/ci.yml \
 	cmake/mustache_config.h.in \
 	cmake/mustacheConfig.cmake.in \
+	cmake/check_cista_version_algorithm.cpp \
 	default.nix \
 	flake.nix \
 	flake.lock \
@@ -29,6 +30,8 @@ EXTRA_DIST = \
 	scripts/check-version-consistency.sh \
 	src/archive/.clang-tidy \
 	src/archive/cista.cpp \
+	src/archive/cista_include.hpp \
+	src/archive/cista_version.hpp \
 	src/archive/xxh3.cpp \
 	src/archive/xxh3/xxh3.h \
 	spec/specs \

@@ -33,6 +33,9 @@ struct ArchivedTemplateLimits {
     std::size_t maxDataParts = 100000;
 };
 
+//! Returns an opaque identifier suitable for archived-template cache keys.
+MUSTACHE_API std::string_view archivedTemplateCompatibilityTag() noexcept;
+
 //! Copies archive bytes into owned storage and validates them once.
 MUSTACHE_API ArchivedTemplateView loadArchivedTemplate(
     const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits = ArchivedTemplateLimits());

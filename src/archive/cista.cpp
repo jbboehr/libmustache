@@ -8,72 +8,13 @@
 
 #include "render_engine.hpp"
 
-#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3) && defined(CISTA_FNV1A)
-#undef CISTA_FNV1A
-#endif
 #if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
 #include "xxh3/xxh3.h"
 #else
 #include <xxhash.h>
 #endif
-#if defined(_MSC_VER) && defined(_M_IX86)
-#include <cstdint>
-#include <intrin.h>
-
-namespace {
-
-std::uint64_t mustacheCistaInterlockedOr64(std::int64_t * block, std::uint64_t mask) noexcept
-{
-  volatile __int64 * target = reinterpret_cast<volatile __int64 *>(block);
-  __int64 observed = _InterlockedCompareExchange64(target, 0, 0);
-  for (;;) {
-    const __int64 desired = static_cast<__int64>(static_cast<std::uint64_t>(observed) | mask);
-    const __int64 previous = _InterlockedCompareExchange64(target, desired, observed);
-    if (previous == observed) {
-      return static_cast<std::uint64_t>(observed);
-    }
-    observed = previous;
-  }
-}
-
-std::uint64_t mustacheCistaInterlockedAnd64(std::int64_t * block, std::uint64_t mask) noexcept
-{
-  volatile __int64 * target = reinterpret_cast<volatile __int64 *>(block);
-  __int64 observed = _InterlockedCompareExchange64(target, 0, 0);
-  for (;;) {
-    const __int64 desired = static_cast<__int64>(static_cast<std::uint64_t>(observed) & mask);
-    const __int64 previous = _InterlockedCompareExchange64(target, desired, observed);
-    if (previous == observed) {
-      return static_cast<std::uint64_t>(observed);
-    }
-    observed = previous;
-  }
-}
-
-} // namespace
-
-// Cista 0.16 uses x64-only MSVC intrinsics in inline helpers even when those
-// helpers are not instantiated by the archive schema. Supply equivalent CAS
-// loops while parsing the dependency header so Win32 can compile it.
-#define _InterlockedOr64 mustacheCistaInterlockedOr64
-#define _InterlockedAnd64 mustacheCistaInterlockedAnd64
-#endif
-#if defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable : 4702)
-#endif
-#if defined(MUSTACHE_USE_VENDORED_CISTA)
-#include <cista.h>
-#else
-#include <cista/serialization.h>
-#endif
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
-#if defined(_MSC_VER) && defined(_M_IX86)
-#undef _InterlockedAnd64
-#undef _InterlockedOr64
-#endif
+#include "cista_include.hpp"
+#include "cista_version.hpp"
 #if defined(MUSTACHE_CISTA_HAVE_ZLIB)
 #include <zlib.h>
 #endif
@@ -105,14 +46,11 @@ struct CompiledPartialSource {
 
 namespace {
 
-namespace archive_data = cista::offset;
-
-constexpr std::uint64_t archiveGraphMagic = UINT64_C(0x4D55535443495354);
-constexpr std::uint32_t archiveSchemaVersion = 1;
-constexpr std::size_t archivePreambleSize = 16;
+constexpr std::size_t archivePreambleSize = 24;
 constexpr std::array<std::uint8_t, 8> archivePreambleMagic = {'M', 'U', 'S', 'T', 'A', 'R', 'C', 0};
-constexpr std::uint64_t archiveFormatGeneration = 1;
+constexpr std::uint64_t archiveFormatGeneration = 2;
 constexpr std::size_t archiveFormatGenerationOffset = archivePreambleMagic.size();
+constexpr std::size_t archiveCompatibilityFingerprintOffset = archiveFormatGenerationOffset + sizeof(std::uint64_t);
 #if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
 constexpr cista::mode archiveVersionMode = cista::mode::WITH_VERSION;
 #else
@@ -126,7 +64,53 @@ constexpr cista::mode archiveModeDeepCheck = archiveVersionMode | cista::mode::D
 constexpr cista::mode archiveModeIntegrity = archiveVersionMode | cista::mode::WITH_INTEGRITY;
 #endif
 constexpr std::size_t renderNestingCeiling = mustache::detail::renderNestingCeiling;
-constexpr std::uint32_t invalidIndex = std::numeric_limits<std::uint32_t>::max();
+static_assert(std::is_unsigned_v<cista::hash_t> && sizeof(cista::hash_t) == sizeof(std::uint64_t),
+    "archive generation 2 requires a 64-bit unsigned Cista type version");
+
+template <cista::mode Mode> std::uint64_t archiveCompatibilityFingerprint() noexcept;
+
+template <cista::mode Mode> constexpr cista::mode archiveCistaExecutionMode() noexcept
+{
+  static_assert(cista::is_mode_enabled(Mode, cista::mode::WITH_VERSION) !=
+          cista::is_mode_enabled(Mode, cista::mode::WITH_STATIC_VERSION),
+      "archive modes must select exactly one logical Cista version representation");
+  static_assert(cista::is_mode_disabled(Mode, cista::mode::SKIP_VERSION),
+      "archive modes must not skip the explicit logical type version");
+  static_assert(cista::is_mode_disabled(Mode, cista::mode::SKIP_INTEGRITY),
+      "archive modes must not reserve an unwritten integrity field");
+  static_assert(cista::is_mode_disabled(Mode, cista::mode::UNCHECKED), "archive modes must preserve validation");
+  static_assert(cista::is_mode_disabled(Mode, cista::mode::CAST),
+      "archive modes must preserve the fixed ArchiveGraph representation");
+  cista::mode result = cista::mode::SKIP_VERSION;
+  if constexpr (cista::is_mode_enabled(Mode, cista::mode::WITH_INTEGRITY)) {
+    result = result | cista::mode::WITH_INTEGRITY;
+  }
+#if !defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
+  if constexpr (cista::is_mode_enabled(Mode, cista::mode::DEEP_CHECK)) {
+    result = result | cista::mode::DEEP_CHECK;
+  }
+#endif
+  if constexpr (cista::is_mode_enabled(Mode, cista::mode::SERIALIZE_BIG_ENDIAN)) {
+    result = result | cista::mode::SERIALIZE_BIG_ENDIAN;
+  }
+  return result;
+}
+
+#if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
+static_assert(
+    cista::is_mode_disabled(archiveCistaExecutionMode<archiveModeDeepCheckAndIntegrity>(), cista::mode::DEEP_CHECK),
+    "the production archive reader must use allocation-safe fixed-schema deep checking");
+#else
+static_assert(cista::is_mode_disabled(archiveCistaExecutionMode<archiveModeNeither>(), cista::mode::DEEP_CHECK),
+    "the benchmark neither mode must not execute Cista deep checking");
+static_assert(cista::is_mode_enabled(archiveCistaExecutionMode<archiveModeDeepCheck>(), cista::mode::DEEP_CHECK),
+    "the benchmark deep-check mode must execute Cista deep checking");
+static_assert(cista::is_mode_disabled(archiveCistaExecutionMode<archiveModeIntegrity>(), cista::mode::DEEP_CHECK),
+    "the benchmark integrity mode must not execute Cista deep checking");
+static_assert(
+    cista::is_mode_enabled(archiveCistaExecutionMode<archiveModeDeepCheckAndIntegrity>(), cista::mode::DEEP_CHECK),
+    "the benchmark protected mode must execute Cista deep checking");
+#endif
 
 template <typename Unsigned>
 void writeLittleEndian(std::vector<std::uint8_t> * bytes, std::size_t offset, Unsigned value)
@@ -147,6 +131,7 @@ template <typename Unsigned> Unsigned readLittleEndian(std::string_view bytes, s
   return value;
 }
 
+template <cista::mode Mode>
 std::vector<std::uint8_t> frameArchive(std::vector<std::uint8_t>&& payload, const CistaArchiveLimits& limits)
 {
   if (limits.maxInputBytes < archivePreambleSize || payload.size() > limits.maxInputBytes - archivePreambleSize) {
@@ -158,10 +143,12 @@ std::vector<std::uint8_t> frameArchive(std::vector<std::uint8_t>&& payload, cons
   bytes.resize(archivePreambleSize, 0);
   std::copy(archivePreambleMagic.begin(), archivePreambleMagic.end(), bytes.begin());
   writeLittleEndian(&bytes, archiveFormatGenerationOffset, archiveFormatGeneration);
+  writeLittleEndian(&bytes, archiveCompatibilityFingerprintOffset, archiveCompatibilityFingerprint<Mode>());
   bytes.insert(bytes.end(), payload.begin(), payload.end());
   return bytes;
 }
 
+template <cista::mode Mode>
 std::string_view readArchivePreamble(std::string_view bytes, const CistaArchiveLimits& limits)
 {
   if (bytes.empty()) {
@@ -179,6 +166,10 @@ std::string_view readArchivePreamble(std::string_view bytes, const CistaArchiveL
   if (readLittleEndian<std::uint64_t>(bytes, archiveFormatGenerationOffset) != archiveFormatGeneration) {
     throw mustache::Exception("Unsupported libmustache archive format generation");
   }
+  if (readLittleEndian<std::uint64_t>(bytes, archiveCompatibilityFingerprintOffset) !=
+      archiveCompatibilityFingerprint<Mode>()) {
+    throw mustache::Exception("Unsupported libmustache archive compatibility");
+  }
   if (bytes.size() == archivePreambleSize) {
     throw mustache::Exception("Empty Cista archive payload");
   }
@@ -191,44 +182,169 @@ enum Presence : std::uint8_t {
   HasStopSequence = 4,
 };
 
-struct ArchiveSlice {
-    std::uint32_t offset = 0;
-    std::uint32_t length = 0;
-};
+template <cista::mode Mode> std::uint64_t archiveTypeVersion() noexcept
+{
+  if constexpr (cista::is_mode_enabled(Mode, cista::mode::WITH_VERSION)) {
+    // Cista's runtime helper allocates a std::map. Reproduce its canonical
+    // type walk with fixed storage so the public noexcept tag remains safe.
+    return archiveRuntimeTypeVersion();
+  }
+  if constexpr (cista::is_mode_enabled(Mode, cista::mode::WITH_STATIC_VERSION)) {
+    return static_cast<std::uint64_t>(cista::static_type_hash<ArchiveGraph>());
+  }
+  return 0;
+}
 
-struct ArchiveNode {
-    ArchiveSlice data;
-    ArchiveSlice startSequence;
-    ArchiveSlice stopSequence;
-    std::uint32_t firstChild = invalidIndex;
-    std::uint32_t nextSibling = invalidIndex;
-    std::uint16_t type = 0;
-    std::uint16_t flags = 0;
-    std::uint8_t presence = 0;
-    std::uint8_t reserved0 = 0;
-    std::uint8_t reserved1 = 0;
-    std::uint8_t reserved2 = 0;
-};
+template <cista::mode Mode> void validateArchiveTypeVersion(std::string_view payload)
+{
+  if constexpr (cista::is_mode_enabled(Mode, cista::mode::WITH_VERSION) ||
+      cista::is_mode_enabled(Mode, cista::mode::WITH_STATIC_VERSION)) {
+    if (payload.size() < sizeof(cista::hash_t)) {
+      throw mustache::Exception("Truncated Cista archive type version");
+    }
+    cista::hash_t serializedVersion = 0;
+    std::memcpy(&serializedVersion, payload.data(), sizeof(serializedVersion));
+    if (static_cast<std::uint64_t>(cista::convert_endian<Mode>(serializedVersion)) != archiveTypeVersion<Mode>()) {
+      throw mustache::Exception("Unsupported Cista archive type version");
+    }
+  }
+}
 
-struct ArchivePartial {
-    ArchiveSlice name;
-    std::uint32_t root = 0;
-};
+template <cista::mode Mode, typename Target> void writeArchiveTypeVersion(Target& target)
+{
+  const cista::hash_t serializedVersion =
+      cista::convert_endian<Mode>(static_cast<cista::hash_t>(archiveTypeVersion<Mode>()));
+  if (target.write(&serializedVersion, sizeof(serializedVersion)) != 0) {
+    throw mustache::Exception("Invalid Cista archive type version offset");
+  }
+}
 
-struct ArchiveGraph {
-    std::uint64_t magic = archiveGraphMagic;
-    std::uint32_t version = archiveSchemaVersion;
-    std::uint32_t root = 0;
-    std::uint64_t serializedSize = 0;
-    archive_data::vector<ArchiveNode> nodes;
-    archive_data::vector<ArchivePartial> partials;
-    archive_data::vector<std::uint8_t> strings;
-#if defined(_MSC_VER) && defined(_M_IX86)
-    // MSVC gives this graph eight-byte alignment on x86. Make its four tail
-    // padding bytes explicit so Cista cannot serialize indeterminate data.
-    std::uint32_t reserved = 0;
+std::uint64_t appendCompatibilityValue(std::uint64_t hash, std::uint64_t value) noexcept
+{
+  constexpr std::uint64_t prime = UINT64_C(1099511628211);
+  for (std::size_t index = 0; index < sizeof(value); ++index) {
+    hash ^= static_cast<std::uint8_t>(value >> (index * 8));
+    hash *= prime;
+  }
+  return hash;
+}
+
+std::uint64_t appendCompatibilityOffset(std::uint64_t hash, cista::offset_t offset) noexcept
+{
+  return appendCompatibilityValue(hash, static_cast<std::uint64_t>(offset));
+}
+
+template <typename Type> std::uint64_t appendTypeLayout(std::uint64_t hash) noexcept
+{
+  hash = appendCompatibilityValue(hash, sizeof(Type));
+  return appendCompatibilityValue(hash, alignof(Type));
+}
+
+template <typename Element> std::uint64_t appendVectorLayout(std::uint64_t hash) noexcept
+{
+  using Vector = archive_data::vector<Element>;
+  using Pointer = typename Vector::pointer;
+  hash = appendTypeLayout<Vector>(hash);
+  hash = appendTypeLayout<Pointer>(hash);
+  hash = appendCompatibilityOffset(hash, cista_member_offset(Vector, el_));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(Vector, used_size_));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(Vector, allocated_size_));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(Vector, self_allocated_));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(Vector, __fill_0__));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(Vector, __fill_1__));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(Vector, __fill_2__));
+  return appendCompatibilityOffset(hash, cista_member_offset(Pointer, offset_));
+}
+
+template <cista::mode Mode> std::uint64_t archiveCompatibilityFingerprint() noexcept
+{
+  constexpr std::uint64_t offsetBasis = UINT64_C(14695981039346656037);
+  std::uint64_t hash = appendCompatibilityValue(offsetBasis, archiveFormatGeneration);
+  hash = appendCompatibilityValue(hash, archiveSchemaVersion);
+  hash = appendCompatibilityValue(hash, archiveGraphMagic);
+
+  std::uint64_t representation = 0;
+  if constexpr (cista::is_mode_enabled(Mode, cista::mode::WITH_VERSION)) {
+    representation |= UINT64_C(1) << 0;
+  }
+  if constexpr (cista::is_mode_enabled(Mode, cista::mode::WITH_STATIC_VERSION)) {
+    representation |= UINT64_C(1) << 1;
+  }
+  if constexpr (cista::is_mode_enabled(Mode, cista::mode::WITH_INTEGRITY)) {
+    representation |= UINT64_C(1) << 2;
+#if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
+    representation |= UINT64_C(1) << 3;
+#else
+    representation |= UINT64_C(1) << 4;
 #endif
-};
+  }
+  hash = appendCompatibilityValue(hash, representation);
+  hash = appendCompatibilityOffset(hash, cista::data_start(Mode));
+  hash = appendTypeLayout<cista::hash_t>(hash);
+
+  const std::uint16_t nativeEndian = 1;
+  hash = appendCompatibilityValue(hash, *reinterpret_cast<const std::uint8_t *>(&nativeEndian) == 1 ? 1 : 2);
+  hash = appendTypeLayout<void *>(hash);
+  hash = appendTypeLayout<cista::offset_t>(hash);
+  hash = appendTypeLayout<ArchiveSlice>(hash);
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveSlice, offset));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveSlice, length));
+  hash = appendTypeLayout<ArchiveNode>(hash);
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, data));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, startSequence));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, stopSequence));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, firstChild));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, nextSibling));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, type));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, flags));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, presence));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, reserved0));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, reserved1));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, reserved2));
+  hash = appendTypeLayout<ArchivePartial>(hash);
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchivePartial, name));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchivePartial, root));
+  hash = appendTypeLayout<ArchiveGraph>(hash);
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveGraph, magic));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveGraph, version));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveGraph, root));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveGraph, serializedSize));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveGraph, nodes));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveGraph, partials));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveGraph, strings));
+#if defined(_MSC_VER) && defined(_M_IX86)
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveGraph, reserved));
+#endif
+  hash = appendVectorLayout<ArchiveNode>(hash);
+  hash = appendVectorLayout<ArchivePartial>(hash);
+  hash = appendVectorLayout<std::uint8_t>(hash);
+  return appendCompatibilityValue(hash, archiveTypeVersion<Mode>());
+}
+
+#if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
+constexpr std::string_view archiveCompatibilityTagPrefix = "libmustache-cista-v2-";
+
+std::array<char, archiveCompatibilityTagPrefix.size() + 16> makeArchiveCompatibilityTag(
+    std::uint64_t fingerprint) noexcept
+{
+  constexpr std::string_view hexadecimal = "0123456789abcdef";
+  std::array<char, archiveCompatibilityTagPrefix.size() + 16> tag{};
+  std::copy(archiveCompatibilityTagPrefix.begin(), archiveCompatibilityTagPrefix.end(), tag.begin());
+  for (std::size_t index = 0; index < 16; ++index) {
+    const std::size_t shift = (15 - index) * 4;
+    const std::size_t digit = static_cast<std::size_t>((fingerprint >> shift) & 0xF);
+    tag[archiveCompatibilityTagPrefix.size() + index] = hexadecimal[digit];
+  }
+  return tag;
+}
+
+template <cista::mode Mode> std::string_view archiveCompatibilityTag() noexcept
+{
+  static const std::array<char, archiveCompatibilityTagPrefix.size() + 16> tag =
+      makeArchiveCompatibilityTag(archiveCompatibilityFingerprint<Mode>());
+  return std::string_view(tag.data(), tag.size());
+}
+#endif
 
 #if defined(_MSC_VER) && defined(_M_IX86)
 static_assert(cista_member_offset(ArchiveGraph, reserved) + sizeof(ArchiveGraph::reserved) == sizeof(ArchiveGraph),
@@ -1186,14 +1302,24 @@ class ArchivePartialSource {
 
 template <cista::mode Mode> const ArchiveGraph& readArchive(std::string_view bytes, const CistaArchiveLimits& limits)
 {
-  const std::string_view payload = readArchivePreamble(bytes, limits);
+  constexpr cista::mode executionMode = archiveCistaExecutionMode<Mode>();
+  static_assert(cista::data_start(executionMode) == cista::data_start(Mode),
+      "the allocation-free Cista reader must preserve the serialized graph offset");
+  static_assert(cista::integrity_start(executionMode) == cista::integrity_start(Mode),
+      "the allocation-free Cista reader must preserve the integrity offset");
+  const std::string_view payload = readArchivePreamble<Mode>(bytes, limits);
+  validateArchiveTypeVersion<Mode>(payload);
   if (reinterpret_cast<std::uintptr_t>(payload.data()) % alignof(ArchiveGraph) != 0) {
     throw mustache::Exception("Unaligned Cista archive buffer");
   }
   validateArchiveGraphLayout<Mode>(payload);
   const ArchiveGraph * graph = nullptr;
   try {
-    graph = cista::deserialize<ArchiveGraph, Mode>(payload);
+    // Cista's runtime version check and DEEP_CHECK pointer tracker both call
+    // its noexcept, allocating type_hash(). The explicit version gate and the
+    // exhaustive fixed-schema vector/range validation above provide those
+    // gates without risking termination under allocation failure.
+    graph = cista::deserialize<ArchiveGraph, executionMode>(payload);
   } catch (const cista::cista_exception& exception) {
     throw mustache::Exception(exception.what());
   }
@@ -1208,6 +1334,11 @@ template <cista::mode Mode, typename Partials>
 std::vector<std::uint8_t> serializeCistaArchiveWithMode(
     const mustache::Node& root, const Partials& partials, const CistaArchiveLimits& archiveLimits)
 {
+  constexpr cista::mode executionMode = archiveCistaExecutionMode<Mode>();
+  static_assert(cista::data_start(executionMode) == cista::data_start(Mode),
+      "the allocation-free Cista writer must preserve the serialized graph offset");
+  static_assert(cista::integrity_start(executionMode) == cista::integrity_start(Mode),
+      "the allocation-free Cista writer must preserve the integrity offset");
   if (archiveLimits.maxInputBytes < archivePreambleSize) {
     throw mustache::Exception("Cista archive output byte limit exceeded");
   }
@@ -1216,11 +1347,15 @@ std::vector<std::uint8_t> serializeCistaArchiveWithMode(
       ArchiveBuilder(archiveLimits, static_cast<std::size_t>(cista::data_start(Mode))).build(root, partials);
   ArchiveValidator(graph, archiveLimits).validate();
   CistaSizeCounter counter(maximumPayloadBytes);
-  cista::serialize<Mode>(counter, graph);
+  writeArchiveTypeVersion<Mode>(counter);
+  cista::serialize<executionMode>(counter, graph);
   graph.serializedSize = counter.size();
   CistaBoundedBuffer buffer(maximumPayloadBytes, counter.size());
-  cista::serialize<Mode>(buffer, graph);
-  return frameArchive(buffer.release(), archiveLimits);
+  writeArchiveTypeVersion<Mode>(buffer);
+  cista::serialize<executionMode>(buffer, graph);
+  std::vector<std::uint8_t> payload = buffer.release();
+  validateArchiveTypeVersion<Mode>(std::string_view(reinterpret_cast<const char *>(payload.data()), payload.size()));
+  return frameArchive<Mode>(std::move(payload), archiveLimits);
 }
 
 template <cista::mode Mode>
@@ -1462,6 +1597,11 @@ bool ArchivedTemplateView::empty() const noexcept
 ArchivedTemplateView::operator bool() const noexcept
 {
   return !empty();
+}
+
+std::string_view archivedTemplateCompatibilityTag() noexcept
+{
+  return mustache_benchmark::archiveCompatibilityTag<mustache_benchmark::archiveModeDeepCheckAndIntegrity>();
 }
 
 std::vector<std::uint8_t> serializeArchivedTemplate(

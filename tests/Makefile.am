@@ -78,7 +78,10 @@ endif
 EXTRA_DIST = \
 	CMakeLists.txt \
 	archive_runtime_dependency_helpers.cmake \
+	check_archive_allocation_failure.cmake \
+	check_archive_allocation_failure.sh \
 	check_archive_runtime_dependencies.cmake \
+	check_cista_version_mutation.cmake \
 	check_public_compiled_template_boundary.cmake \
 	check_unix_exports.cmake \
 	run_fuzzer_smoke.cmake \
@@ -87,11 +90,12 @@ EXTRA_DIST = \
 	verify_archive_runtime_dependency_names.cmake \
 	verify_fuzzer_smoke_safety.cmake \
 	verify_unix_export_platform.cmake \
-	fixtures/cista-archive-v1-x86_64-le-itanium.hex \
+	fixtures/cista-archive-v2-x86_64-le-itanium.hex \
 	fuzz_node_unserialize.cpp \
 	fuzz_tokenizer.cpp \
 	fuzz_data_parser.cpp \
 	fuzz_cista_archive.cpp \
+	test_cista_version_mutation.cpp \
 	fuzz/node_unserialize.dict \
 	fuzz/tokenizer.dict \
 	fuzz/data_parser.dict \
@@ -132,7 +136,7 @@ if MUSTACHE_SPEC_TEST_ENABLED
 TESTS += test_spec
 endif
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
-TESTS += test_cista_archive test_archived_template
+TESTS += test_cista_archive test_archived_template check_archive_allocation_failure.sh
 endif
 TESTS_ENVIRONMENT = \
 	top_srcdir=$(top_srcdir) \

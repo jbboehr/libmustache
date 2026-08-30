@@ -450,8 +450,9 @@ source graph: tokenize and serialize every root/partial with the legacy format,
 or tokenize and serialize the complete Cista graph using the selected native
 mode. Times are median/p95 microseconds aggregated across three runs:
 
-These recorded runs predate the 16-byte libmustache format preamble. The
-preamble adds one writer-side framing copy and a small fixed reader check;
+These recorded runs predate the libmustache format preamble. The current
+24-byte generation-2 preamble adds one writer-side framing copy and small fixed
+generation/native-compatibility reader checks;
 rerun the native and PHP/APCu measurements before making the final deployment
 decision.
 
@@ -501,14 +502,16 @@ If the feasibility work continues, use this integration policy:
   tree first. This API now defensively copies archive bytes, validates them once
   in final aligned storage, and keeps that private backing alive through an
   immutable shared handle.
-- The experiment now uses a minimal libmustache format-generation preamble and
-  raw bounds checks for the root vector spans before pointer traversal. Cista's
-  `WITH_VERSION`, `WITH_INTEGRITY`, and `DEEP_CHECK` policies then provide type,
-  integrity, and structural validation; the protected archive graph owns its
-  semantic schema and exact payload size. Its x86-64 little-endian Itanium-ABI
+- The experiment now uses a libmustache format-generation/native-compatibility
+  preamble and raw bounds checks for the root vector spans before pointer
+  traversal. Libmustache's explicit type-version gate and fixed-schema deep
+  checks combine with Cista integrity and first-phase structural validation;
+  the protected archive graph owns its semantic schema and exact payload size.
+  Its x86-64 little-endian Itanium-ABI
   bytes are pinned by a golden fixture across every bundled/system dependency
   combination. Treat any dependency or schema update as a deliberate format
-  event and include the libmustache format generation in future PHP cache keys.
+  event and include `archivedTemplateCompatibilityTag()` verbatim in future PHP
+  cache keys.
 - Require `DEEP_CHECK`, libmustache semantic validation, full lambda and
   inline-partial semantics, alignment and backing-store lifetime tests,
   corruption fixtures, archive-validation/render fuzzing, and a secured native

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <memory>
 #include <new>
 #include <string>
@@ -12,6 +13,9 @@
 #include <vector>
 
 #include "compiled_template.hpp"
+#ifdef MUSTACHE_HAVE_ARCHIVED_TEMPLATES
+#include "archived_template.hpp"
+#endif
 #include "data.hpp"
 #include "lambda.hpp"
 #include "mustache.hpp"
@@ -334,6 +338,68 @@ void testSerializationFailureDoesNotPublishPartialBytes()
       });
 }
 
+#ifdef MUSTACHE_HAVE_ARCHIVED_TEMPLATES
+void testArchiveCompatibilityTagDoesNotAllocate()
+{
+  allocation_failure_test::arm(0);
+  const std::string_view tag = mustache::archivedTemplateCompatibilityTag();
+  const bool allocated = allocation_failure_test::disarm();
+  expect(!allocated, "the archived-template compatibility tag allocated memory");
+  expect(!tag.empty(), "the archived-template compatibility tag is empty under memory pressure");
+}
+
+int runArchiveAllocationProbe(std::string_view operation, const char * failAtText)
+{
+  char * end = nullptr;
+  const unsigned long long parsed = std::strtoull(failAtText, &end, 10);
+  if (end == failAtText || *end != '\0' || parsed > std::numeric_limits<std::size_t>::max()) {
+    std::fprintf(stderr, "invalid archive allocation failure index\n");
+    return 12;
+  }
+
+  mustache::Node root = makeSerializableTree();
+  std::vector<std::uint8_t> archive;
+  if (operation == "load") {
+    archive = mustache::serializeArchivedTemplate(root);
+  } else if (operation != "serialize") {
+    std::fprintf(stderr, "invalid archive allocation operation\n");
+    return 12;
+  }
+  allocation_failure_test::arm(static_cast<std::size_t>(parsed));
+  try {
+    if (operation == "serialize") {
+      static_cast<void>(mustache::serializeArchivedTemplate(root));
+    } else {
+      static_cast<void>(mustache::loadArchivedTemplate(archive));
+    }
+  } catch (const std::bad_alloc&) {
+    if (!allocation_failure_test::disarm()) {
+      std::fprintf(stderr, "archive %.*s threw bad_alloc without an injected failure\n",
+          static_cast<int>(operation.size()), operation.data());
+      return 12;
+    }
+    return 10;
+  } catch (const std::exception& exception) {
+    const bool injected = allocation_failure_test::disarm();
+    std::fprintf(stderr, "archive %.*s threw %s%s\n", static_cast<int>(operation.size()), operation.data(),
+        exception.what(), injected ? " after an injected allocation failure" : "");
+    return 12;
+  } catch (...) {
+    const bool injected = allocation_failure_test::disarm();
+    std::fprintf(stderr, "archive %.*s threw a non-standard exception%s\n", static_cast<int>(operation.size()),
+        operation.data(), injected ? " after an injected allocation failure" : "");
+    return 12;
+  }
+
+  if (allocation_failure_test::disarm()) {
+    std::fprintf(stderr, "archive %.*s ignored an injected allocation failure\n", static_cast<int>(operation.size()),
+        operation.data());
+    return 12;
+  }
+  return 0;
+}
+#endif
+
 struct DeserializationCase {
     DeserializationCase() :
         serial(makeSerializableTree().serializeValue()),
@@ -424,8 +490,18 @@ void testRenderingFailureDoesNotPublishPartialOutput()
 
 } // namespace
 
-int main()
+int main(int argc, char ** argv)
 {
+  static_cast<void>(argv);
+#ifdef MUSTACHE_HAVE_ARCHIVED_TEMPLATES
+  if (argc == 4 && std::string_view(argv[1]) == "--archive-allocation-probe") {
+    return runArchiveAllocationProbe(argv[2], argv[3]);
+  }
+#endif
+  if (argc != 1) {
+    std::fprintf(stderr, "unexpected allocation-failure test arguments\n");
+    return 1;
+  }
   testTokenizationFailureIsTransactional();
 #ifdef MUSTACHE_HAVE_LIBJSON
   testJSONFailureDoesNotPublishPartialData();
@@ -434,6 +510,9 @@ int main()
   testYAMLFailureDoesNotPublishPartialData();
 #endif
   testSerializationFailureDoesNotPublishPartialBytes();
+#ifdef MUSTACHE_HAVE_ARCHIVED_TEMPLATES
+  testArchiveCompatibilityTagDoesNotAllocate();
+#endif
   testDeserializationFailureDoesNotPublishPartialTree();
   testRenderingFailureDoesNotPublishPartialOutput();
   return failures == 0 ? 0 : 1;

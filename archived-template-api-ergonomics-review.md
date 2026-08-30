@@ -134,8 +134,7 @@ as a defect below, but it contributes to the lifecycle and error-model tradeoff.
 
 ### Issue 2 — Medium: Native archive compatibility is not available as a cache-key contract
 
-- **Contract:** `docs/development/cista-archive-format-v1.md:18-31` and
-  `docs/development/cista-archive-format-v1.md:79-92`.
+- **Contract:** `docs/development/cista-archive-format-v2.md`.
 - **Consumer scenario:** Archives are produced during a build and deployed to
   multiple architectures, C++ ABIs, or rolling libmustache versions, or are
   retained in a shared persistent cache while processes are upgraded.
@@ -158,11 +157,14 @@ as a defect below, but it contributes to the lifecycle and error-model tradeoff.
   The tag should change whenever existing archive bytes cease to be readable and
   should cover the native layout/type domain as well as the outer format
   generation. PHP and build integrations should include it directly in cache
-  keys. Consider embedding an explicit compatibility discriminator in the
-  preamble before generation 1 is frozen.
+  keys. Embed the same compatibility discriminator in the preamble and advance
+  the experimental format generation deliberately.
 - **Compatibility:** Adding a query is source- and ABI-additive. Changing the
   preamble requires a deliberate format-generation decision, which is still
   feasible while the format is experimental.
+- **Resolution:** Implemented by format generation 2. The public opaque tag and
+  the preamble carry the same native-layout fingerprint, and generation-1
+  experimental archives are rejected explicitly.
 - **Confidence:** High for the contract gap; cross-architecture behavior was
   inferred from the documented native representation and platform-specific
   fixture rather than executed locally.
@@ -325,9 +327,9 @@ Before php-mustache or another consumer treats ABI 6 as stable:
    it the primary example and integration path.
 3. Give `ArchivedTemplateLimits` an exported constructor, rename
    `maxInputBytes` to `maxArchiveBytes`, and clarify aggregate total fields.
-4. Expose a library-owned archive compatibility tag for cache keys; decide
-   whether generation 1 should also embed an explicit native compatibility
-   discriminator.
+4. Expose a library-owned archive compatibility tag for cache keys and embed
+   the same native compatibility discriminator in the preamble. Completed in
+   format generation 2.
 5. Add an archive-specific exception reason before persistent-cache recovery
    behavior is published, if the PHP integration demonstrates a need to
    distinguish cache misses from configuration failures.

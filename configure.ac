@@ -383,6 +383,49 @@ AS_IF([test "x$enable_archived_templates" = "xyes"], [
             AC_MSG_ERROR([bundled Cista header is missing: $srcdir/vendor/cista/cista.h])
         ])
     ])
+
+    AS_IF([test "x$cross_compiling" != "xyes"], [
+        AS_UNSET([mustache_cv_cista_version_algorithm])
+    ])
+    AC_CACHE_CHECK([whether the Cista runtime type-version algorithm matches the generation-2 adapter],
+        [mustache_cv_cista_version_algorithm], [
+        mustache_save_CPPFLAGS=$CPPFLAGS
+        mustache_save_LIBS=$LIBS
+        CPPFLAGS="$CPPFLAGS -I$srcdir -I$srcdir/src/archive/xxh3 -DCISTA_XXH3=1 -DMUSTACHE_CISTA_RUNTIME_VERSION_XXH3=1"
+        AS_IF([test "x$with_system_cista" = "xyes"], [
+            CPPFLAGS="$CPPFLAGS $CISTA_CFLAGS"
+        ], [
+            CPPFLAGS="$CPPFLAGS -I$srcdir/vendor/cista -DMUSTACHE_USE_VENDORED_CISTA=1"
+        ])
+        AS_IF([test "x$with_system_xxhash" = "xyes"], [
+            CPPFLAGS="$CPPFLAGS $XXHASH_CFLAGS"
+            LIBS="$XXHASH_LIBS $LIBS"
+        ], [
+            CPPFLAGS="$CPPFLAGS -I$srcdir/vendor/xxhash -DXXH_IMPLEMENTATION=1 -DXXH_STATIC_LINKING_ONLY=1 -DXXH_NAMESPACE=MUSTACHE_CISTA_XXH_"
+        ])
+        AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include "src/archive/xxh3/xxh3.h"
+#include "src/archive/cista_include.hpp"
+#include "src/archive/cista_version.hpp"
+#undef XXH3_64bits_withSeed
+#include "src/archive/xxh3.cpp"
+
+int main()
+{
+  return cista::type_hash<mustache_benchmark::ArchiveGraph>() !=
+      mustache_benchmark::archiveRuntimeTypeVersion();
+}
+        ]])],
+        [mustache_cv_cista_version_algorithm=yes],
+        [mustache_cv_cista_version_algorithm=no],
+        [mustache_cv_cista_version_algorithm=unknown])
+        CPPFLAGS=$mustache_save_CPPFLAGS
+        LIBS=$mustache_save_LIBS
+    ])
+    AS_CASE([$mustache_cv_cista_version_algorithm],
+        [yes], [],
+        [unknown], [AC_MSG_ERROR([cross-compiling Cista archive support requires a cached mustache_cv_cista_version_algorithm=yes result from a matching native dependency witness])],
+        [AC_MSG_ERROR([the selected Cista runtime type-version algorithm does not match libmustache's allocation-free generation-2 adapter])])
 ])
 PKG_CHECK_MODULES([ZLIB], [zlib], [mustache_have_zlib=yes], [
     mustache_have_zlib=no

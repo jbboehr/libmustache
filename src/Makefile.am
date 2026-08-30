@@ -37,6 +37,8 @@ if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
 noinst_LTLIBRARIES += libmustache_archive_adapter.la
 libmustache_archive_adapter_la_SOURCES = \
 	archive/cista.cpp \
+	archive/cista_include.hpp \
+	archive/cista_version.hpp \
 	archive/xxh3.cpp \
 	archived_template.hpp
 libmustache_archive_adapter_la_CXXFLAGS = \

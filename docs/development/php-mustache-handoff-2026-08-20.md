@@ -85,6 +85,10 @@ as a release commitment.
   aligned storage. The resulting immutable handle validates once and remains
   valid independently of the input buffer, so the extension must not create a
   separate borrowed Cista view over Zend memory.
+- Include `archivedTemplateCompatibilityTag()` verbatim in every persistent
+  archive cache namespace. Do not derive a key from libmustache versions,
+  architecture names, or private Cista details; the library-owned opaque tag
+  already identifies the format generation and native representation domain.
 
 ## Verified downstream touchpoints
 

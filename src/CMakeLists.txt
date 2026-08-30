@@ -16,6 +16,8 @@ if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
         "${CMAKE_CURRENT_SOURCE_DIR}/archive/xxh3.cpp")
     list(APPEND MUSTACHE_SOURCES
         "${MUSTACHE_CISTA_ARCHIVE_SOURCE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/archive/cista_include.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/archive/cista_version.hpp"
         "${MUSTACHE_CISTA_XXH3_SOURCE}")
     if(NOT MSVC)
         set_property(SOURCE

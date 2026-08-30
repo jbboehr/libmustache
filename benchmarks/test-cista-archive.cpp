@@ -224,7 +224,7 @@ void expect(bool condition, const char * message)
   }
 }
 
-constexpr std::size_t archivePreambleSize = 16;
+constexpr std::size_t archivePreambleSize = 24;
 
 std::uint64_t readLittleEndian(const std::vector<std::uint8_t>& bytes, std::size_t offset, std::size_t width)
 {
@@ -307,7 +307,7 @@ std::vector<std::uint8_t> readGoldenArchive()
   if (topSourceDirectory == nullptr || *topSourceDirectory == '\0') {
     throw std::runtime_error("top_srcdir is required to locate the golden Cista archive");
   }
-  const std::string path = std::string(topSourceDirectory) + "/tests/fixtures/cista-archive-v1-x86_64-le-itanium.hex";
+  const std::string path = std::string(topSourceDirectory) + "/tests/fixtures/cista-archive-v2-x86_64-le-itanium.hex";
   std::ifstream stream(path);
   if (!stream) {
     throw std::runtime_error("unable to open the golden Cista archive");
@@ -621,9 +621,12 @@ int main()
     expect(archive.size() > archivePreambleSize, "Cista archive preamble has no payload");
     expect(std::equal(expectedMagic.begin(), expectedMagic.end(), archive.begin()),
         "Cista archive preamble magic changed");
-    expect(readLittleEndian(archive, 8, 8) == 1, "libmustache archive format generation changed");
+    expect(readLittleEndian(archive, 8, 8) == 2, "libmustache archive format generation changed");
+    expect(readLittleEndian(archive, 16, 8) != 0, "libmustache archive compatibility fingerprint is empty");
     if (isGoldenPlatform(sizeof(void *))) {
-      expect(archive == readGoldenArchive(), "Cista archive differs from the version 1 golden fixture");
+      expect(readLittleEndian(archive, 16, 8) == UINT64_C(0xCB437BCD4ADCBE5D),
+          "libmustache archive compatibility fingerprint changed");
+      expect(archive == readGoldenArchive(), "Cista archive differs from the version 2 golden fixture");
     }
     const std::string_view bytes(reinterpret_cast<const char *>(archive.data()), archive.size());
     mustache_benchmark::validateCistaArchive(bytes);
@@ -671,6 +674,23 @@ int main()
     expectEqualArchives(modeArchives[0], modeArchives[1], "deep checking unexpectedly changed the serialized archive");
     expectEqualArchives(modeArchives[2], modeArchives[3], "deep checking changed the integrity-protected archive");
     expect(modeArchives[2].size() > modeArchives[0].size(), "integrity mode did not add archive framing");
+    expect(readLittleEndian(modeArchives[0], 16, 8) == readLittleEndian(modeArchives[1], 16, 8),
+        "reader-only deep checking changed the compatibility fingerprint");
+    expect(readLittleEndian(modeArchives[2], 16, 8) == readLittleEndian(modeArchives[3], 16, 8),
+        "reader-only deep checking changed the protected compatibility fingerprint");
+    expect(readLittleEndian(modeArchives[0], 16, 8) != readLittleEndian(modeArchives[2], 16, 8),
+        "integrity framing did not change the compatibility fingerprint");
+    bool incompatibleModeRejectedAtPreamble = false;
+    try {
+      mustache_benchmark::validateCistaArchive(
+          std::string_view(reinterpret_cast<const char *>(modeArchives[0].data()), modeArchives[0].size()),
+          mustache_benchmark::CistaSecurityMode::Integrity);
+    } catch (const mustache::Exception& exception) {
+      incompatibleModeRejectedAtPreamble =
+          std::string_view(exception.what()) == "Unsupported libmustache archive compatibility";
+    }
+    expect(incompatibleModeRejectedAtPreamble,
+        "a mismatched serialized archive mode was not rejected at the compatibility preamble");
     expect(mustache_benchmark::renderCistaArchive(
                std::string_view(reinterpret_cast<const char *>(modeArchives[0].data()), modeArchives[0].size()), data,
                mustache_benchmark::CistaSecurityMode::DeepCheck) == expected,

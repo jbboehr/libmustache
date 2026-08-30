@@ -82,7 +82,7 @@ pkg-config metadata. Custom system locations can be supplied through
 explicit `MUSTACHE_ENABLE_CISTA_BENCHMARK` comparison and is not a production
 archive dependency. The experimental format preamble and Cista validation
 responsibilities are specified in the
-[archive format document](docs/development/cista-archive-format-v1.md).
+[archive format document](docs/development/cista-archive-format-v2.md).
 
 When enabled, `mustache_config.h` defines
 `MUSTACHE_HAVE_ARCHIVED_TEMPLATES`. The preferred public API serializes an
@@ -92,11 +92,17 @@ owning, validated handle:
 ```cpp
 mustache::CompiledTemplate compiled = mustache::compile("Hello {{name}}");
 
+std::string_view cacheNamespace = mustache::archivedTemplateCompatibilityTag();
 std::vector<std::uint8_t> bytes = mustache::serializeArchivedTemplate(compiled);
 mustache::ArchivedTemplateView archived =
     mustache::loadArchivedTemplate(bytes);
 std::string output = mustache::render(archived, data);
 ```
+
+Include `archivedTemplateCompatibilityTag()` verbatim in persistent cache keys.
+The opaque tag changes whenever this build cannot read an earlier archived
+representation, allowing rolling deployments and multi-platform builds to
+isolate incompatible entries before loading them.
 
 The `Node` overload remains available for advanced callers that construct or
 transform syntax trees directly.

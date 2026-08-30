@@ -120,6 +120,9 @@ int main()
   const std::string lambdaOutput = mustache::render(mustache::compile("{{.}}"), consumerLambda);
 
 #ifdef MUSTACHE_HAVE_ARCHIVED_TEMPLATES
+  const std::string_view archiveCompatibilityTag = mustache::archivedTemplateCompatibilityTag();
+  const bool archiveCompatibilityTagValid =
+      archiveCompatibilityTag.substr(0, std::string_view("libmustache-cista-v2-").size()) == "libmustache-cista-v2-";
   const std::vector<std::uint8_t> archiveBytes = mustache::serializeArchivedTemplate(compiled, partials);
   mustache::ArchivedTemplateLimits archiveLimits;
   const mustache::ArchivedTemplateView archived = mustache::loadArchivedTemplate(archiveBytes, archiveLimits);
@@ -142,6 +145,7 @@ int main()
   const std::string archivedLimitedFreeOutput = mustache::render(archivedMoveAssigned, scalar, renderLimits);
   const std::string expectedArchivedOutput = "[compiled]";
 #else
+  const bool archiveCompatibilityTagValid = true;
   const bool archivedHandlesValid = true;
   const std::string archivedOutput = "ok";
   const std::string archivedLimitedOutput = "ok";
@@ -161,7 +165,7 @@ int main()
   return decoded->type == mustache::Node::TypeRoot && decoded->children.size() == 1 &&
           decoded->children.front()->data.has_value() && *decoded->children.front()->data == "owned" &&
           nodeTemplate == "owned" && compiledOutput == "[compiled]" && lambdaOutput == "consumer-lambda" &&
-          archivedHandlesValid && archivedOutput == expectedArchivedOutput &&
+          archiveCompatibilityTagValid && archivedHandlesValid && archivedOutput == expectedArchivedOutput &&
           archivedLimitedOutput == expectedArchivedOutput && archivedFreeOutput == expectedArchivedOutput &&
           archivedLimitedFreeOutput == expectedArchivedOutput && !inactiveContext.active() && inactiveContextRejected
       ? 0
