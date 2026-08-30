@@ -1,21 +1,14 @@
-#include <cerrno>
 #include <chrono>
-#include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <streambuf>
+#include <system_error>
 #include <vector>
-
-#ifdef _WIN32
-#include <direct.h>
-#else
-#include <sys/stat.h>
-#include <unistd.h>
-#endif
 
 #include "cli.hpp"
 #include "mustache_config.h"
@@ -33,37 +26,21 @@ void expect(bool condition, const std::string& message)
   }
 }
 
-bool makeDirectory(const std::string& path)
-{
-#ifdef _WIN32
-  return _mkdir(path.c_str()) == 0;
-#else
-  return mkdir(path.c_str(), 0700) == 0;
-#endif
-}
-
-void removeDirectory(const std::string& path)
-{
-#ifdef _WIN32
-  static_cast<void>(_rmdir(path.c_str()));
-#else
-  static_cast<void>(rmdir(path.c_str()));
-#endif
-}
-
 class TestDirectory {
   public:
     TestDirectory()
     {
       const auto timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+      std::error_code error;
       for (unsigned int attempt = 0; attempt < 100; ++attempt) {
         root_ = "mustache-cli-test-" + std::to_string(timestamp) + "-" + std::to_string(attempt);
-        if (makeDirectory(root_)) {
+        if (std::filesystem::create_directory(root_, error)) {
           return;
         }
-        if (errno != EEXIST) {
+        if (error && error != std::errc::file_exists) {
           break;
         }
+        error.clear();
       }
       throw std::runtime_error("Cannot create CLI test directory");
     }
@@ -73,27 +50,22 @@ class TestDirectory {
 
     ~TestDirectory()
     {
-      for (auto path = paths_.rbegin(); path != paths_.rend(); ++path) {
-        static_cast<void>(std::remove(path->c_str()));
-      }
-      removeDirectory(root_);
+      std::error_code ignoredError;
+      static_cast<void>(std::filesystem::remove_all(root_, ignoredError));
     }
 
-    std::string path(const std::string& name)
+    std::string path(const std::string& name) const
     {
-      const std::string result = root_ + "/" + name;
-      paths_.push_back(result);
-      return result;
+      return (root_ / name).string();
     }
 
-    const std::string& root() const noexcept
+    std::string root() const
     {
-      return root_;
+      return root_.string();
     }
 
   private:
-    std::string root_;
-    std::vector<std::string> paths_;
+    std::filesystem::path root_;
 };
 
 void writeFile(const std::string& path, const std::string& contents)
@@ -420,31 +392,36 @@ void testCompileAndRenderFailures(TestDirectory& directory, const std::string& v
 int main()
 {
   try {
-    TestDirectory directory;
-    const std::string validTemplate = directory.path("base.mustache");
+    std::string directoryPath;
+    {
+      TestDirectory directory;
+      directoryPath = directory.root();
+      const std::string validTemplate = directory.path("base.mustache");
 #ifdef MUSTACHE_HAVE_LIBJSON
-    const std::string validData = directory.path("base.json");
+      const std::string validData = directory.path("base.json");
 #elif defined(MUSTACHE_HAVE_LIBYAML)
-    const std::string validData = directory.path("base.yaml");
+      const std::string validData = directory.path("base.yaml");
 #else
-    const std::string validData = directory.path("base.json");
+      const std::string validData = directory.path("base.json");
 #endif
-    const std::string validPartial = directory.path("base-partial.mustache");
-    writeFile(validTemplate, "{{value}}");
+      const std::string validPartial = directory.path("base-partial.mustache");
+      writeFile(validTemplate, "{{value}}");
 #ifdef MUSTACHE_HAVE_LIBJSON
-    writeFile(validData, "{\"value\":\"ok\"}");
+      writeFile(validData, "{\"value\":\"ok\"}");
 #elif defined(MUSTACHE_HAVE_LIBYAML)
-    writeFile(validData, "value: ok\n");
+      writeFile(validData, "value: ok\n");
 #else
-    writeFile(validData, "{\"value\":\"unused\"}");
+      writeFile(validData, "{\"value\":\"unused\"}");
 #endif
-    writeFile(validPartial, "partial");
+      writeFile(validPartial, "partial");
 
-    testHelpAndVersion();
-    testSuccessfulRendering(directory);
-    testArgumentFailures(validTemplate, validData, validPartial);
-    testFileAndParseFailures(directory, validTemplate, validData);
-    testCompileAndRenderFailures(directory, validData);
+      testHelpAndVersion();
+      testSuccessfulRendering(directory);
+      testArgumentFailures(validTemplate, validData, validPartial);
+      testFileAndParseFailures(directory, validTemplate, validData);
+      testCompileAndRenderFailures(directory, validData);
+    }
+    expect(!std::filesystem::exists(directoryPath), "CLI fixture directory was not removed");
   } catch (const std::exception& exception) {
     std::cerr << "FAIL: CLI test setup failed: " << exception.what() << '\n';
     ++failures;
