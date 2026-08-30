@@ -3,15 +3,11 @@
 #include "./fixtures/lambdas.hpp"
 
 #include <cstdint>
+#include <filesystem>
 #include <limits>
 #include <memory>
+#include <system_error>
 #include <utility>
-
-#ifdef _WIN32
-#include <io.h>
-#else
-#include <dirent.h>
-#endif
 
 std::list<MustacheSpecTest *> tests;
 int execNum = 1;
@@ -45,57 +41,42 @@ int main(int argc, char * argv[])
   }
 
   std::list<std::string> files;
-#ifdef _WIN32
-  struct _finddata_t findData;
-  std::string pattern(directory);
-  pattern += "\\*.yml";
-  intptr_t handle = _findfirst(pattern.c_str(), &findData);
-  if (handle == -1) {
-    std::cerr << "Unable to open directory " << directory << std::endl;
-    return 1;
-  }
-  do {
-    if (!(findData.attrib & _A_SUBDIR)) {
-      files.push_back(findData.name);
+  std::error_code directoryError;
+  std::filesystem::directory_iterator iterator(directory, directoryError);
+  const std::filesystem::directory_iterator end;
+  for (; iterator != end; iterator.increment(directoryError)) {
+    if (directoryError) {
+      break;
     }
-  } while (_findnext(handle, &findData) == 0);
-  _findclose(handle);
-#else
-  DIR * dir = opendir(directory);
-  if (dir == NULL) {
+    const std::string file = iterator->path().filename().string();
+    if (file.empty() || file.front() == '.' || iterator->path().extension() != ".yml") {
+      continue;
+    }
+
+    if (iterator->is_regular_file(directoryError)) {
+      files.push_back(file);
+    } else if (directoryError) {
+      break;
+    }
+  }
+  if (directoryError) {
     std::cerr << "Unable to open directory " << directory << std::endl;
     return 1;
   }
-  struct dirent * ent;
-  while ((ent = readdir(dir)) != NULL) {
-    files.push_back(ent->d_name);
-  }
-  closedir(dir);
-#endif
 
   files.sort();
 
-  for (std::list<std::string>::const_iterator it = files.begin(); it != files.end(); ++it) {
-    const char * file = it->c_str();
-    if (file[0] == '.')
-      continue;
-    if (strlen(file) < 5)
-      continue;
-    if (strcmp(file + strlen(file) - 4, ".yml") != 0)
-      continue;
+  for (const std::string& file : files) {
     //if( file[0] == '~' ) continue; // Ignore lambdas
-    currentSuite = file;
+    currentSuite = file.c_str();
     mustache_test::specRecordSuiteFile(currentSuite);
 
     // Make filename
-    std::string fileName;
-    fileName += directory;
-    fileName += '/';
-    fileName += file;
+    const std::filesystem::path fileName = std::filesystem::path(directory) / file;
 
-    std::ifstream pFile(fileName.c_str(), std::ios::in | std::ios::binary);
+    std::ifstream pFile(fileName, std::ios::in | std::ios::binary);
     if (!pFile.is_open()) {
-      std::cerr << "Unable to open file: " << fileName;
+      std::cerr << "Unable to open file: " << fileName.string();
       continue;
     }
 
@@ -104,7 +85,7 @@ int main(int argc, char * argv[])
     const std::streamoff streamLength = pFile.tellg();
     if (streamLength < 0 || streamLength > std::numeric_limits<std::streamsize>::max() ||
         static_cast<std::uintmax_t>(streamLength) > std::numeric_limits<std::size_t>::max()) {
-      std::cerr << "Invalid file size: " << fileName << "\n";
+      std::cerr << "Invalid file size: " << fileName.string() << "\n";
       continue;
     }
     pFile.seekg(0, pFile.beg);
@@ -115,13 +96,13 @@ int main(int argc, char * argv[])
       pFile.read(fileData.data(), static_cast<std::streamsize>(streamLength));
     }
     if (!pFile) {
-      std::cerr << "Unable to read file: " << fileName << "\n";
+      std::cerr << "Unable to read file: " << fileName.string() << "\n";
       continue;
     }
     pFile.close();
 
     // parse the file
-    std::cout << fileName << "\n";
+    std::cout << fileName.string() << "\n";
     parse_file(fileData.data(), fileData.size());
   }
 
