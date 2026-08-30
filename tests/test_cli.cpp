@@ -253,6 +253,7 @@ void testSuccessfulRendering(TestDirectory& directory)
   const std::string staticTemplate = directory.path("static.mustache");
   writeFile(staticTemplate, "static");
   expectSuccess(invoke({"-t", staticTemplate}), "static", "render with the default null data");
+  expectSuccess(invoke({"-t", staticTemplate, "-n", "0002"}), "static", "render count with leading zeroes");
   expectSuccess(invoke({"-t", staticTemplate, "--"}), "static", "render with an end-of-options marker");
 
   const Invocation deprecated = invoke({"-r", "-t", staticTemplate});
@@ -323,10 +324,13 @@ void testArgumentFailures(const std::string& templatePath, const std::string& da
   expectFailure(invoke({"-t", templatePath, "-n", "1", "--repeat=2"}), "Render count was specified more than once",
       "duplicate repeat option");
 
-  expectFailure(invoke({"-t", templatePath, "-n", "invalid"}), "Render count must be a positive integer",
-      "nonnumeric repeat count");
   for (const std::string& value :
-      {std::string("0"), std::string("1000001"), std::string("999999999999999999999999999999999999")}) {
+      {std::string("invalid"), std::string("1x"), std::string("+1"), std::string("-1"), std::string(" 1")}) {
+    expectFailure(invoke({"-t", templatePath, "-n", value}), "Render count must be a positive integer",
+        "invalid repeat count " + value);
+  }
+  for (const std::string& value : {std::string("0"), std::string("1000001"),
+           std::string("999999999999999999999999999999999999"), std::string("999999999999999999999999999999999999x")}) {
     expectFailure(invoke({"-t", templatePath, "-n", value}), "Render count must be between 1 and 1000000",
         "out-of-range repeat count " + value);
   }

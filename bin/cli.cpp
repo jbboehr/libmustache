@@ -1,10 +1,10 @@
 #include "cli.hpp"
 
 #include <array>
+#include <charconv>
 #include <cerrno>
 #include <cstddef>
 #include <fstream>
-#include <limits>
 #include <map>
 #include <ostream>
 #include <stdexcept>
@@ -127,15 +127,12 @@ bool readOptionValue(const std::vector<std::string>& arguments, std::size_t& ind
 std::size_t parseRepetitions(const std::string& value)
 {
   std::size_t repetitions = 0;
-  for (const char character : value) {
-    if (character < '0' || character > '9') {
-      throw std::runtime_error("Render count must be a positive integer: " + value);
-    }
-    const std::size_t digit = static_cast<std::size_t>(character - '0');
-    if (repetitions > (std::numeric_limits<std::size_t>::max() - digit) / 10) {
-      throw std::runtime_error("Render count must be between 1 and " + std::to_string(maxRepetitions) + ": " + value);
-    }
-    repetitions = repetitions * 10 + digit;
+  const std::from_chars_result result = std::from_chars(value.data(), value.data() + value.size(), repetitions, 10);
+  if (result.ec == std::errc::result_out_of_range) {
+    throw std::runtime_error("Render count must be between 1 and " + std::to_string(maxRepetitions) + ": " + value);
+  }
+  if (result.ec != std::errc() || result.ptr != value.data() + value.size()) {
+    throw std::runtime_error("Render count must be a positive integer: " + value);
   }
   if (repetitions == 0 || repetitions > maxRepetitions) {
     throw std::runtime_error("Render count must be between 1 and " + std::to_string(maxRepetitions) + ": " + value);
