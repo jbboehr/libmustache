@@ -125,6 +125,7 @@ int main()
       archiveCompatibilityTag.substr(0, std::string_view("libmustache-cista-v2-").size()) == "libmustache-cista-v2-";
   const std::vector<std::uint8_t> archiveBytes = mustache::serializeArchivedTemplate(compiled, partials);
   mustache::ArchivedTemplateLimits archiveLimits;
+  archiveLimits.maxArchiveBytes = archiveBytes.size();
   const mustache::ArchivedTemplate archived = mustache::loadArchivedTemplate(archiveBytes, archiveLimits);
   const std::string_view archiveByteView(reinterpret_cast<const char *>(archiveBytes.data()), archiveBytes.size());
   const mustache::ArchivedTemplate archivedFromView = mustache::loadArchivedTemplate(archiveByteView, archiveLimits);

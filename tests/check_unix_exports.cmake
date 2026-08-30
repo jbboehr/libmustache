@@ -55,6 +55,9 @@ require_export_count("^_?mustache_version$" 1 "mustache_version")
 require_export_count("^_?mustache_version_int$" 1 "mustache_version_int")
 if(MUSTACHE_ARCHIVED_TEMPLATES)
     require_export_count(
+        "^_?_ZN8mustache22ArchivedTemplateLimitsC1Ev$" 1
+        "ArchivedTemplateLimits default constructor")
+    require_export_count(
         "^_?_ZN8mustache16ArchivedTemplateC1Ev$" 1
         "ArchivedTemplate default constructor")
     require_export_count(

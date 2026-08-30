@@ -50,18 +50,18 @@ const char * cistaChecksumAlgorithmName(CistaChecksumAlgorithm algorithm) noexce
 std::uint64_t checksumCistaArchive(std::string_view bytes, CistaChecksumAlgorithm algorithm);
 
 struct CistaArchiveLimits {
-    std::size_t maxInputBytes = std::size_t{64} * 1024 * 1024;
+    std::size_t maxArchiveBytes = std::size_t{64} * 1024 * 1024;
     std::size_t maxNestingDepth = 64;
     std::size_t maxNodes = 100000;
-    std::size_t maxStringBytes = std::size_t{64} * 1024 * 1024;
+    std::size_t maxTotalStringBytes = std::size_t{64} * 1024 * 1024;
     std::size_t maxDataPartsPerNode = 256;
-    std::size_t maxDataParts = 100000;
+    std::size_t maxTotalDataParts = 100000;
 };
 
 /*! Serialize an experimental archive with a libmustache format preamble.
 
     The fixed-width preamble is validated before Cista performs its own type,
-    integrity, and structural checks. It counts toward maxInputBytes.
+    integrity, and structural checks. It counts toward maxArchiveBytes.
 */
 std::vector<std::uint8_t> serializeCistaArchive(const mustache::Node& root,
     const mustache::Node::Partials& partials = mustache::Node::Partials(),

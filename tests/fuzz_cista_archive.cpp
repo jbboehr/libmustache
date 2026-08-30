@@ -149,15 +149,15 @@ mustache::Data makeData()
   return data;
 }
 
-mustache_benchmark::CistaArchiveLimits fuzzArchiveLimits(std::size_t maxInputBytes)
+mustache_benchmark::CistaArchiveLimits fuzzArchiveLimits(std::size_t maxArchiveBytes)
 {
   mustache_benchmark::CistaArchiveLimits limits;
-  limits.maxInputBytes = maxInputBytes;
+  limits.maxArchiveBytes = maxArchiveBytes;
   limits.maxNestingDepth = 64;
   limits.maxNodes = 1024;
-  limits.maxStringBytes = 16 * 1024;
+  limits.maxTotalStringBytes = 16 * 1024;
   limits.maxDataPartsPerNode = 513;
-  limits.maxDataParts = 8192;
+  limits.maxTotalDataParts = 8192;
   return limits;
 }
 

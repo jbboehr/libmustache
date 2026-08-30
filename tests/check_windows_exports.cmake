@@ -46,6 +46,7 @@ if(MUSTACHE_ARCHIVED_TEMPLATES)
         endif()
     endfunction()
 
+    require_archive_export_count("\\?\\?0ArchivedTemplateLimits@mustache@@" 1 "limits constructor")
     require_archive_export_count("\\?\\?0ArchivedTemplate@mustache@@" 3 "constructors")
     require_archive_export_count("\\?\\?1ArchivedTemplate@mustache@@" 1 "destructor")
     require_archive_export_count("\\?\\?4ArchivedTemplate@mustache@@" 2 "assignment operators")

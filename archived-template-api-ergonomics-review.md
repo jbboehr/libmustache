@@ -57,7 +57,7 @@ mustache::PartialMap partials;
 partials.emplace("card", mustache::compile("Hello {{name}}"));
 
 mustache::ArchivedTemplateLimits limits;
-limits.maxInputBytes = 1024 * 1024;
+limits.maxArchiveBytes = 1024 * 1024;
 std::vector<std::uint8_t> bytes =
     mustache::serializeArchivedTemplate(compiled, partials, limits);
 ```
@@ -203,14 +203,15 @@ as a defect below, but it contributes to the lifecycle and error-model tradeoff.
 - **Consumer scenario:** A packager or extension tightens archive limits, or a
   dynamically linked libmustache update needs to revise safe defaults without
   recompiling every consumer.
-- **Evidence:** A compiler probe confirmed `ArchivedTemplateLimits` is an
-  aggregate and accepts six positional `std::size_t` arguments. Its default
-  member initializers are compiled into each caller, unlike the exported
+- **Evidence:** At review time, a compiler probe confirmed
+  `ArchivedTemplateLimits` was an
+  aggregate and accepted six positional `std::size_t` arguments. Its default
+  member initializers were compiled into each caller, unlike the exported
   constructors used by `Tokenizer::Limits`, `Data::ParseLimits`,
-  `Node::SerializationLimits`, and `RenderLimits`. In
-  `src/archive/cista.cpp:1158-1174`, `maxInputBytes` limits serialized output;
-  in `src/archive/cista.cpp:1425-1441`, it limits loader input.
-- **Why it hurts:** Six same-typed positional values can be reordered without a
+  `Node::SerializationLimits`, and `RenderLimits`. The same
+  `maxInputBytes` field limited serialized output on the writer path and input
+  bytes on the loader path.
+- **Why it hurts:** Six same-typed positional values could be reordered without a
   compiler error. `maxInputBytes` is also misleading on the writer path, and a
   shared-library update cannot revise the default policy for already-compiled
   call sites.
@@ -237,8 +238,12 @@ as a defect below, but it contributes to the lifecycle and error-model tradeoff.
   changing a public struct's layout is ABI-sensitive regardless. Make the change
   before ABI 6 is frozen. Existing named field assignments require mechanical
   updates; fragile positional initialization should intentionally stop compiling.
-- **Confidence:** High. The aggregate probe compiled and the two observable uses
-  of `maxInputBytes` are explicit.
+- **Resolution:** Implemented before ABI 6 release. Defaults now come from the
+  exported constructor, positional aggregate initialization is rejected, and
+  the shared writer/loader policy uses `maxArchiveBytes`,
+  `maxTotalStringBytes`, and `maxTotalDataParts`.
+- **Confidence:** High. The original aggregate probe compiled, and the two
+  observable uses of `maxInputBytes` were explicit.
 
 ### Issue 5 — Low: Archive-loading failures have no machine-readable category
 
@@ -285,17 +290,17 @@ This table reflects the current contract after the recorded resolutions.
 | Lens | Assessment | Reason |
 |---|---|---|
 | Obvious path | Strong | The documented path compiles, serializes, loads, and renders through opaque owning handles. |
-| Misuse resistance | Mixed | Validation and immutable ownership are strong, but raw archive bytes, nullable handles, and six positional limit values allow plausible near-misses. |
+| Misuse resistance | Mixed | Validation, immutable ownership, and non-positional limits are strong, but raw archive bytes and nullable handles still allow plausible near-misses. |
 | Naming and symmetry | Strong | `ArchivedTemplate` parallels `CompiledTemplate`, and `load`/`serialize`/`render` use one vocabulary. |
-| Signatures | Mixed | Modern and advanced writer overloads compose predictably, but aggregate archive limits still permit positional mistakes. |
+| Signatures | Strong | Modern and advanced writer overloads compose predictably, and archive limits require named field configuration. |
 | Type and IDE experience | Strong | Opaque compiled templates and typed partial maps flow directly into the archive writer without exposing Cista. |
 | Error model | Mixed | Exceptions are consistent with libmustache, but archive load reasons are not machine-readable. |
 | Lifecycle | Strong to mixed | Ownership and cheap copies are explicit, but a default-constructed empty handle remains fallible only when used. |
-| Defaults | Mixed | Defaults are conservative and bounded, but are embedded inline in consumer code and one byte-limit name changes meaning by operation. |
+| Defaults | Strong | Defaults are conservative, bounded, library-owned, and named consistently across writer and loader paths. |
 | Composability | Strong | `CompiledTemplate` and `PartialMap` feed the writer directly while `Node` remains an advanced path. |
 | Progressive disclosure | Strong | The common path stays opaque; callers encounter the low-level AST only when deliberately selecting it. |
 | Discoverability | Strong to mixed | Names expose ownership and cache compatibility, while limit and failure details still require documentation. |
-| Evolution | Mixed | The format and cache domain are versioned, but aggregate limits still bake defaults into callers before ABI freeze. |
+| Evolution | Strong to mixed | The format and cache domain are versioned and limit defaults are library-owned; public struct fields and layout remain compatibility-sensitive. |
 
 Asynchronous operation and cancellation are not applicable: compilation,
 archive loading, and rendering are intentionally synchronous CPU-bound library
@@ -327,6 +332,7 @@ Before php-mustache or another consumer treats ABI 6 as stable:
    it the primary example and integration path. Completed.
 3. Give `ArchivedTemplateLimits` an exported constructor, rename
    `maxInputBytes` to `maxArchiveBytes`, and clarify aggregate total fields.
+   Completed before ABI 6 release.
 4. Expose a library-owned archive compatibility tag for cache keys and embed
    the same native compatibility discriminator in the preamble. Completed in
    format generation 2.
@@ -346,9 +352,10 @@ regularize resource policy before ABI 6 freezes.
   types, format documentation, and ABI-6 migration policy were inspected.
 - A disposable compiler probe confirmed that, at review time, the preferred
   `CompiledTemplate` call did not compile.
-- A second disposable compiler probe confirmed that `ArchivedTemplateLimits`
-  is an aggregate and accepts positional initialization, and that the archived
-  template handle is publicly default-constructible.
+- A second disposable compiler probe confirmed that, at review time,
+  `ArchivedTemplateLimits` was an aggregate and accepted positional
+  initialization, and that the archived template handle was publicly
+  default-constructible.
 - The repository's existing consumer and archive tests provide executable
   evidence for the current happy path, owning-copy behavior, empty-handle
   rejection, resource limits, and free/member render symmetry.

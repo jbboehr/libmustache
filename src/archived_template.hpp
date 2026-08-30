@@ -23,14 +23,23 @@ class Data;
 class Mustache;
 class ArchivedTemplate;
 
-//! Resource limits applied while creating or validating an archived template.
+/*! Resource limits applied while creating or validating an archived template.
+
+    Every field is an enforced maximum. A zero value therefore rejects any
+    archive that consumes that resource; zero never means unlimited.
+    maxArchiveBytes applies to the complete framed archive on both writer and
+    loader paths. The maxTotalStringBytes and maxTotalDataParts budgets are
+    aggregate limits across the complete archived template and its partials.
+*/
 struct ArchivedTemplateLimits {
-    std::size_t maxInputBytes = std::size_t{64} * 1024 * 1024;
-    std::size_t maxNestingDepth = 64;
-    std::size_t maxNodes = 100000;
-    std::size_t maxStringBytes = std::size_t{64} * 1024 * 1024;
-    std::size_t maxDataPartsPerNode = 256;
-    std::size_t maxDataParts = 100000;
+    std::size_t maxArchiveBytes;
+    std::size_t maxNestingDepth;
+    std::size_t maxNodes;
+    std::size_t maxTotalStringBytes;
+    std::size_t maxDataPartsPerNode;
+    std::size_t maxTotalDataParts;
+
+    MUSTACHE_API ArchivedTemplateLimits();
 };
 
 //! Returns an opaque identifier suitable for archived-template cache keys.

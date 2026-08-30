@@ -256,16 +256,6 @@ void testOwnershipAndRendering()
   }
   expect(rejected, "an empty archived template was rendered");
 
-  mustache::ArchivedTemplateLimits archiveLimits;
-  archiveLimits.maxInputBytes = serialized.size() - 1;
-  rejected = false;
-  try {
-    (void)mustache::loadArchivedTemplate(serialized, archiveLimits);
-  } catch (const mustache::Exception&) {
-    rejected = true;
-  }
-  expect(rejected, "public archive loading ignored its input limit");
-
   std::vector<std::uint8_t> corrupted(serialized);
   corrupted.back() ^= std::uint8_t{0xFF};
   rejected = false;
@@ -387,7 +377,7 @@ void testCompiledTemplateSerialization()
   };
 
   mustache::ArchivedTemplateLimits limits;
-  limits.maxInputBytes = 0;
+  limits.maxArchiveBytes = 0;
   expectLimitBeforePartialInspection(compiled, limits, "Cista archive output byte limit exceeded",
       "the output byte limit was checked after compiled partial preprocessing");
 
@@ -419,7 +409,7 @@ void testSerializationLimits()
   };
 
   mustache::ArchivedTemplateLimits limits;
-  limits.maxInputBytes = 0;
+  limits.maxArchiveBytes = 0;
   expectSerializationRejected(limits, "archive serialization ignored its output byte limit");
 
   limits = mustache::ArchivedTemplateLimits();
@@ -427,7 +417,7 @@ void testSerializationLimits()
   expectSerializationRejected(limits, "archive serialization ignored its node limit");
 
   limits = mustache::ArchivedTemplateLimits();
-  limits.maxStringBytes = 0;
+  limits.maxTotalStringBytes = 0;
   expectSerializationRejected(limits, "archive serialization ignored its string byte limit");
 
   limits = mustache::ArchivedTemplateLimits();
@@ -439,8 +429,61 @@ void testSerializationLimits()
   expectSerializationRejected(limits, "archive serialization ignored its per-node data-part limit");
 
   limits = mustache::ArchivedTemplateLimits();
-  limits.maxDataParts = 1;
+  limits.maxTotalDataParts = 1;
   expectSerializationRejected(limits, "archive serialization ignored its aggregate data-part limit");
+}
+
+void testLoadingLimits()
+{
+  mustache::Mustache engine;
+  mustache::Node root;
+  engine.tokenize("{{user.name}}", &root);
+  const std::vector<std::uint8_t> serialized = mustache::serializeArchivedTemplate(root);
+
+  const auto expectLoadingRejected = [&serialized](mustache::ArchivedTemplateLimits limits, const char * message) {
+    bool rejected = false;
+    try {
+      (void)mustache::loadArchivedTemplate(serialized, limits);
+    } catch (const mustache::Exception&) {
+      rejected = true;
+    }
+    expect(rejected, message);
+  };
+
+  mustache::ArchivedTemplateLimits limits;
+  limits.maxArchiveBytes = 0;
+  expectLoadingRejected(limits, "archive loading ignored its archive byte limit");
+
+  limits = mustache::ArchivedTemplateLimits();
+  limits.maxNestingDepth = 0;
+  expectLoadingRejected(limits, "archive loading ignored its nesting limit");
+
+  limits = mustache::ArchivedTemplateLimits();
+  limits.maxNodes = 0;
+  expectLoadingRejected(limits, "archive loading ignored its node limit");
+
+  limits = mustache::ArchivedTemplateLimits();
+  limits.maxTotalStringBytes = 0;
+  expectLoadingRejected(limits, "archive loading ignored its aggregate string byte limit");
+
+  limits = mustache::ArchivedTemplateLimits();
+  limits.maxDataPartsPerNode = 0;
+  expectLoadingRejected(limits, "archive loading ignored its per-node data-part limit");
+
+  limits = mustache::ArchivedTemplateLimits();
+  limits.maxTotalDataParts = 0;
+  expectLoadingRejected(limits, "archive loading ignored its aggregate data-part limit");
+}
+
+void testArchiveLimitDefaults()
+{
+  const mustache::ArchivedTemplateLimits limits;
+  expect(limits.maxArchiveBytes == 64 * 1024 * 1024, "default archive byte limit changed");
+  expect(limits.maxNestingDepth == 64, "default archive nesting limit changed");
+  expect(limits.maxNodes == 100000, "default archive node limit changed");
+  expect(limits.maxTotalStringBytes == 64 * 1024 * 1024, "default aggregate archive string limit changed");
+  expect(limits.maxDataPartsPerNode == 256, "default per-node archive data-part limit changed");
+  expect(limits.maxTotalDataParts == 100000, "default aggregate archive data-part limit changed");
 }
 
 } // namespace
@@ -454,6 +497,8 @@ static_assert(std::is_nothrow_move_assignable<mustache::ArchivedTemplate>::value
     "archived templates must be nothrow move assignable");
 static_assert(noexcept(mustache::archivedTemplateCompatibilityTag()),
     "the archived-template compatibility tag query must be non-throwing");
+static_assert(!std::is_aggregate<mustache::ArchivedTemplateLimits>::value,
+    "archived-template limits must reject positional aggregate initialization");
 
 int main()
 {
@@ -465,6 +510,8 @@ int main()
     testPartialsAndLambdas();
     testCompiledTemplateSerialization();
     testSerializationLimits();
+    testLoadingLimits();
+    testArchiveLimitDefaults();
   } catch (const std::exception& exception) {
     std::fprintf(stderr, "archived-template API test failed: %s\n", exception.what());
     return 1;

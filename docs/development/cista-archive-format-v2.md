@@ -109,7 +109,7 @@ generation when the preamble or underlying Cista encoding becomes incompatible.
 
 Readers apply these gates in order:
 
-1. Enforce `maxInputBytes` against the complete preamble plus payload.
+1. Enforce `maxArchiveBytes` against the complete preamble plus payload.
 2. Require the complete fixed preamble, magic, supported format generation, and
    matching native compatibility fingerprint.
 3. Require the payload's Cista type-version word to match the fixed-storage

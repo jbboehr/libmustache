@@ -224,6 +224,25 @@ void expect(bool condition, const char * message)
   }
 }
 
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+void testArchiveLimitDefaultParity()
+{
+  const mustache::ArchivedTemplateLimits production;
+  const mustache_benchmark::CistaArchiveLimits benchmark;
+  expect(production.maxArchiveBytes == benchmark.maxArchiveBytes,
+      "benchmark and production archive byte defaults diverged");
+  expect(production.maxNestingDepth == benchmark.maxNestingDepth,
+      "benchmark and production archive nesting defaults diverged");
+  expect(production.maxNodes == benchmark.maxNodes, "benchmark and production archive node defaults diverged");
+  expect(production.maxTotalStringBytes == benchmark.maxTotalStringBytes,
+      "benchmark and production aggregate string defaults diverged");
+  expect(production.maxDataPartsPerNode == benchmark.maxDataPartsPerNode,
+      "benchmark and production per-node data-part defaults diverged");
+  expect(production.maxTotalDataParts == benchmark.maxTotalDataParts,
+      "benchmark and production aggregate data-part defaults diverged");
+}
+#endif
+
 constexpr std::size_t archivePreambleSize = 24;
 
 std::uint64_t readLittleEndian(const std::vector<std::uint8_t>& bytes, std::size_t offset, std::size_t width)
@@ -599,6 +618,9 @@ int main()
 {
   try {
     expect(!isGoldenPlatform(4), "x86-64 x32 ABI incorrectly selected the 64-bit golden archive");
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+    testArchiveLimitDefaultParity();
+#endif
     testDataPartCursorContract();
 
     mustache::Mustache engine;
@@ -767,13 +789,13 @@ int main()
         "node type narrowed before validation");
 
     mustache_benchmark::CistaArchiveLimits serializationLimits;
-    serializationLimits.maxInputBytes = archive.size() - 1;
+    serializationLimits.maxArchiveBytes = archive.size() - 1;
     expectOperationRejected(
         [&root, &partials, &serializationLimits]() {
           (void)mustache_benchmark::serializeCistaArchive(root, partials, serializationLimits);
         },
         "serialized output exceeds the paired reader limit");
-    serializationLimits.maxInputBytes = archive.size();
+    serializationLimits.maxArchiveBytes = archive.size();
     expect(mustache_benchmark::serializeCistaArchive(root, partials, serializationLimits) == archive,
         "serialized output at the exact paired reader limit was rejected or changed");
 
@@ -1068,9 +1090,9 @@ int main()
         "unaligned buffer");
 
     mustache_benchmark::CistaArchiveLimits archiveLimits;
-    archiveLimits.maxInputBytes = archive.size() - 1;
+    archiveLimits.maxArchiveBytes = archive.size() - 1;
     expectRejected(bytes, data, archiveLimits, mustache::RenderLimits(), "input byte limit");
-    archiveLimits.maxInputBytes = archive.size();
+    archiveLimits.maxArchiveBytes = archive.size();
     expect(mustache_benchmark::renderCistaArchive(bytes, data, archiveLimits) == expected,
         "archive at the exact input byte limit was rejected or rendered differently");
     archiveLimits = mustache_benchmark::CistaArchiveLimits();
@@ -1080,13 +1102,13 @@ int main()
     archiveLimits.maxDataPartsPerNode = 1;
     expectRejected(bytes, data, archiveLimits, mustache::RenderLimits(), "per-node data-part limit");
     archiveLimits = mustache_benchmark::CistaArchiveLimits();
-    archiveLimits.maxDataParts = 1;
+    archiveLimits.maxTotalDataParts = 1;
     expectRejected(bytes, data, archiveLimits, mustache::RenderLimits(), "aggregate data-part limit");
     archiveLimits = mustache_benchmark::CistaArchiveLimits();
     archiveLimits.maxNestingDepth = 1;
     expectRejected(bytes, data, archiveLimits, mustache::RenderLimits(), "archive nesting limit");
     archiveLimits = mustache_benchmark::CistaArchiveLimits();
-    archiveLimits.maxStringBytes = 0;
+    archiveLimits.maxTotalStringBytes = 0;
     expectRejected(bytes, data, archiveLimits, mustache::RenderLimits(), "archive string byte limit");
 
     mustache::RenderLimits renderLimits;

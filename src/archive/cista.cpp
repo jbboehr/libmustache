@@ -134,7 +134,7 @@ template <typename Unsigned> Unsigned readLittleEndian(std::string_view bytes, s
 template <cista::mode Mode>
 std::vector<std::uint8_t> frameArchive(std::vector<std::uint8_t>&& payload, const CistaArchiveLimits& limits)
 {
-  if (limits.maxInputBytes < archivePreambleSize || payload.size() > limits.maxInputBytes - archivePreambleSize) {
+  if (limits.maxArchiveBytes < archivePreambleSize || payload.size() > limits.maxArchiveBytes - archivePreambleSize) {
     throw mustache::Exception("Cista archive output byte limit exceeded");
   }
 
@@ -154,7 +154,7 @@ std::string_view readArchivePreamble(std::string_view bytes, const CistaArchiveL
   if (bytes.empty()) {
     throw mustache::Exception("Empty Cista archive");
   }
-  if (bytes.size() > limits.maxInputBytes) {
+  if (bytes.size() > limits.maxArchiveBytes) {
     throw mustache::Exception("Cista archive input byte limit exceeded");
   }
   if (bytes.size() < archivePreambleSize) {
@@ -625,7 +625,7 @@ class ArchiveBuilder {
           bytes > std::numeric_limits<std::uint32_t>::max() - stringBytes_) {
         throw mustache::Exception("Cista archive string bytes exceed format limit");
       }
-      if (stringBytes_ > limits_.maxStringBytes || bytes > limits_.maxStringBytes - stringBytes_) {
+      if (stringBytes_ > limits_.maxTotalStringBytes || bytes > limits_.maxTotalStringBytes - stringBytes_) {
         throw mustache::Exception("Cista archive string byte limit exceeded");
       }
       stringBytes_ += bytes;
@@ -659,7 +659,7 @@ class ArchiveBuilder {
         if (parts > limits_.maxDataPartsPerNode) {
           throw mustache::Exception("Cista archive per-node data-part limit exceeded");
         }
-        addBounded(parts, limits_.maxDataParts, &dataParts_, "Cista archive data-part limit exceeded");
+        addBounded(parts, limits_.maxTotalDataParts, &dataParts_, "Cista archive data-part limit exceeded");
       }
       for (const std::unique_ptr<mustache::Node>& child : source.children) {
         if (child == nullptr) {
@@ -673,15 +673,15 @@ class ArchiveBuilder {
     {
       std::size_t minimum = archivePreambleSize;
       const auto addMinimum = [&minimum, this](std::size_t amount) {
-        if (minimum > limits_.maxInputBytes || amount > limits_.maxInputBytes - minimum) {
+        if (minimum > limits_.maxArchiveBytes || amount > limits_.maxArchiveBytes - minimum) {
           throw mustache::Exception("Cista archive output byte limit exceeded");
         }
         minimum += amount;
       };
       addMinimum(cistaHeaderBytes_);
       addMinimum(sizeof(ArchiveGraph));
-      if (nodeCount_ > limits_.maxInputBytes / sizeof(ArchiveNode) ||
-          partialCount_ > limits_.maxInputBytes / sizeof(ArchivePartial)) {
+      if (nodeCount_ > limits_.maxArchiveBytes / sizeof(ArchiveNode) ||
+          partialCount_ > limits_.maxArchiveBytes / sizeof(ArchivePartial)) {
         throw mustache::Exception("Cista archive output byte limit exceeded");
       }
       addMinimum(nodeCount_ * sizeof(ArchiveNode));
@@ -785,7 +785,7 @@ class ArchiveValidator {
       if (inputBytes_ != 0 && graph_.serializedSize != inputBytes_) {
         throw mustache::Exception("Invalid Cista archive encoded length");
       }
-      if (graph_.strings.size() > limits_.maxStringBytes) {
+      if (graph_.strings.size() > limits_.maxTotalStringBytes) {
         throw mustache::Exception("Cista archive string byte limit exceeded");
       }
       validateRoot(graph_.root);
@@ -921,7 +921,7 @@ class ArchiveValidator {
       if (parts > limits_.maxDataPartsPerNode) {
         throw mustache::Exception("Cista archive per-node data-part limit exceeded");
       }
-      addBounded(parts, limits_.maxDataParts, &dataParts_, "Cista archive data-part limit exceeded");
+      addBounded(parts, limits_.maxTotalDataParts, &dataParts_, "Cista archive data-part limit exceeded");
     }
 
     void validateChildren(const ArchiveNode& node, std::size_t depth)
@@ -1339,10 +1339,10 @@ std::vector<std::uint8_t> serializeCistaArchiveWithMode(
       "the allocation-free Cista writer must preserve the serialized graph offset");
   static_assert(cista::integrity_start(executionMode) == cista::integrity_start(Mode),
       "the allocation-free Cista writer must preserve the integrity offset");
-  if (archiveLimits.maxInputBytes < archivePreambleSize) {
+  if (archiveLimits.maxArchiveBytes < archivePreambleSize) {
     throw mustache::Exception("Cista archive output byte limit exceeded");
   }
-  const std::size_t maximumPayloadBytes = archiveLimits.maxInputBytes - archivePreambleSize;
+  const std::size_t maximumPayloadBytes = archiveLimits.maxArchiveBytes - archivePreambleSize;
   ArchiveGraph graph =
       ArchiveBuilder(archiveLimits, static_cast<std::size_t>(cista::data_start(Mode))).build(root, partials);
   ArchiveValidator(graph, archiveLimits).validate();
@@ -1563,6 +1563,15 @@ std::string renderCistaArchive(std::string_view bytes, const mustache::Data& dat
 #if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
 namespace mustache {
 
+ArchivedTemplateLimits::ArchivedTemplateLimits() :
+    maxArchiveBytes(std::size_t{64} * 1024 * 1024),
+    maxNestingDepth(64),
+    maxNodes(100000),
+    maxTotalStringBytes(std::size_t{64} * 1024 * 1024),
+    maxDataPartsPerNode(256),
+    maxTotalDataParts(100000)
+{}
+
 struct ArchivedTemplate::State {
     explicit State(std::vector<std::uint8_t> archiveBytes) :
         bytes(std::move(archiveBytes)),
@@ -1628,7 +1637,7 @@ std::vector<std::uint8_t> serializeArchivedTemplate(
 
 ArchivedTemplate loadArchivedTemplate(const std::vector<std::uint8_t>& bytes, const ArchivedTemplateLimits& limits)
 {
-  if (bytes.size() > limits.maxInputBytes) {
+  if (bytes.size() > limits.maxArchiveBytes) {
     throw Exception("Cista archive input byte limit exceeded");
   }
   std::shared_ptr<ArchivedTemplate::State> loaded =
@@ -1641,7 +1650,7 @@ ArchivedTemplate loadArchivedTemplate(const std::vector<std::uint8_t>& bytes, co
 
 ArchivedTemplate loadArchivedTemplate(std::string_view bytes, const ArchivedTemplateLimits& limits)
 {
-  if (bytes.size() > limits.maxInputBytes) {
+  if (bytes.size() > limits.maxArchiveBytes) {
     throw Exception("Cista archive input byte limit exceeded");
   }
   std::vector<std::uint8_t> ownedBytes(bytes.size());
