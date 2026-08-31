@@ -84,30 +84,19 @@ void htmlspecialchars_append(const std::string& str, std::string * buf)
 
 void explode(const std::string& delimiter, const std::string& str, std::vector<std::string> * arr)
 {
-  const std::string::size_type strleng = str.length();
-  const std::string::size_type delleng = delimiter.length();
-  if (delleng == 0) {
-    // no change
+  if (delimiter.empty()) {
     return;
   }
 
-  std::string::size_type i = 0;
-  std::string::size_type k = 0;
-  while (i < strleng) {
-    std::string::size_type j = 0;
-    while (i + j < strleng && j < delleng && str[i + j] == delimiter[j]) {
-      j++;
-    }
-    if (j == delleng) {
-      // found delimiter
-      arr->push_back(str.substr(k, i - k));
-      i += delleng;
-      k = i;
-    } else {
-      i++;
-    }
+  const std::string stableDelimiter = delimiter;
+  std::string::size_type start = 0;
+  std::string::size_type separator = str.find(stableDelimiter, start);
+  while (separator != std::string::npos) {
+    arr->push_back(str.substr(start, separator - start));
+    start = separator + stableDelimiter.size();
+    separator = str.find(stableDelimiter, start);
   }
-  arr->push_back(str.substr(k, i - k));
+  arr->push_back(str.substr(start));
 }
 
 void stringTok(const std::string& str, std::string_view delimiters, std::vector<std::string> * tokens)

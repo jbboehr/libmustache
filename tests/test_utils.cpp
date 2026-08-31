@@ -18,27 +18,60 @@ bool expectEqual(const char * testName, const std::string& actual, const std::st
   return false;
 }
 
+bool expectEqual(
+    const char * testName, const std::vector<std::string>& actual, const std::vector<std::string>& expected)
+{
+  if (actual == expected) {
+    return true;
+  }
+
+  fprintf(stdout, "Failed %s, expected %zu parts, got %zu parts\n", testName, expected.size(), actual.size());
+  return false;
+}
+
 } // namespace
 
 int main()
 {
-  std::string case1 = "a.b.c";
-  std::vector<std::string> result1;
-  mustache::explode(".", case1, &result1);
-  if (result1.size() != 3) {
-    fprintf(stdout, "Failed, expected three parts, got %zu\n", result1.size());
+  std::vector<std::string> parts;
+  mustache::explode(".", "a.b.c", &parts);
+  if (!expectEqual("basic split", parts, {"a", "b", "c"})) {
     return 1;
   }
-  if (result1[0].compare("a") != 0) {
-    fprintf(stdout, "Failed, expected part 1 to be 'a', got '%s'\n", result1[0].c_str());
+
+  parts = {"existing"};
+  mustache::explode("::", "a::::b::", &parts);
+  if (!expectEqual("multi-character split", parts, {"existing", "a", "", "b", ""})) {
     return 1;
   }
-  if (result1[1].compare("b") != 0) {
-    fprintf(stdout, "Failed, expected part 2 to be 'b', got '%s'\n", result1[1].c_str());
+
+  parts.clear();
+  mustache::explode("aa", "aaa", &parts);
+  if (!expectEqual("non-overlapping split", parts, {"", "a"})) {
     return 1;
   }
-  if (result1[2].compare("c") != 0) {
-    fprintf(stdout, "Failed, expected part 3 to be 'c', got '%s'\n", result1[2].c_str());
+
+  parts.clear();
+  mustache::explode(".", "", &parts);
+  if (!expectEqual("empty input split", parts, {""})) {
+    return 1;
+  }
+
+  parts = {"existing"};
+  mustache::explode("", "ignored", &parts);
+  if (!expectEqual("empty delimiter split", parts, {"existing"})) {
+    return 1;
+  }
+
+  parts = {"."};
+  while (parts.size() < parts.capacity()) {
+    parts.emplace_back("padding");
+  }
+  std::vector<std::string> aliasedDelimiterExpected = parts;
+  aliasedDelimiterExpected.emplace_back("a");
+  aliasedDelimiterExpected.emplace_back("");
+  mustache::explode(parts.front(), "a.", &parts);
+  if (!expectEqual("aliased delimiter split", parts, aliasedDelimiterExpected)) {
     return 1;
   }
 
