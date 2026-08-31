@@ -75,6 +75,45 @@ int main()
     return 1;
   }
 
+  std::vector<std::string> tokens = {"alpha beta gamma"};
+  while (tokens.size() < tokens.capacity()) {
+    tokens.emplace_back("padding");
+  }
+  std::vector<std::string> aliasedTokenInputExpected = tokens;
+  aliasedTokenInputExpected.emplace_back("alpha");
+  aliasedTokenInputExpected.emplace_back("beta");
+  aliasedTokenInputExpected.emplace_back("gamma");
+  mustache::stringTok(tokens.front(), " ", &tokens);
+  if (!expectEqual("aliased token input", tokens, aliasedTokenInputExpected)) {
+    return 1;
+  }
+
+  std::vector<std::string> delimiterTokens = {" :;!@#$%^&*()"};
+  while (delimiterTokens.size() < delimiterTokens.capacity()) {
+    delimiterTokens.emplace_back("padding");
+  }
+  std::vector<std::string> aliasedTokenDelimiterExpected = delimiterTokens;
+  aliasedTokenDelimiterExpected.emplace_back("alpha");
+  aliasedTokenDelimiterExpected.emplace_back("beta");
+  aliasedTokenDelimiterExpected.emplace_back("gamma");
+  mustache::stringTok("alpha beta:gamma", delimiterTokens.front(), &delimiterTokens);
+  if (!expectEqual("aliased token delimiter", delimiterTokens, aliasedTokenDelimiterExpected)) {
+    return 1;
+  }
+
+  parts = {"alpha.beta.gamma"};
+  while (parts.size() < parts.capacity()) {
+    parts.emplace_back("padding");
+  }
+  std::vector<std::string> aliasedSplitInputExpected = parts;
+  aliasedSplitInputExpected.emplace_back("alpha");
+  aliasedSplitInputExpected.emplace_back("beta");
+  aliasedSplitInputExpected.emplace_back("gamma");
+  mustache::explode(".", parts.front(), &parts);
+  if (!expectEqual("aliased split input", parts, aliasedSplitInputExpected)) {
+    return 1;
+  }
+
   std::string htmlInput = "plain &\"'<>";
   htmlInput.push_back('\0');
   htmlInput.append("tail");
