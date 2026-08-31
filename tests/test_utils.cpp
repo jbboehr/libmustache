@@ -102,5 +102,25 @@ int main()
     return 1;
   }
 
+  std::string mutableSelfAppended(64, 'x');
+  mutableSelfAppended.front() = '&';
+  mutableSelfAppended.resize(mutableSelfAppended.capacity(), 'x');
+  const std::string mutableSelfExpected =
+      mutableSelfAppended + "&amp;" + std::string(mutableSelfAppended.size() - 1, 'x');
+  mustache::htmlspecialchars_append(&mutableSelfAppended, &mutableSelfAppended);
+  if (!expectEqual("mutable self-appending HTML escape", mutableSelfAppended, mutableSelfExpected)) {
+    return 1;
+  }
+
+  std::string constSelfAppended(64, 'y');
+  constSelfAppended.front() = '<';
+  constSelfAppended.resize(constSelfAppended.capacity(), 'y');
+  const std::string constSelfExpected = constSelfAppended + "&lt;" + std::string(constSelfAppended.size() - 1, 'y');
+  const std::string& constSelfInput = constSelfAppended;
+  mustache::htmlspecialchars_append(constSelfInput, &constSelfAppended);
+  if (!expectEqual("const self-appending HTML escape", constSelfAppended, constSelfExpected)) {
+    return 1;
+  }
+
   return 0;
 }

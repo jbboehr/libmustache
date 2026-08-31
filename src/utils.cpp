@@ -58,6 +58,12 @@ void htmlspecialchars_append(std::string * str, std::string * buf)
 
 void htmlspecialchars_append(const std::string& str, std::string * buf)
 {
+  if (&str == buf) {
+    const std::string stableInput = str;
+    htmlspecialchars_append(stableInput, buf);
+    return;
+  }
+
   for (const char chr : str) {
     switch (chr) {
       case '&':
