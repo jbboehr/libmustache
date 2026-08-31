@@ -57,6 +57,7 @@ MUSTACHE_API void trim(std::string& str, std::string_view trimChars = whiteSpace
 /*!
   Not multibyte safe
   /param str The string to escape
+  \throws mustache::Exception if str is null
 */
 MUSTACHE_API void htmlspecialchars(std::string * str);
 
@@ -65,10 +66,11 @@ MUSTACHE_API void htmlspecialchars(std::string * str);
   Not multibyte safe
   /param str The string to escape
   /param buf The string to append to
+  \throws mustache::Exception if str or buf is null
 */
 MUSTACHE_API void htmlspecialchars_append(std::string * str, std::string * buf);
 
-//! Const-safe overload for owned scalar values.
+//! Const-safe overload for owned scalar values. Throws mustache::Exception if buf is null.
 MUSTACHE_API void htmlspecialchars_append(const std::string& str, std::string * buf);
 
 //! Explode a string.
@@ -77,6 +79,7 @@ MUSTACHE_API void htmlspecialchars_append(const std::string& str, std::string * 
   /param delimiter The delimiter to explode by
   /param str The string to explode
   /param arr The chunks are stored here
+  \throws mustache::Exception if arr is null
 */
 MUSTACHE_API void explode(const std::string& delimiter, const std::string& str, std::vector<std::string> * arr);
 
@@ -86,6 +89,7 @@ MUSTACHE_API void explode(const std::string& delimiter, const std::string& str, 
   /param str The string to tokenize
   /param delimiters The delimiters to tokenize by
   /param tokens The tokens are stored here
+  \throws mustache::Exception if tokens is null
 */
 MUSTACHE_API void stringTok(const std::string& str, std::string_view delimiters, std::vector<std::string> * tokens);
 

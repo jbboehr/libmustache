@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstdio>
 
+#include "exception.hpp"
 #include "utils.hpp"
 
 namespace {
@@ -29,10 +30,70 @@ bool expectEqual(
   return false;
 }
 
+template <typename Callable>
+bool expectException(const char * testName, const char * expectedMessage, Callable callable)
+{
+  try {
+    callable();
+  } catch (const mustache::Exception& exception) {
+    if (std::string(exception.what()) == expectedMessage) {
+      return true;
+    }
+    fprintf(stdout, "Failed %s, expected '%s', got '%s'\n", testName, expectedMessage, exception.what());
+    return false;
+  }
+
+  fprintf(stdout, "Failed %s, no exception was thrown\n", testName);
+  return false;
+}
+
 } // namespace
 
 int main()
 {
+  if (!expectException("missing in-place HTML input", "Missing HTML input", []() {
+        mustache::htmlspecialchars(nullptr);
+      })) {
+    return 1;
+  }
+
+  std::string nullInputOutput = "unchanged";
+  if (!expectException("missing HTML append input", "Missing HTML input",
+          [&nullInputOutput]() {
+            mustache::htmlspecialchars_append(static_cast<std::string *>(nullptr), &nullInputOutput);
+          }) ||
+      !expectEqual("missing HTML append input output", nullInputOutput, "unchanged")) {
+    return 1;
+  }
+
+  std::string nullOutputInput = "unchanged";
+  if (!expectException("missing mutable HTML append output", "Missing HTML output",
+          [&nullOutputInput]() {
+            mustache::htmlspecialchars_append(&nullOutputInput, nullptr);
+          }) ||
+      !expectEqual("missing mutable HTML append output input", nullOutputInput, "unchanged")) {
+    return 1;
+  }
+
+  const std::string constNullOutputInput = "unchanged";
+  if (!expectException("missing const HTML append output", "Missing HTML output", [&constNullOutputInput]() {
+        mustache::htmlspecialchars_append(constNullOutputInput, nullptr);
+      })) {
+    return 1;
+  }
+
+  if (!expectException("missing split output", "Missing split output", []() {
+        mustache::explode(".", "a.b", nullptr);
+      })) {
+    return 1;
+  }
+
+  if (!expectException("missing token output", "Missing token output", []() {
+        mustache::stringTok("a b", " ", nullptr);
+      })) {
+    return 1;
+  }
+
   std::vector<std::string> parts;
   mustache::explode(".", "a.b.c", &parts);
   if (!expectEqual("basic split", parts, {"a", "b", "c"})) {

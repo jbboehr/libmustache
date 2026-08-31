@@ -1,6 +1,8 @@
 
 #include "utils.hpp"
 
+#include "exception.hpp"
+
 namespace mustache {
 
 namespace {
@@ -59,6 +61,9 @@ void trim(std::string& str, std::string_view trimChars)
 
 void htmlspecialchars(std::string * str)
 {
+  if (str == nullptr) {
+    throw Exception("Missing HTML input");
+  }
   std::string tmp;
   tmp.reserve(str->size());
   htmlspecialchars_append(*str, &tmp);
@@ -67,11 +72,17 @@ void htmlspecialchars(std::string * str)
 
 void htmlspecialchars_append(std::string * str, std::string * buf)
 {
+  if (str == nullptr) {
+    throw Exception("Missing HTML input");
+  }
   htmlspecialchars_append(*str, buf);
 }
 
 void htmlspecialchars_append(const std::string& str, std::string * buf)
 {
+  if (buf == nullptr) {
+    throw Exception("Missing HTML output");
+  }
   if (&str == buf) {
     const std::string stableInput = str;
     htmlspecialchars_append(stableInput, buf);
@@ -104,6 +115,9 @@ void htmlspecialchars_append(const std::string& str, std::string * buf)
 
 void explode(const std::string& delimiter, const std::string& str, std::vector<std::string> * arr)
 {
+  if (arr == nullptr) {
+    throw Exception("Missing split output");
+  }
   if (delimiter.empty()) {
     return;
   }
@@ -124,6 +138,9 @@ void explode(const std::string& delimiter, const std::string& str, std::vector<s
 
 void stringTok(const std::string& str, std::string_view delimiters, std::vector<std::string> * tokens)
 {
+  if (tokens == nullptr) {
+    throw Exception("Missing token output");
+  }
   const bool inputAliasesOutput = aliasesElement(str, *tokens);
   const std::string stableInput = inputAliasesOutput ? str : std::string();
   const std::string& input = inputAliasesOutput ? stableInput : str;
