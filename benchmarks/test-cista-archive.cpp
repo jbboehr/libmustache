@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
@@ -13,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -296,20 +298,6 @@ mustache_benchmark::CistaChecksumAlgorithm cistaIntegrityChecksumAlgorithm() noe
 #endif
 }
 
-std::uint8_t hexNibble(char value)
-{
-  if (value >= '0' && value <= '9') {
-    return static_cast<std::uint8_t>(value - '0');
-  }
-  if (value >= 'a' && value <= 'f') {
-    return static_cast<std::uint8_t>(value - 'a' + 10);
-  }
-  if (value >= 'A' && value <= 'F') {
-    return static_cast<std::uint8_t>(value - 'A' + 10);
-  }
-  throw std::runtime_error("golden Cista archive contains a non-hexadecimal byte");
-}
-
 std::vector<std::uint8_t> readGoldenArchive()
 {
 #if defined(_MSC_VER)
@@ -337,7 +325,13 @@ std::vector<std::uint8_t> readGoldenArchive()
     if (encoded.size() != 2) {
       throw std::runtime_error("golden Cista archive contains a malformed byte");
     }
-    bytes.push_back(static_cast<std::uint8_t>((hexNibble(encoded[0]) << 4) | hexNibble(encoded[1])));
+    unsigned int value = 0;
+    const char * const end = encoded.data() + encoded.size();
+    const std::from_chars_result result = std::from_chars(encoded.data(), end, value, 16);
+    if (result.ec != std::errc() || result.ptr != end) {
+      throw std::runtime_error("golden Cista archive contains a non-hexadecimal byte");
+    }
+    bytes.push_back(static_cast<std::uint8_t>(value));
   }
   if (!stream.eof() || bytes.empty()) {
     throw std::runtime_error("unable to read the golden Cista archive");

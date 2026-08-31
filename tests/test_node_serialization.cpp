@@ -1,11 +1,13 @@
 #include "mustache_config.h"
 
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -18,20 +20,6 @@ int failures = 0;
 const char phpMustacheVariableAST[] = "4d55000100000000000100000013"
                                       "4d550010010000050000000000007465737400";
 
-unsigned int hexDigit(char value)
-{
-  if (value >= '0' && value <= '9') {
-    return static_cast<unsigned int>(value - '0');
-  }
-  if (value >= 'a' && value <= 'f') {
-    return static_cast<unsigned int>(value - 'a' + 10);
-  }
-  if (value >= 'A' && value <= 'F') {
-    return static_cast<unsigned int>(value - 'A' + 10);
-  }
-  return 16;
-}
-
 std::vector<uint8_t> decodeHex(const char * hex)
 {
   const std::string encoded(hex);
@@ -42,13 +30,15 @@ std::vector<uint8_t> decodeHex(const char * hex)
 
   decoded.reserve(encoded.size() / 2);
   for (std::size_t i = 0; i < encoded.size(); i += 2) {
-    const unsigned int high = hexDigit(encoded[i]);
-    const unsigned int low = hexDigit(encoded[i + 1]);
-    if (high > 15 || low > 15) {
+    unsigned int value = 0;
+    const char * const begin = encoded.data() + i;
+    const char * const end = begin + 2;
+    const std::from_chars_result result = std::from_chars(begin, end, value, 16);
+    if (result.ec != std::errc() || result.ptr != end) {
       decoded.clear();
       return decoded;
     }
-    decoded.push_back(static_cast<uint8_t>((high << 4) | low));
+    decoded.push_back(static_cast<uint8_t>(value));
   }
   return decoded;
 }

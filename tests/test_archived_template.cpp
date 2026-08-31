@@ -11,6 +11,7 @@
 #include "mustache.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cstdlib>
 #include <cstdint>
 #include <cstdio>
@@ -20,6 +21,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -78,20 +80,6 @@ bool isGoldenPlatform(std::size_t pointerBytes) noexcept
 #endif
 }
 
-std::uint8_t hexNibble(char value)
-{
-  if (value >= '0' && value <= '9') {
-    return static_cast<std::uint8_t>(value - '0');
-  }
-  if (value >= 'a' && value <= 'f') {
-    return static_cast<std::uint8_t>(value - 'a' + 10);
-  }
-  if (value >= 'A' && value <= 'F') {
-    return static_cast<std::uint8_t>(value - 'A' + 10);
-  }
-  throw std::runtime_error("golden archive contains a non-hexadecimal byte");
-}
-
 std::vector<std::uint8_t> readGoldenArchive()
 {
 #if defined(_MSC_VER)
@@ -119,7 +107,13 @@ std::vector<std::uint8_t> readGoldenArchive()
     if (encoded.size() != 2) {
       throw std::runtime_error("golden archive contains a malformed byte");
     }
-    bytes.push_back(static_cast<std::uint8_t>((hexNibble(encoded[0]) << 4) | hexNibble(encoded[1])));
+    unsigned int value = 0;
+    const char * const end = encoded.data() + encoded.size();
+    const std::from_chars_result result = std::from_chars(encoded.data(), end, value, 16);
+    if (result.ec != std::errc() || result.ptr != end) {
+      throw std::runtime_error("golden archive contains a non-hexadecimal byte");
+    }
+    bytes.push_back(static_cast<std::uint8_t>(value));
   }
   if (!stream.eof() || bytes.empty()) {
     throw std::runtime_error("unable to read the golden archive");
@@ -166,8 +160,11 @@ void testArchiveCompatibilityPreamble()
       "the archived-template compatibility tag has an unexpected prefix");
   std::uint64_t taggedFingerprint = 0;
   if (compatibilityTag.size() == compatibilityTagPrefix.size() + 16) {
-    for (const char digit : compatibilityTag.substr(compatibilityTagPrefix.size())) {
-      taggedFingerprint = (taggedFingerprint << 4) | hexNibble(digit);
+    const char * const begin = compatibilityTag.data() + compatibilityTagPrefix.size();
+    const char * const end = compatibilityTag.data() + compatibilityTag.size();
+    const std::from_chars_result result = std::from_chars(begin, end, taggedFingerprint, 16);
+    if (result.ec != std::errc() || result.ptr != end) {
+      throw std::runtime_error("archive compatibility tag contains a non-hexadecimal byte");
     }
   }
   expect(taggedFingerprint == compatibilityFingerprint,
