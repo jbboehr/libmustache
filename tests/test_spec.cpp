@@ -2,14 +2,16 @@
 #include "test_spec.hpp"
 #include "./fixtures/lambdas.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <limits>
 #include <memory>
 #include <system_error>
 #include <utility>
+#include <vector>
 
-std::list<MustacheSpecTest *> tests;
+std::vector<std::unique_ptr<MustacheSpecTest>> tests;
 int execNum = 1;
 static const char * currentSuite;
 
@@ -40,7 +42,7 @@ int main(int argc, char * argv[])
     execNum = atoi(numStr);
   }
 
-  std::list<std::string> files;
+  std::vector<std::string> files;
   std::error_code directoryError;
   std::filesystem::directory_iterator iterator(directory, directoryError);
   const std::filesystem::directory_iterator end;
@@ -64,7 +66,7 @@ int main(int argc, char * argv[])
     return 1;
   }
 
-  files.sort();
+  std::sort(files.begin(), files.end());
 
   for (const std::string& file : files) {
     //if( file[0] == '~' ) continue; // Ignore lambdas
@@ -107,27 +109,25 @@ int main(int argc, char * argv[])
   }
 
   // Summarize
-  std::list<MustacheSpecTest *>::iterator it = tests.begin();
   int nPassed = 0;
   int nKnownFailures = 0;
   int nUnexpectedFailures = 0;
   int nUnexpectedPasses = 0;
   int nSkipped = 0;
-  for (; it != tests.end(); ++it) {
-    if ((*it)->skipped) {
+  for (const std::unique_ptr<MustacheSpecTest>& test : tests) {
+    if (test->skipped) {
       nSkipped++;
-    } else if ((*it)->knownFailure) {
-      if ((*it)->passed()) {
+    } else if (test->knownFailure) {
+      if (test->passed()) {
         nUnexpectedPasses++;
       } else {
         nKnownFailures++;
       }
-    } else if ((*it)->passed()) {
+    } else if (test->passed()) {
       nPassed++;
     } else {
       nUnexpectedFailures++;
     }
-    delete *it;
   }
   tests.clear();
   const bool inventoryValid = mustache_test::validateSpecInventory(std::cerr);
@@ -195,7 +195,7 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
     return;
   }
 
-  MustacheSpecTest * test = new MustacheSpecTest;
+  std::unique_ptr<MustacheSpecTest> test = std::make_unique<MustacheSpecTest>();
   test->suite.assign(currentSuite);
 
   // Read the name first so unsupported tests can be counted without parsing
@@ -218,7 +218,7 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
   test->knownFailure = expectation.outcome == mustache_test::SpecExpectedFailure;
   if (test->skipped) {
     test->print();
-    tests.push_back(test);
+    tests.push_back(std::move(test));
     return;
   }
 
@@ -269,7 +269,7 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
 
   // Output result
   test->print();
-  tests.push_back(test);
+  tests.push_back(std::move(test));
 }
 
 void mustache_spec_parse_data(yaml_document_t * document, yaml_node_t * node, mustache::Data * data)

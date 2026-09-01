@@ -8,11 +8,10 @@
 
 #include "lambdas.hpp"
 
-static void add_lambda(mustache::Lambda * lambda, mustache::Data * data)
+static void add_lambda(std::unique_ptr<mustache::Lambda> lambda, mustache::Data * data)
 {
-  std::unique_ptr<mustache::Lambda> owned(lambda);
   if (data->type() == mustache::Data::TypeMap) {
-    data->set("lambda", mustache::Data::lambda(std::move(owned)));
+    data->set("lambda", mustache::Data::lambda(std::move(lambda)));
   } else {
     std::cerr << "Root data was not a map!" << std::endl;
   }
@@ -21,25 +20,25 @@ static void add_lambda(mustache::Lambda * lambda, mustache::Data * data)
 void load_lambdas_into_test_data(mustache::Data * data, std::string name)
 {
   if (name.compare("Interpolation") == 0) {
-    add_lambda(new StaticLambda("world"), data);
+    add_lambda(std::make_unique<StaticLambda>("world"), data);
   } else if (name.compare("Interpolation - Expansion") == 0) {
-    add_lambda(new StaticLambda("{{planet}}"), data);
+    add_lambda(std::make_unique<StaticLambda>("{{planet}}"), data);
   } else if (name.compare("Interpolation - Alternate Delimiters") == 0) {
-    add_lambda(new StaticLambda("|planet| => {{planet}}"), data);
+    add_lambda(std::make_unique<StaticLambda>("|planet| => {{planet}}"), data);
   } else if (name.compare("Interpolation - Multiple Calls") == 0) {
-    add_lambda(new MultipleCallsLambda(), data);
+    add_lambda(std::make_unique<MultipleCallsLambda>(), data);
   } else if (name.compare("Escaping") == 0) {
-    add_lambda(new StaticLambda(">"), data);
+    add_lambda(std::make_unique<StaticLambda>(">"), data);
   } else if (name.compare("Section") == 0) {
-    add_lambda(new SectionLambda(), data);
+    add_lambda(std::make_unique<SectionLambda>(), data);
   } else if (name.compare("Section - Expansion") == 0) {
-    add_lambda(new SectionExpansionLambda(), data);
+    add_lambda(std::make_unique<SectionExpansionLambda>(), data);
   } else if (name.compare("Section - Alternate Delimiters") == 0) {
-    add_lambda(new SectionAlternateDelimitersLambda(), data);
+    add_lambda(std::make_unique<SectionAlternateDelimitersLambda>(), data);
   } else if (name.compare("Section - Multiple Calls") == 0) {
-    add_lambda(new SectionMultipleCallsLambda(), data);
+    add_lambda(std::make_unique<SectionMultipleCallsLambda>(), data);
   } else if (name.compare("Inverted Section") == 0) {
-    add_lambda(new StaticLambda(""), data);
+    add_lambda(std::make_unique<StaticLambda>(""), data);
   }
 }
 
