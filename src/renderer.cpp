@@ -13,29 +13,6 @@ Renderer::ActiveEngineScope * Renderer::ActiveEngineScope::current_ = NULL;
 
 namespace {
 
-template <typename Callable> class ScopeExit {
-  public:
-    explicit ScopeExit(Callable callable) :
-        callable(std::move(callable))
-    {}
-
-    ScopeExit(const ScopeExit&) = delete;
-    ScopeExit& operator=(const ScopeExit&) = delete;
-
-    ~ScopeExit() noexcept
-    {
-      callable();
-    }
-
-  private:
-    Callable callable;
-};
-
-template <typename Callable> ScopeExit<Callable> onScopeExit(Callable callable)
-{
-  return ScopeExit<Callable>(std::move(callable));
-}
-
 std::string_view escapedValue(char value)
 {
   switch (value) {
@@ -184,7 +161,7 @@ void Renderer::renderForLambda(const Node * node, std::string * output)
 
   std::string * parentOutput = _output;
   _output = output;
-  const auto outputGuard = onScopeExit([this, parentOutput]() {
+  const auto outputGuard = detail::onRenderScopeExit([this, parentOutput]() {
     _output = parentOutput;
   });
 
@@ -192,7 +169,7 @@ void Renderer::renderForLambda(const Node * node, std::string * output)
     throw Exception("Render output byte limit exceeded");
   }
   _indentationStack.emplace_back();
-  const auto indentationGuard = onScopeExit([this]() {
+  const auto indentationGuard = detail::onRenderScopeExit([this]() {
     _indentationStack.pop_back();
   });
   ActiveRenderEngine * activeEngine = ActiveEngineScope::find(this);
@@ -401,7 +378,7 @@ std::string Renderer::_invokeSectionLambda(
   ActiveEngineScope activeEngineScope(this, activeRenderEngine);
   LambdaRenderContext context(this);
   ++_lambdaCallbackDepth;
-  const auto callbackGuard = onScopeExit([this, &context]() {
+  const auto callbackGuard = detail::onRenderScopeExit([this, &context]() {
     context.invalidate();
     --_lambdaCallbackDepth;
   });
