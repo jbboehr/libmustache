@@ -1,0 +1,103 @@
+name: monthly fuzzing
+
+on:
+  schedule:
+    - cron: "17 8 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: monthly-fuzzing
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: fuzz_node_unserialize
+            corpus: node_unserialize
+            corpus_path: build-fuzz/tests/fuzz-corpus/node_unserialize
+            max_len: 65536
+          - target: fuzz_tokenizer
+            corpus: tokenizer
+            corpus_path: build-fuzz/tests/fuzz-corpus/tokenizer
+            max_len: 4096
+          - target: fuzz_data_parser
+            corpus: data_parser
+            corpus_path: build-fuzz/tests/fuzz-corpus/data_parser
+            max_len: 2048
+          - target: fuzz_cista_archive
+            corpus: cista_archive
+            corpus_path: build-fuzz/tests/fuzz-seeds/cista_archive
+            max_len: 131072
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      CC: clang
+      CXX: clang++
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            clang \
+            cmake \
+            libyaml-dev \
+            ninja-build \
+            nlohmann-json3-dev \
+            pkg-config
+
+      - name: Configure fuzzers
+        run: |
+          cmake -S . -B build-fuzz -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DMUSTACHE_ENABLE_SANITIZERS=ON \
+            -DMUSTACHE_WARNINGS_AS_ERRORS=ON \
+            -DMUSTACHE_ENABLE_FUZZING=ON \
+            -DMUSTACHE_ENABLE_ARCHIVED_TEMPLATES=ON \
+            -DMUSTACHE_ENABLE_JSON=ON \
+            -DMUSTACHE_ENABLE_YAML=ON
+
+      - name: Build ${{ matrix.target }}
+        run: cmake --build build-fuzz --target "${{ matrix.target }}" --parallel 2
+
+      - name: Fuzz ${{ matrix.target }} for 15 minutes
+        run: |
+          set -o pipefail
+          artifact_directory="build-fuzz/tests/fuzz-artifacts/${{ matrix.corpus }}"
+          mkdir -p "$artifact_directory"
+          "./build-fuzz/tests/${{ matrix.target }}" \
+            -max_total_time=900 \
+            -max_len="${{ matrix.max_len }}" \
+            -timeout=5 \
+            -rss_limit_mb=4096 \
+            -print_final_stats=1 \
+            "-dict=tests/fuzz/${{ matrix.corpus }}.dict" \
+            "-artifact_prefix=${artifact_directory}/" \
+            "${{ matrix.corpus_path }}" \
+            2>&1 | tee "build-fuzz/${{ matrix.target }}.log"
+
+      - name: Upload corpus, log, and reproducers
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: monthly-fuzz-${{ matrix.target }}
+          path: |
+            ${{ matrix.corpus_path }}
+            build-fuzz/tests/fuzz-artifacts/${{ matrix.corpus }}
+            build-fuzz/${{ matrix.target }}.log
+          if-no-files-found: warn
+          retention-days: 35
