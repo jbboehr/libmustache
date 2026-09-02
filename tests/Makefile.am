@@ -80,6 +80,8 @@ EXTRA_DIST = \
 	archive_runtime_dependency_helpers.cmake \
 	check_archive_allocation_failure.cmake \
 	check_archive_allocation_failure.sh \
+	check_numeric_test_inputs.cmake \
+	check_spec_execution_count.sh \
 	check_archive_runtime_dependencies.cmake \
 	check_cista_version_mutation.cmake \
 	check_public_compiled_template_boundary.cmake \
@@ -133,7 +135,7 @@ TESTS += test_json_numeric_locale
 endif
 
 if MUSTACHE_SPEC_TEST_ENABLED
-TESTS += test_spec
+TESTS += test_spec check_spec_execution_count.sh
 endif
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
 TESTS += test_cista_archive test_archived_template check_archive_allocation_failure.sh

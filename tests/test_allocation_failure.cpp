@@ -1,10 +1,10 @@
 #include "mustache_config.h"
 
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <limits>
 #include <memory>
 #include <new>
 #include <string>
@@ -350,9 +350,10 @@ void testArchiveCompatibilityTagDoesNotAllocate()
 
 int runArchiveAllocationProbe(std::string_view operation, const char * failAtText)
 {
-  char * end = nullptr;
-  const unsigned long long parsed = std::strtoull(failAtText, &end, 10);
-  if (end == failAtText || *end != '\0' || parsed > std::numeric_limits<std::size_t>::max()) {
+  const std::string_view value(failAtText);
+  std::size_t parsed = 0;
+  const std::from_chars_result result = std::from_chars(value.data(), value.data() + value.size(), parsed, 10);
+  if (result.ec != std::errc() || result.ptr != value.data() + value.size()) {
     std::fprintf(stderr, "invalid archive allocation failure index\n");
     return 12;
   }
@@ -365,7 +366,7 @@ int runArchiveAllocationProbe(std::string_view operation, const char * failAtTex
     std::fprintf(stderr, "invalid archive allocation operation\n");
     return 12;
   }
-  allocation_failure_test::arm(static_cast<std::size_t>(parsed));
+  allocation_failure_test::arm(parsed);
   try {
     if (operation == "serialize") {
       static_cast<void>(mustache::serializeArchivedTemplate(root));

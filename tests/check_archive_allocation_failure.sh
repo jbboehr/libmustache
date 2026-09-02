@@ -1,5 +1,21 @@
 #!/bin/sh
 
+for invalid_value in +1 ' 1' 1x -1 999999999999999999999999; do
+    invalid_output=$(./test_allocation_failure --archive-allocation-probe serialize "$invalid_value" 2>&1)
+    invalid_result=$?
+    if test "$invalid_result" -ne 12; then
+        echo "archive allocation probe accepted $invalid_value (result $invalid_result)" >&2
+        exit 1
+    fi
+    case $invalid_output in
+        *"invalid archive allocation failure index"*) ;;
+        *)
+            echo "archive allocation probe did not diagnose $invalid_value" >&2
+            exit 1
+            ;;
+    esac
+done
+
 for operation in serialize load; do
     observed_failure=no
     fail_at=0

@@ -3,10 +3,12 @@
 #include "./fixtures/lambdas.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cstdint>
 #include <filesystem>
 #include <limits>
 #include <memory>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -39,7 +41,14 @@ int main(int argc, char * argv[])
   char * numStr = getenv("EXEC_NUM");
   if (numStr != NULL) {
     printf("%s\n", numStr);
-    execNum = atoi(numStr);
+    const std::string_view value(numStr);
+    int parsed = 0;
+    const std::from_chars_result result = std::from_chars(value.data(), value.data() + value.size(), parsed, 10);
+    if (result.ec != std::errc() || result.ptr != value.data() + value.size() || parsed <= 0) {
+      std::cerr << "Invalid EXEC_NUM: expected a positive decimal integer\n";
+      return 1;
+    }
+    execNum = parsed;
   }
 
   std::vector<std::string> files;

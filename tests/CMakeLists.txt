@@ -190,6 +190,22 @@ if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES AND NOT CMAKE_CROSSCOMPILING)
             "-DMUSTACHE_TEST_ALLOCATION_FAILURE_EXECUTABLE=$<TARGET_FILE:test_allocation_failure>"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/check_archive_allocation_failure.cmake")
 endif()
+if(NOT CMAKE_CROSSCOMPILING AND
+        (MUSTACHE_HAVE_LIBYAML OR MUSTACHE_HAVE_ARCHIVED_TEMPLATES))
+    set(MUSTACHE_TEST_INPUT_COMMAND "${CMAKE_COMMAND}")
+    if(MUSTACHE_HAVE_LIBYAML)
+        list(APPEND MUSTACHE_TEST_INPUT_COMMAND
+            "-DMUSTACHE_TEST_SPEC_EXECUTABLE=$<TARGET_FILE:test_spec>"
+            "-DMUSTACHE_SPEC_DIR=${MUSTACHE_SPEC_DIR}")
+    endif()
+    if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+        list(APPEND MUSTACHE_TEST_INPUT_COMMAND
+            "-DMUSTACHE_TEST_ALLOCATION_FAILURE_EXECUTABLE=$<TARGET_FILE:test_allocation_failure>")
+    endif()
+    list(APPEND MUSTACHE_TEST_INPUT_COMMAND
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/check_numeric_test_inputs.cmake")
+    add_test(NAME numeric_test_inputs COMMAND ${MUSTACHE_TEST_INPUT_COMMAND})
+endif()
 add_test(NAME archive_runtime_dependency_names
     COMMAND "${CMAKE_COMMAND}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/verify_archive_runtime_dependency_names.cmake")
