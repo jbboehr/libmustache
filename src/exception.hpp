@@ -28,6 +28,7 @@ class MUSTACHE_API Exception : public std::runtime_error {
     Exception(const std::string& desc) :
         std::runtime_error(desc)
     {}
+    ~Exception() override;
 };
 #if defined(_MSC_VER)
 #pragma warning(pop)

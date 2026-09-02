@@ -3,21 +3,9 @@
 
 #include "exception.hpp"
 
+#include <iterator>
+
 namespace mustache {
-
-namespace {
-
-bool aliasesElement(const std::string& value, const std::vector<std::string>& values)
-{
-  for (const std::string& candidate : values) {
-    if (&candidate == &value) {
-      return true;
-    }
-  }
-  return false;
-}
-
-} // namespace
 
 void stripWhitespace(std::string& str, std::string_view chars)
 {
@@ -84,7 +72,8 @@ void htmlspecialchars_append(const std::string& str, std::string * buf)
     throw Exception("Missing HTML output");
   }
   if (&str == buf) {
-    const std::string stableInput = str;
+    // Appending to buf can invalidate str because they are the same object.
+    const std::string stableInput = str; // NOLINT(performance-unnecessary-copy-initialization)
     htmlspecialchars_append(stableInput, buf);
     return;
   }
@@ -122,18 +111,16 @@ void explode(const std::string& delimiter, const std::string& str, std::vector<s
     return;
   }
 
-  const std::string stableDelimiter = delimiter;
-  const bool inputAliasesOutput = aliasesElement(str, *arr);
-  const std::string stableInput = inputAliasesOutput ? str : std::string();
-  const std::string& input = inputAliasesOutput ? stableInput : str;
+  std::vector<std::string> parts;
   std::string::size_type start = 0;
-  std::string::size_type separator = input.find(stableDelimiter, start);
+  std::string::size_type separator = str.find(delimiter, start);
   while (separator != std::string::npos) {
-    arr->push_back(input.substr(start, separator - start));
-    start = separator + stableDelimiter.size();
-    separator = input.find(stableDelimiter, start);
+    parts.push_back(str.substr(start, separator - start));
+    start = separator + delimiter.size();
+    separator = str.find(delimiter, start);
   }
-  arr->push_back(input.substr(start));
+  parts.push_back(str.substr(start));
+  arr->insert(arr->end(), std::make_move_iterator(parts.begin()), std::make_move_iterator(parts.end()));
 }
 
 void stringTok(const std::string& str, std::string_view delimiters, std::vector<std::string> * tokens)
@@ -141,25 +128,23 @@ void stringTok(const std::string& str, std::string_view delimiters, std::vector<
   if (tokens == nullptr) {
     throw Exception("Missing token output");
   }
-  const bool inputAliasesOutput = aliasesElement(str, *tokens);
-  const std::string stableInput = inputAliasesOutput ? str : std::string();
-  const std::string& input = inputAliasesOutput ? stableInput : str;
-  const std::string stableDelimiters(delimiters);
+  std::vector<std::string> nextTokens;
 
   // Skip delimiters at beginning.
-  std::string::size_type lastPos = input.find_first_not_of(stableDelimiters, 0);
+  std::string::size_type lastPos = str.find_first_not_of(delimiters, 0);
 
   // Find first "non-delimiter".
-  std::string::size_type pos = input.find_first_of(stableDelimiters, lastPos);
+  std::string::size_type pos = str.find_first_of(delimiters, lastPos);
 
   while (std::string::npos != pos || std::string::npos != lastPos) {
     // Found a token, add it to the vector.
-    tokens->push_back(input.substr(lastPos, pos - lastPos));
+    nextTokens.push_back(str.substr(lastPos, pos - lastPos));
     // Skip delimiters.  Note the "not_of"
-    lastPos = input.find_first_not_of(stableDelimiters, pos);
+    lastPos = str.find_first_not_of(delimiters, pos);
     // Find next "non-delimiter"
-    pos = input.find_first_of(stableDelimiters, lastPos);
+    pos = str.find_first_of(delimiters, lastPos);
   }
+  tokens->insert(tokens->end(), std::make_move_iterator(nextTokens.begin()), std::make_move_iterator(nextTokens.end()));
 }
 
 } // namespace mustache

@@ -1,6 +1,8 @@
 
 #include "mustache.hpp"
 
+#include "exception.hpp"
+
 #include <limits>
 #include <string_view>
 
@@ -62,6 +64,8 @@ int mustache_version_int()
 }
 
 namespace mustache {
+
+Exception::~Exception() = default;
 
 void Mustache::tokenize(std::string * tmpl, Node * root)
 {

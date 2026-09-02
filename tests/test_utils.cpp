@@ -175,6 +175,61 @@ int main()
     return 1;
   }
 
+  parts = {".", "alpha.beta.gamma"};
+  while (parts.size() < parts.capacity()) {
+    parts.emplace_back("padding");
+  }
+  std::vector<std::string> aliasedSplitArgumentsExpected = parts;
+  aliasedSplitArgumentsExpected.emplace_back("alpha");
+  aliasedSplitArgumentsExpected.emplace_back("beta");
+  aliasedSplitArgumentsExpected.emplace_back("gamma");
+  mustache::explode(parts.front(), parts[1], &parts);
+  if (!expectEqual("aliased split input and delimiter", parts, aliasedSplitArgumentsExpected)) {
+    return 1;
+  }
+
+  parts = {"::"};
+  while (parts.size() < parts.capacity()) {
+    parts.emplace_back("padding");
+  }
+  std::vector<std::string> sameAliasedSplitArgumentsExpected = parts;
+  sameAliasedSplitArgumentsExpected.emplace_back("");
+  sameAliasedSplitArgumentsExpected.emplace_back("");
+  mustache::explode(parts.front(), parts.front(), &parts);
+  if (!expectEqual("same aliased split input and delimiter", parts, sameAliasedSplitArgumentsExpected)) {
+    return 1;
+  }
+
+  tokens = {"alpha:beta::gamma"};
+  while (tokens.size() < tokens.capacity()) {
+    tokens.emplace_back("padding");
+  }
+  std::vector<std::string> sameAliasedTokenArgumentsExpected = tokens;
+  sameAliasedTokenArgumentsExpected.emplace_back("alpha");
+  sameAliasedTokenArgumentsExpected.emplace_back("beta");
+  sameAliasedTokenArgumentsExpected.emplace_back("gamma");
+  const std::string_view sameAliasedTokenDelimiters(tokens.front().data() + 5, 1);
+  mustache::stringTok(tokens.front(), sameAliasedTokenDelimiters, &tokens);
+  if (!expectEqual("same aliased token input and delimiter", tokens, sameAliasedTokenArgumentsExpected)) {
+    return 1;
+  }
+
+  std::string embeddedDelimiter("x\0:y", 4);
+  std::string embeddedTokenInput("a\0b:c", 5);
+  tokens = {embeddedDelimiter, embeddedTokenInput};
+  while (tokens.size() < tokens.capacity()) {
+    tokens.emplace_back("padding");
+  }
+  std::vector<std::string> aliasedEmbeddedTokenArgumentsExpected = tokens;
+  aliasedEmbeddedTokenArgumentsExpected.emplace_back("a");
+  aliasedEmbeddedTokenArgumentsExpected.emplace_back("b");
+  aliasedEmbeddedTokenArgumentsExpected.emplace_back("c");
+  const std::string_view aliasedEmbeddedTokenDelimiters(tokens.front().data() + 1, 2);
+  mustache::stringTok(tokens[1], aliasedEmbeddedTokenDelimiters, &tokens);
+  if (!expectEqual("aliased embedded-NUL token input and delimiter", tokens, aliasedEmbeddedTokenArgumentsExpected)) {
+    return 1;
+  }
+
   std::string htmlInput = "plain &\"'<>";
   htmlInput.push_back('\0');
   htmlInput.append("tail");
