@@ -10,7 +10,7 @@ check_PROGRAMS += test_spec
 endif
 
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
-check_PROGRAMS += test_cista_archive test_archived_template
+check_PROGRAMS += test_cista_archive test_archived_template test_render_equivalence
 endif
 
 test_spec_SOURCES = test_spec.cpp test_spec.hpp spec_expectations.hpp ./fixtures/lambdas.cpp ./fixtures/lambdas.hpp
@@ -31,6 +31,7 @@ test_allocation_failure_SOURCES = test_allocation_failure.cpp
 test_allocation_failure_CXXFLAGS = $(AM_CXXFLAGS) -Wno-mismatched-new-delete
 test_cli_SOURCES = test_cli.cpp ../bin/cli.cpp ../bin/cli.hpp
 test_archived_template_SOURCES = test_archived_template.cpp
+test_render_equivalence_SOURCES = test_render_equivalence.cpp
 test_cista_archive_SOURCES = \
 	../benchmarks/test-cista-archive.cpp \
 	../src/archive/cista.cpp \
@@ -138,7 +139,7 @@ if MUSTACHE_SPEC_TEST_ENABLED
 TESTS += test_spec check_spec_execution_count.sh
 endif
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
-TESTS += test_cista_archive test_archived_template check_archive_allocation_failure.sh
+TESTS += test_cista_archive test_archived_template test_render_equivalence check_archive_allocation_failure.sh
 endif
 TESTS_ENVIRONMENT = \
 	top_srcdir=$(top_srcdir) \

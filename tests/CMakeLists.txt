@@ -82,6 +82,9 @@ if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
     add_executable(test_archived_template test_archived_template.cpp)
     target_link_libraries(test_archived_template PRIVATE mustache_static)
     mustache_apply_build_options(test_archived_template)
+    add_executable(test_render_equivalence test_render_equivalence.cpp)
+    target_link_libraries(test_render_equivalence PRIVATE mustache_static)
+    mustache_apply_build_options(test_render_equivalence)
     if(MUSTACHE_TEST_CISTA_VERSION_MUTATION)
         add_executable(test_cista_version_mutation
             test_cista_version_mutation.cpp)
@@ -278,6 +281,7 @@ if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
     add_test(NAME archived_template COMMAND test_archived_template)
     set_tests_properties(archived_template PROPERTIES
         ENVIRONMENT "top_srcdir=${CMAKE_CURRENT_SOURCE_DIR}/..")
+    add_test(NAME render_equivalence COMMAND test_render_equivalence)
 
     # file(GET_RUNTIME_DEPENDENCIES) supports only these target formats.
     if(NOT CMAKE_CROSSCOMPILING AND
