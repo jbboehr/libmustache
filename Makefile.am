@@ -27,6 +27,7 @@ EXTRA_DIST = \
 	flake.nix \
 	flake.lock \
 	nix/derivation.nix \
+	scripts/check-release-archive.sh \
 	scripts/check-version-consistency.sh \
 	src/archive/.clang-tidy \
 	src/archive/cista.cpp \
@@ -50,12 +51,29 @@ EXTRA_DIST = \
 	vendor/xxhash/xxhash.h \
 	vcpkg.json
 
-.PHONY: check-version render-standard render-complex render-deep
+RELEASE_CHECK_JOBS ?= 2
+
+.PHONY: check-version check-release check-release-archive check-release-nix render-standard render-complex render-deep
 
 check-local: check-version
 
 check-version:
 	$(SHELL) $(top_srcdir)/scripts/check-version-consistency.sh
+
+check-release:
+	$(MAKE) check-release-archive
+	$(MAKE) check-release-nix
+
+check-release-archive:
+	$(MAKE) -j$(RELEASE_CHECK_JOBS) distcheck
+	MUSTACHE_RELEASE_CHECK_JOBS=$(RELEASE_CHECK_JOBS) \
+		$(SHELL) "$(top_srcdir)/scripts/check-release-archive.sh" \
+		"$(abs_top_builddir)/$(PACKAGE_TARNAME)-$(PACKAGE_VERSION).tar.gz"
+
+check-release-nix:
+	nix flake check "$(abs_top_srcdir)" \
+		--option max-jobs $(RELEASE_CHECK_JOBS) \
+		--option cores $(RELEASE_CHECK_JOBS)
 
 render-standard: all
 	./bin/mustachec -t $(top_srcdir)/tests/fixtures/standard.mustache -d $(top_srcdir)/tests/fixtures/standard.yml

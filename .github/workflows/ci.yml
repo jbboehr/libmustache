@@ -69,6 +69,7 @@ jobs:
             "${{ matrix.compiler.package }}" \
             autoconf \
             automake \
+            cmake \
             nlohmann-json3-dev \
             libtool \
             libyaml-dev \
@@ -127,7 +128,13 @@ jobs:
 
       - name: Verify distribution archive
         working-directory: build-autotools
-        run: make distcheck
+        run: |
+          if [ "${{ matrix.os }}" = ubuntu-24.04 ] &&
+            [ "${{ matrix.compiler.name }}" = GCC ]; then
+            make RELEASE_CHECK_JOBS=2 check-release-archive
+          else
+            make distcheck
+          fi
 
       - name: Upload Autotools failure logs
         if: ${{ failure() }}

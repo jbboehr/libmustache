@@ -31,7 +31,7 @@ cd libmustache
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
-ctest --test-dir build --output-on-failure
+cmake -E chdir build ctest --output-on-failure
 cmake --install build --prefix /usr/local
 ```
 
@@ -455,7 +455,7 @@ for both `x86-windows` and `x64-windows`:
 cmake -S . -B build -A x64 ^
   -DCMAKE_TOOLCHAIN_FILE=C:\path\to\vcpkg\scripts\buildsystems\vcpkg.cmake
 cmake --build build --config Release --parallel
-ctest --test-dir build -C Release --output-on-failure
+cmake -E chdir build ctest -C Release --output-on-failure
 cmake --install build --config Release --prefix artifacts
 ```
 
