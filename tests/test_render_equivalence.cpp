@@ -6,6 +6,8 @@
 
 #include "archived_template.hpp"
 #include "data.hpp"
+#include "exception.hpp"
+#include "lambda.hpp"
 #include "mustache.hpp"
 #include "node.hpp"
 
@@ -51,12 +53,44 @@ struct Coverage {
     std::size_t emptyLists = 0;
     std::size_t nonemptyLists = 0;
     std::size_t embeddedNuls = 0;
+    std::size_t variableLambdas = 0;
+    std::size_t sectionLambdas = 0;
+    std::size_t rootOwnedPartials = 0;
+    std::size_t externalPartialOverrides = 0;
+    std::size_t exactOutputLimits = 0;
+    std::size_t rejectedOutputLimits = 0;
+    std::size_t exactNodeVisitLimits = 0;
+    std::size_t rejectedNodeVisitLimits = 0;
 };
 
 struct GeneratedCase {
     std::string source;
     std::map<std::string, std::string> partialSources;
     mustache::Data data;
+};
+
+class TemplateLambda final : public mustache::Lambda {
+  public:
+    TemplateLambda(std::string response, std::size_t * calls) :
+        response_(std::move(response)),
+        calls_(calls)
+    {}
+
+    std::string invoke() override
+    {
+      ++*calls_;
+      return response_;
+    }
+
+    std::string invoke(std::string_view, mustache::LambdaRenderContext) override
+    {
+      ++*calls_;
+      return response_;
+    }
+
+  private:
+    std::string response_;
+    std::size_t * calls_;
 };
 
 std::string escaped(std::string_view value)
@@ -137,6 +171,10 @@ mustache::Data makeData(Random& random, std::size_t caseIndex, Coverage& coverag
   data.set("ratio", mustache::Data::floating(floatingValues[caseIndex % floatingValues.size()]));
   data.set("enabled", mustache::Data::boolean(caseIndex % 2 != 0));
   data.set("missingLike", mustache::Data::null());
+  data.set("variableLambda",
+      mustache::Data::lambda(std::make_unique<TemplateLambda>("{{user.name}}", &coverage.variableLambdas)));
+  data.set("sectionLambda",
+      mustache::Data::lambda(std::make_unique<TemplateLambda>("[{{title}}/{{>footer}}]", &coverage.sectionLambdas)));
 
   mustache::Data address = mustache::Data::object();
   address.set("city", mustache::Data::string(randomValue(random, caseIndex + 1, coverage)));
@@ -252,6 +290,7 @@ GeneratedCase makeCase(Random& random, std::size_t caseIndex, Coverage& coverage
                           "{{#user}}{{name}}@{{address.city}}/{{{html}}}{{/user}}\n"
                           "{{#items}}{{name}}={{value}}:{{#visible}}V{{/visible}}{{^visible}}H{{/visible}}:"
                           "{{#tags}}[{{.}}]{{/tags}}:{{>row}}{{/items}}\n"
+                          "{{variableLambda}}|{{#sectionLambda}}raw {{title}}{{/sectionLambda}}\n"
                           "  {{>card}}\n"
                           "{{=<% %>=}}<%title%><%={{ }}=%>\n",
       {{"card", "CARD {{user.name}}/{{title}}\n {{>footer}}\n"}, {"footer", "F={{count}}/{{scalar}}\n"},
@@ -286,6 +325,10 @@ mustache::Node::Partials legacyRoundTripPartials(const mustache::Node::Partials&
 {
   mustache::Node::Partials result;
   for (const auto& entry : source) {
+    if (entry.second == nullptr) {
+      result.emplace(entry.first, std::unique_ptr<mustache::Node>());
+      continue;
+    }
     const std::vector<std::uint8_t> bytes = entry.second->serializeValue();
     std::unique_ptr<mustache::Node> decoded = mustache::Node::unserializeOwned(byteView(bytes));
     if (decoded->serializeValue() != bytes) {
@@ -306,7 +349,22 @@ mustache::Node::Partials legacyRoundTripPartials(const mustache::Node::Partials&
   throw std::runtime_error("generated representations rendered differently");
 }
 
-void checkCase(const GeneratedCase& generated)
+template <typename Render>
+void expectRenderRejected(
+    const char * representation, const char * expectedMessage, Render&& render, const mustache::RenderLimits& limits)
+{
+  try {
+    static_cast<void>(render(limits));
+  } catch (const mustache::Exception& exception) {
+    if (std::string_view(exception.what()) == expectedMessage) {
+      return;
+    }
+    throw std::runtime_error(std::string(representation) + " rejected with an unexpected error: " + exception.what());
+  }
+  throw std::runtime_error(std::string(representation) + " unexpectedly accepted a constrained render");
+}
+
+void checkCase(const GeneratedCase& generated, Coverage& coverage)
 {
   mustache::Mustache engine;
   mustache::Node root;
@@ -323,20 +381,119 @@ void checkCase(const GeneratedCase& generated)
   const std::vector<std::uint8_t> archiveBytes = mustache::serializeArchivedTemplate(root, partials);
   const mustache::ArchivedTemplate archived = mustache::loadArchivedTemplate(archiveBytes);
 
-  mustache::RenderLimits renderLimits;
-  std::string ownedOutput;
-  engine.render(&root, &generated.data, &partials, &ownedOutput, renderLimits);
+  const auto renderOwned = [&](const mustache::RenderLimits& limits) {
+    std::string output;
+    engine.render(&root, &generated.data, &partials, &output, limits);
+    return output;
+  };
+  const auto renderLegacy = [&](const mustache::RenderLimits& limits) {
+    std::string output;
+    engine.render(legacyRoot.get(), &generated.data, &legacyPartials, &output, limits);
+    return output;
+  };
+  const auto renderArchived = [&](const mustache::RenderLimits& limits) {
+    return mustache::render(archived, generated.data, limits);
+  };
 
-  std::string legacyOutput;
-  engine.render(legacyRoot.get(), &generated.data, &legacyPartials, &legacyOutput, renderLimits);
+  mustache::RenderLimits renderLimits;
+  const std::string ownedOutput = renderOwned(renderLimits);
+  const std::string legacyOutput = renderLegacy(renderLimits);
   if (legacyOutput != ownedOutput) {
     reportMismatch("legacy", ownedOutput, legacyOutput);
   }
 
-  const std::string archivedOutput = mustache::render(archived, generated.data, renderLimits);
+  const std::string archivedOutput = renderArchived(renderLimits);
   if (archivedOutput != ownedOutput) {
     reportMismatch("archived", ownedOutput, archivedOutput);
   }
+
+  renderLimits.maxOutputBytes = ownedOutput.size();
+  const std::string exactOwnedOutput = renderOwned(renderLimits);
+  const std::string exactLegacyOutput = renderLegacy(renderLimits);
+  const std::string exactArchivedOutput = renderArchived(renderLimits);
+  if (exactOwnedOutput != ownedOutput) {
+    reportMismatch("owned exact output limit", ownedOutput, exactOwnedOutput);
+  }
+  if (exactLegacyOutput != ownedOutput) {
+    reportMismatch("legacy exact output limit", ownedOutput, exactLegacyOutput);
+  }
+  if (exactArchivedOutput != ownedOutput) {
+    reportMismatch("archived exact output limit", ownedOutput, exactArchivedOutput);
+  }
+  ++coverage.exactOutputLimits;
+
+  if (!ownedOutput.empty()) {
+    --renderLimits.maxOutputBytes;
+    expectRenderRejected("owned", "Render output byte limit exceeded", renderOwned, renderLimits);
+    expectRenderRejected("legacy", "Render output byte limit exceeded", renderLegacy, renderLimits);
+    expectRenderRejected("archived", "Render output byte limit exceeded", renderArchived, renderLimits);
+    ++coverage.rejectedOutputLimits;
+  }
+}
+
+void checkPartialAndNodeVisitBoundaries(Coverage& coverage)
+{
+  mustache::Mustache engine;
+  mustache::Node root;
+  engine.tokenize("{{>choice}}|{{>fallback}}", &root);
+
+  const std::map<std::string, std::string> rootPartialSources = {{"choice", "root-choice"}, {"fallback", "fallback"}};
+  root.partials = tokenizePartials(engine, rootPartialSources);
+
+  const std::map<std::string, std::string> externalPartialSources = {{"choice", "external"}};
+  mustache::Node::Partials externalPartials = tokenizePartials(engine, externalPartialSources);
+  externalPartials.emplace("fallback", std::unique_ptr<mustache::Node>());
+  ++coverage.rootOwnedPartials;
+  ++coverage.externalPartialOverrides;
+
+  const std::vector<std::uint8_t> legacyBytes = root.serializeValue();
+  std::unique_ptr<mustache::Node> legacyRoot = mustache::Node::unserializeOwned(byteView(legacyBytes));
+  // The legacy format serializes nodes rather than a root's partial map. Round
+  // trip each partial independently so all nodes still pass through that
+  // representation while preserving the renderer's effective partial graph.
+  legacyRoot->partials = legacyRoundTripPartials(root.partials);
+  mustache::Node::Partials legacyExternalPartials = legacyRoundTripPartials(externalPartials);
+
+  const std::vector<std::uint8_t> archiveBytes = mustache::serializeArchivedTemplate(root, externalPartials);
+  const mustache::ArchivedTemplate archived = mustache::loadArchivedTemplate(archiveBytes);
+  const mustache::Data data = mustache::Data::null();
+
+  const auto renderOwned = [&](const mustache::RenderLimits& limits) {
+    std::string output;
+    engine.render(&root, &data, &externalPartials, &output, limits);
+    return output;
+  };
+  const auto renderLegacy = [&](const mustache::RenderLimits& limits) {
+    std::string output;
+    engine.render(legacyRoot.get(), &data, &legacyExternalPartials, &output, limits);
+    return output;
+  };
+  const auto renderArchived = [&](const mustache::RenderLimits& limits) {
+    return mustache::render(archived, data, limits);
+  };
+
+  const std::string expected = "external|fallback";
+  mustache::RenderLimits limits;
+  limits.maxNodeVisits = 8;
+  const std::string ownedOutput = renderOwned(limits);
+  const std::string legacyOutput = renderLegacy(limits);
+  const std::string archivedOutput = renderArchived(limits);
+  if (ownedOutput != expected) {
+    reportMismatch("owned partial precedence", expected, ownedOutput);
+  }
+  if (legacyOutput != expected) {
+    reportMismatch("legacy partial precedence", expected, legacyOutput);
+  }
+  if (archivedOutput != expected) {
+    reportMismatch("archived partial precedence", expected, archivedOutput);
+  }
+  ++coverage.exactNodeVisitLimits;
+
+  --limits.maxNodeVisits;
+  expectRenderRejected("owned", "Render node visit limit exceeded", renderOwned, limits);
+  expectRenderRejected("legacy", "Render node visit limit exceeded", renderLegacy, limits);
+  expectRenderRejected("archived", "Render node visit limit exceeded", renderArchived, limits);
+  ++coverage.rejectedNodeVisitLimits;
 }
 
 void checkCoverage(const Coverage& coverage)
@@ -349,6 +506,14 @@ void checkCoverage(const Coverage& coverage)
   if (coverage.arrayContexts == 0 || coverage.listContexts == 0 || coverage.emptyLists == 0 ||
       coverage.nonemptyLists == 0 || coverage.embeddedNuls == 0) {
     throw std::runtime_error("the generated data distribution lost a required boundary class");
+  }
+  if (coverage.variableLambdas == 0 || coverage.sectionLambdas == 0 || coverage.rootOwnedPartials == 0 ||
+      coverage.externalPartialOverrides == 0) {
+    throw std::runtime_error("the generated semantic distribution lost a required callback or partial class");
+  }
+  if (coverage.exactOutputLimits == 0 || coverage.rejectedOutputLimits == 0 || coverage.exactNodeVisitLimits == 0 ||
+      coverage.rejectedNodeVisitLimits == 0) {
+    throw std::runtime_error("the generated limit distribution lost a required boundary class");
   }
 }
 
@@ -365,7 +530,7 @@ int main()
       for (std::size_t caseIndex = 0; caseIndex < casesPerSeed; ++caseIndex) {
         const GeneratedCase generated = makeCase(random, caseIndex, coverage);
         try {
-          checkCase(generated);
+          checkCase(generated, coverage);
         } catch (const std::exception&) {
           std::fprintf(stderr, "counterexample: seed=0x%016llx case=%zu\n  template: %s\n",
               static_cast<unsigned long long>(seed), caseIndex, escaped(generated.source).c_str());
@@ -373,6 +538,7 @@ int main()
         }
       }
     }
+    checkPartialAndNodeVisitBoundaries(coverage);
     checkCoverage(coverage);
   } catch (const std::exception& exception) {
     std::fprintf(stderr, "render equivalence property test failed: %s\n", exception.what());
