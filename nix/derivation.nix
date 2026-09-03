@@ -22,6 +22,7 @@
   staticOnlySupport ? false,
   debugSupport ? false,
   sanitizerSupport ? false,
+  threadSanitizerSupport ? false,
   fuzzSupport ? false,
   clangTidySupport ? false,
   archivedTemplateSupport ? null,
@@ -36,6 +37,7 @@ stdenv.mkDerivation (finalAttrs: {
     + lib.optionalString cmakeSupport "-cmake"
     + lib.optionalString staticOnlySupport "-static-only"
     + lib.optionalString sanitizerSupport "-sanitized"
+    + lib.optionalString threadSanitizerSupport "-thread-sanitized"
     + lib.optionalString fuzzSupport "-fuzz"
     + lib.optionalString clangTidySupport "-clang-tidy"
     + lib.optionalString (archivedTemplateSupport == true) "-archived-templates"
@@ -70,11 +72,15 @@ stdenv.mkDerivation (finalAttrs: {
 
   outputs = ["out" "dev" "lib"];
   strictDeps = true;
-  enableParallelBuilding = true;
+  enableParallelBuilding = !threadSanitizerSupport;
+  enableParallelChecking = !threadSanitizerSupport;
   separateDebugInfo = debugSupport;
-  dontStrip = sanitizerSupport || fuzzSupport;
+  dontStrip = sanitizerSupport || threadSanitizerSupport || fuzzSupport;
+  TSAN_OPTIONS = lib.optionalString threadSanitizerSupport "halt_on_error=1:second_deadlock_stack=1";
 
   buildInputs = assert archivedTemplateSupport == null || builtins.isBool archivedTemplateSupport;
+  assert !sanitizerSupport || !threadSanitizerSupport;
+  assert !threadSanitizerSupport || !fuzzSupport;
   assert !cistaBenchmarkSupport || cmakeSupport;
   assert !useSystemCista || archivedTemplateSupport != false || (cmakeSupport && cistaBenchmarkSupport);
   assert !useSystemCista || cista != null;
@@ -111,6 +117,7 @@ stdenv.mkDerivation (finalAttrs: {
     ++ lib.optional checkSupport "--enable-warnings-as-errors"
     ++ lib.optionals staticOnlySupport ["--disable-shared" "--enable-static"]
     ++ lib.optional sanitizerSupport "--enable-sanitizers"
+    ++ lib.optional threadSanitizerSupport "--enable-thread-sanitizer"
     ++ lib.optional (archivedTemplateSupport == true) "--enable-archived-templates"
     ++ lib.optional (archivedTemplateSupport == false) "--disable-archived-templates"
     ++ lib.optional useSystemCista "--with-system-cista"
@@ -125,6 +132,7 @@ stdenv.mkDerivation (finalAttrs: {
       (lib.cmakeBool "MUSTACHE_ENABLE_ASSERTIONS" true)
       (lib.cmakeBool "MUSTACHE_WARNINGS_AS_ERRORS" checkSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_SANITIZERS" sanitizerSupport)
+      (lib.cmakeBool "MUSTACHE_ENABLE_THREAD_SANITIZER" threadSanitizerSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_FUZZING" fuzzSupport)
       (lib.cmakeBool "MUSTACHE_ENABLE_CLANG_TIDY" clangTidySupport)
       "-DMUSTACHE_ENABLE_ARCHIVED_TEMPLATES=${
@@ -149,7 +157,7 @@ stdenv.mkDerivation (finalAttrs: {
         else "AUTO"
       }"
       "-DCMAKE_BUILD_TYPE=${
-        if debugSupport || sanitizerSupport
+        if debugSupport || sanitizerSupport || threadSanitizerSupport
         then "Debug"
         else "Release"
       }"
@@ -237,6 +245,12 @@ stdenv.mkDerivation (finalAttrs: {
           -fno-sanitize-recover=all
         )
       ''}
+      ${lib.optionalString threadSanitizerSupport ''
+        pkg_config_consumer_flags+=(
+          -fno-omit-frame-pointer
+          -fsanitize=thread
+        )
+      ''}
       "$CXX" "$src/tests/cmake-consumer/main.cpp" \
         -std=c++11 \
         -DMUSTACHE_EXPECTED_VERSION='"${finalAttrs.version}"' \
@@ -277,11 +291,20 @@ stdenv.mkDerivation (finalAttrs: {
           -DMUSTACHE_ENABLE_SANITIZERS=ON
         )
       ''}
+      ${lib.optionalString threadSanitizerSupport ''
+        consumer_cmake_flags+=(
+          '-DCMAKE_CXX_FLAGS=-fno-omit-frame-pointer -fsanitize=thread'
+          '-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread'
+        )
+        subproject_cmake_flags+=(
+          -DMUSTACHE_ENABLE_THREAD_SANITIZER=ON
+        )
+      ''}
       cmake -S "$src/tests/cmake-consumer" -B consumer-shared \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_PREFIX_PATH="$dev;$lib" \
         "''${consumer_cmake_flags[@]}"
-      cmake --build consumer-shared --parallel
+      cmake --build consumer-shared --parallel${lib.optionalString threadSanitizerSupport " 1"}
       consumer-shared/mustache_consumer
 
       cmake -S "$src/tests/cmake-consumer" -B consumer-static \
@@ -289,7 +312,7 @@ stdenv.mkDerivation (finalAttrs: {
         -DCMAKE_PREFIX_PATH="$dev;$lib" \
         -DMUSTACHE_CONSUMER_LINKAGE=static \
         "''${consumer_cmake_flags[@]}"
-      cmake --build consumer-static --parallel
+      cmake --build consumer-static --parallel${lib.optionalString threadSanitizerSupport " 1"}
       consumer-static/mustache_consumer
 
       cmake -S "$src/tests/cmake-find-quiet" -B find-quiet \
@@ -304,7 +327,7 @@ stdenv.mkDerivation (finalAttrs: {
         -DCMAKE_BUILD_TYPE=Release \
         "''${subproject_cmake_flags[@]}" \
         "''${consumer_cmake_flags[@]}"
-      cmake --build subproject-build --parallel
+      cmake --build subproject-build --parallel${lib.optionalString threadSanitizerSupport " 1"}
       subproject-build/mustache_subproject_consumer
     ''
     + ''

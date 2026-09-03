@@ -394,6 +394,72 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  thread-sanitizer:
+    name: ThreadSanitizer (Clang)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CC: clang
+      CXX: clang++
+      TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            clang \
+            autoconf \
+            automake \
+            cmake \
+            nlohmann-json3-dev \
+            libtool \
+            libyaml-dev \
+            m4 \
+            make \
+            ninja-build \
+            pkg-config
+
+      - name: Build and test with ThreadSanitizer
+        run: |
+          cmake -S . -B build-thread-sanitized -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DMUSTACHE_ENABLE_THREAD_SANITIZER=ON \
+            -DMUSTACHE_WARNINGS_AS_ERRORS=ON
+          cmake --build build-thread-sanitized --parallel 2
+          ctest --test-dir build-thread-sanitized \
+            --parallel 2 \
+            --output-on-failure \
+            --output-junit "$GITHUB_WORKSPACE/build-thread-sanitized/ctest-results.xml" \
+            --output-log "$GITHUB_WORKSPACE/build-thread-sanitized/ctest-output.log"
+
+          autoreconf --force --install --verbose
+          mkdir build-thread-sanitized-autotools
+          cd build-thread-sanitized-autotools
+          ../configure \
+            --enable-thread-sanitizer \
+            --enable-warnings-as-errors
+          make --jobs=2
+          make check
+
+      - name: Upload ThreadSanitizer results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: thread-sanitizer-results-Clang
+          path: |
+            build-thread-sanitized/ctest-results.xml
+            build-thread-sanitized/ctest-output.log
+            build-thread-sanitized-autotools/config.log
+            build-thread-sanitized-autotools/tests/*.log
+          if-no-files-found: warn
+          retention-days: 14
+
   nix-matrix:
     name: Generate Nix matrix
     runs-on: ubuntu-24.04

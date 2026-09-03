@@ -101,6 +101,12 @@
             debugSupport = true;
             sanitizerSupport = true;
           };
+          libmustache-thread-sanitized = makePackage {
+            stdenv = pkgs.llvmPackages.stdenv;
+            cmakeSupport = true;
+            debugSupport = true;
+            threadSanitizerSupport = true;
+          };
           libmustache-fuzz = makePackage {
             stdenv = pkgs.llvmPackages.stdenv;
             cmakeSupport = true;

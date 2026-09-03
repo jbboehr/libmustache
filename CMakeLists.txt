@@ -58,6 +58,7 @@ option(MUSTACHE_ENABLE_HARDENING "Enable supported compiler and linker hardening
 option(MUSTACHE_ENABLE_ASSERTIONS "Enable standard-library runtime assertions" ON)
 option(MUSTACHE_WARNINGS_AS_ERRORS "Treat project compiler warnings as errors" OFF)
 option(MUSTACHE_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(MUSTACHE_ENABLE_THREAD_SANITIZER "Enable ThreadSanitizer" OFF)
 option(MUSTACHE_ENABLE_FUZZING "Build the Clang libFuzzer targets and smoke tests" OFF)
 option(MUSTACHE_ENABLE_CLANG_TIDY "Run clang-tidy on production targets" OFF)
 set(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES AUTO CACHE STRING
@@ -78,6 +79,44 @@ set_property(CACHE MUSTACHE_ENABLE_YAML PROPERTY STRINGS AUTO ON OFF)
 option(MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3
     "Use Cista runtime versioning and built-in integrity with the supplied XXH3"
     ${MUSTACHE_ENABLE_CISTA_BENCHMARK})
+
+if(MUSTACHE_ENABLE_SANITIZERS AND MUSTACHE_ENABLE_THREAD_SANITIZER)
+    message(FATAL_ERROR
+        "MUSTACHE_ENABLE_SANITIZERS and MUSTACHE_ENABLE_THREAD_SANITIZER "
+        "cannot be enabled together")
+endif()
+
+if(MUSTACHE_ENABLE_THREAD_SANITIZER)
+    if(MSVC)
+        message(FATAL_ERROR
+            "MUSTACHE_ENABLE_THREAD_SANITIZER requires a GCC-compatible compiler")
+    endif()
+
+    include(CMakePushCheckState)
+    cmake_push_check_state(RESET)
+    set(CMAKE_REQUIRED_FLAGS "-fno-omit-frame-pointer -fsanitize=thread")
+    set(CMAKE_REQUIRED_LINK_OPTIONS "-fsanitize=thread")
+    check_cxx_source_compiles([=[
+        #if defined(__clang__)
+        #if !__has_feature(thread_sanitizer)
+        #error ThreadSanitizer instrumentation was not enabled
+        #endif
+        #elif !defined(__SANITIZE_THREAD__)
+        #error ThreadSanitizer instrumentation was not enabled
+        #endif
+
+        int main()
+        {
+            return 0;
+        }
+    ]=] MUSTACHE_THREAD_SANITIZER_SUPPORTED)
+    cmake_pop_check_state()
+
+    if(NOT MUSTACHE_THREAD_SANITIZER_SUPPORTED)
+        message(FATAL_ERROR
+            "MUSTACHE_ENABLE_THREAD_SANITIZER requires compiler and linker support")
+    endif()
+endif()
 
 if(MUSTACHE_CISTA_BENCHMARK_BUILTIN_XXH3 AND NOT MUSTACHE_ENABLE_CISTA_BENCHMARK)
     message(FATAL_ERROR
@@ -439,6 +478,12 @@ function(mustache_apply_build_options target)
             target_link_options(${target} PRIVATE
                 -fsanitize=address,undefined
                 -fno-sanitize-recover=all)
+        endif()
+        if(MUSTACHE_ENABLE_THREAD_SANITIZER)
+            target_compile_options(${target} PRIVATE
+                -fno-omit-frame-pointer
+                -fsanitize=thread)
+            target_link_options(${target} PRIVATE -fsanitize=thread)
         endif()
     endif()
 endfunction()

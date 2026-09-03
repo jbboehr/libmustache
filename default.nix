@@ -29,6 +29,7 @@ in
     staticOnlySupport ? false,
     debugSupport ? false,
     sanitizerSupport ? false,
+    threadSanitizerSupport ? false,
     fuzzSupport ? false,
     clangTidySupport ? false,
     archivedTemplateSupport ? null,
@@ -39,7 +40,8 @@ in
   }:
     pkgs.callPackage ./nix/derivation.nix {
       inherit stdenv clang-tools cista nlohmann_json libyaml xxhash zlib mustache_spec libmustacheSrc;
-      inherit checkSupport cmakeSupport staticOnlySupport debugSupport sanitizerSupport fuzzSupport clangTidySupport;
+      inherit checkSupport cmakeSupport staticOnlySupport debugSupport sanitizerSupport threadSanitizerSupport;
+      inherit fuzzSupport clangTidySupport;
       inherit archivedTemplateSupport useSystemCista useSystemXxhash cistaBenchmarkSupport cistaBuiltinXxh3Support;
       inherit gitignoreFilterWith;
     }

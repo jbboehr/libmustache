@@ -202,6 +202,13 @@ AS_IF([test "x$enable_warnings_as_errors" = "xyes"], [
 AC_ARG_ENABLE([sanitizers],
     [AS_HELP_STRING([--enable-sanitizers], [enable AddressSanitizer and UndefinedBehaviorSanitizer])],
     [], [enable_sanitizers=no])
+AC_ARG_ENABLE([thread-sanitizer],
+    [AS_HELP_STRING([--enable-thread-sanitizer], [enable ThreadSanitizer])],
+    [], [enable_thread_sanitizer=no])
+AS_IF([test "x$enable_sanitizers" = "xyes" &&
+        test "x$enable_thread_sanitizer" = "xyes"], [
+    AC_MSG_ERROR([--enable-sanitizers and --enable-thread-sanitizer cannot be used together])
+])
 AS_IF([test "x$enable_sanitizers" = "xyes"], [
     AS_IF([test "x$GXX" != "xyes"], [
         AC_MSG_ERROR([--enable-sanitizers requires a GCC-compatible C++ compiler])
@@ -209,6 +216,39 @@ AS_IF([test "x$enable_sanitizers" = "xyes"], [
     MUSTACHE_CXXFLAGS="$MUSTACHE_CXXFLAGS -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all"
     MUSTACHE_LDFLAGS="$MUSTACHE_LDFLAGS -fsanitize=address,undefined -fno-sanitize-recover=all"
 ])
+AS_IF([test "x$enable_thread_sanitizer" = "xyes"], [
+    AS_IF([test "x$GXX" != "xyes"], [
+        AC_MSG_ERROR([--enable-thread-sanitizer requires a GCC-compatible C++ compiler])
+    ])
+    AC_CACHE_CHECK([whether $CXX supports ThreadSanitizer],
+        [mustache_cv_cxx_thread_sanitizer], [
+        mustache_save_CXXFLAGS=$CXXFLAGS
+        mustache_save_LDFLAGS=$LDFLAGS
+        CXXFLAGS="$CXXFLAGS -fno-omit-frame-pointer -fsanitize=thread"
+        LDFLAGS="$LDFLAGS -fsanitize=thread"
+        AC_LINK_IFELSE([
+            AC_LANG_PROGRAM([[
+#if defined(__clang__)
+#if !__has_feature(thread_sanitizer)
+#error ThreadSanitizer instrumentation was not enabled
+#endif
+#elif !defined(__SANITIZE_THREAD__)
+#error ThreadSanitizer instrumentation was not enabled
+#endif
+            ]], [[]])
+        ], [mustache_cv_cxx_thread_sanitizer=yes],
+           [mustache_cv_cxx_thread_sanitizer=no])
+        CXXFLAGS=$mustache_save_CXXFLAGS
+        LDFLAGS=$mustache_save_LDFLAGS
+    ])
+    AS_IF([test "x$mustache_cv_cxx_thread_sanitizer" != "xyes"], [
+        AC_MSG_ERROR([--enable-thread-sanitizer requires compiler and linker support])
+    ])
+    MUSTACHE_CXXFLAGS="$MUSTACHE_CXXFLAGS -fno-omit-frame-pointer -fsanitize=thread"
+    MUSTACHE_LDFLAGS="$MUSTACHE_LDFLAGS -fsanitize=thread"
+])
+AM_CONDITIONAL([MUSTACHE_THREAD_SANITIZER_ENABLED],
+    [test "x$enable_thread_sanitizer" = "xyes"])
 
 AC_ARG_ENABLE([gcov],
     [AS_HELP_STRING([--enable-gcov], [enable gcov coverage instrumentation])],

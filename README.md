@@ -47,6 +47,9 @@ cmake -S . -B build \
 
 Maintainer and CI builds can add `-DMUSTACHE_WARNINGS_AS_ERRORS=ON` to promote
 project warnings to errors without changing the default for downstream builds.
+`MUSTACHE_ENABLE_SANITIZERS=ON` enables AddressSanitizer and
+UndefinedBehaviorSanitizer. `MUSTACHE_ENABLE_THREAD_SANITIZER=ON` enables
+ThreadSanitizer instead; the two sanitizer modes are mutually exclusive.
 
 JSON and YAML support default to `AUTO`: each adapter is built when its
 dependency is detected and omitted otherwise. Use `ON` to require a format or
@@ -174,7 +177,9 @@ sudo make install
 
 Use `--without-mustache-spec` when configuring a source tree without the
 specification submodule. `./configure --help` lists the warning-as-error,
-hardening, sanitizer, coverage, and profiling options.
+hardening, sanitizer, coverage, and profiling options. AddressSanitizer with
+UndefinedBehaviorSanitizer is selected by `--enable-sanitizers`; the mutually
+exclusive `--enable-thread-sanitizer` mode selects ThreadSanitizer.
 
 JSON and YAML support are independently auto-detected by default. Use
 `--with-json=yes` or `--with-yaml=yes` to require the corresponding dependency,
@@ -385,6 +390,13 @@ the former renderer. Context rendering is synchronous and not intended for
 concurrent use. The legacy `invoke(std::string *, Renderer *)` hook and
 `Renderer::renderForLambda()` remain as compatibility adapters; a raw renderer
 pointer obtained through that hook must never be retained.
+
+The public API does not promise thread safety. Keep each render operation and
+all participating `Mustache`, `Renderer`, `Data`, lambda, and callback-context
+objects confined to one thread. A section lambda may hand its active renderer
+or `LambdaRenderContext` to one worker and wait for that worker to finish
+before the callback returns; this serialized handoff does not make concurrent
+rendering through the same objects supported.
 
 Code migrating from ABI 5 should replace direct representation access as
 follows:

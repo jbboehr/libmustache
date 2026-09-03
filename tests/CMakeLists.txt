@@ -56,14 +56,18 @@ add_executable(test_renderer_safety test_renderer_safety.cpp)
 target_link_libraries(test_renderer_safety PRIVATE mustache_static)
 mustache_apply_build_options(test_renderer_safety)
 
-add_executable(test_allocation_failure test_allocation_failure.cpp)
-target_link_libraries(test_allocation_failure PRIVATE mustache_static)
-mustache_apply_build_options(test_allocation_failure)
-if(NOT MSVC)
-    # Replacement new/delete use malloc/free; GCC -Werror treats that pairing
-    # as mismatched-new-delete after inlining into std::make_unique.
-    target_compile_options(test_allocation_failure PRIVATE
-        -Wno-mismatched-new-delete)
+if(NOT MUSTACHE_ENABLE_THREAD_SANITIZER)
+    # This test replaces the global allocation operators, which conflicts with
+    # the allocator interceptors defined by Clang's ThreadSanitizer runtime.
+    add_executable(test_allocation_failure test_allocation_failure.cpp)
+    target_link_libraries(test_allocation_failure PRIVATE mustache_static)
+    mustache_apply_build_options(test_allocation_failure)
+    if(NOT MSVC)
+        # Replacement new/delete use malloc/free; GCC -Werror treats that
+        # pairing as mismatched-new-delete after inlining into std::make_unique.
+        target_compile_options(test_allocation_failure PRIVATE
+            -Wno-mismatched-new-delete)
+    endif()
 endif()
 
 if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES OR MUSTACHE_ENABLE_CISTA_BENCHMARK)
@@ -186,22 +190,27 @@ add_test(NAME length_aware_api COMMAND test_length_aware_api)
 add_test(NAME tokenizer_safety COMMAND test_tokenizer_safety)
 add_test(NAME compiled_template COMMAND test_compiled_template)
 add_test(NAME renderer_safety COMMAND test_renderer_safety)
-add_test(NAME allocation_failure COMMAND test_allocation_failure)
-if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES AND NOT CMAKE_CROSSCOMPILING)
-    add_test(NAME archive_allocation_failure
-        COMMAND "${CMAKE_COMMAND}"
-            "-DMUSTACHE_TEST_ALLOCATION_FAILURE_EXECUTABLE=$<TARGET_FILE:test_allocation_failure>"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/check_archive_allocation_failure.cmake")
+if(NOT MUSTACHE_ENABLE_THREAD_SANITIZER)
+    add_test(NAME allocation_failure COMMAND test_allocation_failure)
+    if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES AND NOT CMAKE_CROSSCOMPILING)
+        add_test(NAME archive_allocation_failure
+            COMMAND "${CMAKE_COMMAND}"
+                "-DMUSTACHE_TEST_ALLOCATION_FAILURE_EXECUTABLE=$<TARGET_FILE:test_allocation_failure>"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/check_archive_allocation_failure.cmake")
+    endif()
 endif()
 if(NOT CMAKE_CROSSCOMPILING AND
-        (MUSTACHE_HAVE_LIBYAML OR MUSTACHE_HAVE_ARCHIVED_TEMPLATES))
+        (MUSTACHE_HAVE_LIBYAML OR
+            (MUSTACHE_HAVE_ARCHIVED_TEMPLATES AND
+                NOT MUSTACHE_ENABLE_THREAD_SANITIZER)))
     set(MUSTACHE_TEST_INPUT_COMMAND "${CMAKE_COMMAND}")
     if(MUSTACHE_HAVE_LIBYAML)
         list(APPEND MUSTACHE_TEST_INPUT_COMMAND
             "-DMUSTACHE_TEST_SPEC_EXECUTABLE=$<TARGET_FILE:test_spec>"
             "-DMUSTACHE_SPEC_DIR=${MUSTACHE_SPEC_DIR}")
     endif()
-    if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+    if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES AND
+            NOT MUSTACHE_ENABLE_THREAD_SANITIZER)
         list(APPEND MUSTACHE_TEST_INPUT_COMMAND
             "-DMUSTACHE_TEST_ALLOCATION_FAILURE_EXECUTABLE=$<TARGET_FILE:test_allocation_failure>")
     endif()
