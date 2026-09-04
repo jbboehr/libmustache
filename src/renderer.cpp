@@ -199,6 +199,12 @@ void Renderer::_appendEscaped(std::string_view value)
   if (_output == NULL) {
     throw Exception("Missing output buffer");
   }
+  if (!value.empty() && value.data() == _output->data()) {
+    // Appending to _output can invalidate value when they share storage.
+    const std::string stableValue(value);
+    _appendEscaped(stableValue);
+    return;
+  }
   const std::size_t maximum = std::min(_limits.maxOutputBytes, _output->max_size());
   if (_output->size() > maximum) {
     throw Exception("Render output byte limit exceeded");

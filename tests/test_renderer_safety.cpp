@@ -387,6 +387,76 @@ void testLimitDefaultsAndOutputAccounting()
   });
 }
 
+void testEscapedOutputAliasing()
+{
+  std::string source = "{{.}}";
+  mustache::Node root;
+  mustache::Mustache engine;
+  engine.tokenize(&source, &root);
+
+  mustache::Data data = mustache::Data::string("<");
+  std::string& output = data.stringValue();
+  output.reserve(4096);
+  output.assign(output.capacity(), 'x');
+  output.front() = '<';
+
+  const std::string original = output;
+  std::string expected = original;
+  expected.append("&lt;");
+  expected.append(original.size() - 1, 'x');
+
+  engine.render(&root, &data, NULL, &output);
+  expect(output == expected, "escaped rendering did not preserve aliased input");
+
+  const std::string binaryOriginal("<&\"'\0>", 6);
+  std::string binaryExpected = binaryOriginal;
+  binaryExpected.append("&lt;&amp;&quot;&#039;");
+  binaryExpected.push_back('\0');
+  binaryExpected.append("&gt;");
+
+  mustache::RenderLimits limits;
+  limits.maxOutputBytes = binaryExpected.size();
+  mustache::Data exactData = mustache::Data::string(binaryOriginal);
+  std::string& exactOutput = exactData.stringValue();
+  engine.render(&root, &exactData, NULL, &exactOutput, limits);
+  expect(exactOutput == binaryExpected, "exact aliased escaped-output limit changed the binary snapshot");
+
+  mustache::Data limitedData = mustache::Data::string(binaryOriginal);
+  std::string& limitedOutput = limitedData.stringValue();
+  limits.maxOutputBytes = binaryExpected.size() - 1;
+  expectException("aliased escaped-output limit", "Render output byte limit exceeded", [&]() {
+    engine.render(&root, &limitedData, NULL, &limitedOutput, limits);
+  });
+  expect(limitedOutput == binaryOriginal, "a rejected aliased escaped append partially changed its backing string");
+
+  limits.maxOutputBytes = binaryExpected.size();
+  engine.render(&root, &limitedData, NULL, &limitedOutput, limits);
+  expect(limitedOutput == binaryExpected, "aliased rendering did not recover after an output-limit failure");
+
+  mustache::Data repeatedData = mustache::Data::string("<");
+  std::string& repeatedOutput = repeatedData.stringValue();
+  mustache::Renderer renderer;
+  renderer.init(&root, &repeatedData, NULL, &repeatedOutput);
+  renderer.render();
+  expect(repeatedOutput == "<&lt;", "the first direct aliased render used the wrong snapshot");
+  renderer.render();
+  expect(repeatedOutput == "<&lt;&lt;&amp;lt;", "a repeated direct aliased render used stale input");
+
+  std::string prefixedSource = "P{{.}}";
+  mustache::Node prefixedRoot;
+  engine.tokenize(&prefixedSource, &prefixedRoot);
+  mustache::Data prefixedData = mustache::Data::string("<");
+  std::string& prefixedOutput = prefixedData.stringValue();
+  engine.render(&prefixedRoot, &prefixedData, NULL, &prefixedOutput);
+  expect(prefixedOutput == "<P&lt;P", "aliased interpolation did not snapshot the value after earlier output");
+
+  mustache::Data separateData = mustache::Data::string("<&");
+  std::string separateOutput = "prefix:";
+  limits.maxOutputBytes = 16;
+  engine.render(&root, &separateData, NULL, &separateOutput, limits);
+  expect(separateOutput == "prefix:&lt;&amp;", "ordinary escaped rendering changed with alias protection");
+}
+
 void testDepthAndWorkLimits()
 {
   const mustache::CompiledTemplate plain = mustache::compile("x");
@@ -697,6 +767,7 @@ int main()
 {
   testContainerCurrentContext();
   testLimitDefaultsAndOutputAccounting();
+  testEscapedOutputAliasing();
   testDepthAndWorkLimits();
   testOwnedPartialSourcePrecedence();
   testPartialIndentationOutputAccounting();

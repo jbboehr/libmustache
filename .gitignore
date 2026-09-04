@@ -51,6 +51,7 @@ tests/test_misc
 tests/test_utils
 test_coverage
 /build/
+/.c-review-results/
 /tmp*
 
 # distros
