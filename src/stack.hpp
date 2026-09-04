@@ -78,7 +78,7 @@ template <class T, int S = MUSTACHE_STACK_DEFAULT_MAXSIZE> class Stack {
     T backOffset(int of)
     {
 #ifndef MUSTACHE_STACK_UNCHECKED
-      if (_size <= of) {
+      if (of < 0 || _size <= of) {
         throw Exception("Reached bottom of stack");
       }
 #endif
@@ -97,10 +97,11 @@ template <class T, int S = MUSTACHE_STACK_DEFAULT_MAXSIZE> class Stack {
       return _stack;
     };
 
-    //! Gets a pointer to the end of the stack
+    //! Gets a pointer to the top of the stack, or begin() when empty.
+    //! This legacy compatibility API is not a one-past-the-end iterator.
     T * end()
     {
-      return (_stack + _size - 1);
+      return _size > 0 ? _stack + _size - 1 : _stack;
     };
 };
 

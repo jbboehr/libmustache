@@ -56,6 +56,17 @@ add_executable(test_renderer_safety test_renderer_safety.cpp)
 target_link_libraries(test_renderer_safety PRIVATE mustache_static)
 mustache_apply_build_options(test_renderer_safety)
 
+add_executable(test_stack_safety test_stack_safety.cpp)
+target_link_libraries(test_stack_safety PRIVATE mustache_static)
+mustache_apply_build_options(test_stack_safety)
+
+add_executable(test_stack_safety_unchecked test_stack_safety.cpp)
+target_compile_definitions(test_stack_safety_unchecked PRIVATE
+    MUSTACHE_STACK_UNCHECKED=1
+    MUSTACHE_TEST_STACK_EXPECT_UNCHECKED=1)
+target_link_libraries(test_stack_safety_unchecked PRIVATE mustache_static)
+mustache_apply_build_options(test_stack_safety_unchecked)
+
 if(NOT MUSTACHE_ENABLE_THREAD_SANITIZER)
     # This test replaces the global allocation operators, which conflicts with
     # the allocator interceptors defined by Clang's ThreadSanitizer runtime.
@@ -190,6 +201,8 @@ add_test(NAME length_aware_api COMMAND test_length_aware_api)
 add_test(NAME tokenizer_safety COMMAND test_tokenizer_safety)
 add_test(NAME compiled_template COMMAND test_compiled_template)
 add_test(NAME renderer_safety COMMAND test_renderer_safety)
+add_test(NAME stack_safety COMMAND test_stack_safety)
+add_test(NAME stack_safety_unchecked COMMAND test_stack_safety_unchecked)
 if(NOT MUSTACHE_ENABLE_THREAD_SANITIZER)
     add_test(NAME allocation_failure COMMAND test_allocation_failure)
     if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES AND NOT CMAKE_CROSSCOMPILING)

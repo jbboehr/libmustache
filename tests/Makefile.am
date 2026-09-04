@@ -1,5 +1,5 @@
 
-check_PROGRAMS = test_utils test_misc test_data_behavior test_node_serialization test_node_template test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template test_renderer_safety test_cli
+check_PROGRAMS = test_utils test_misc test_data_behavior test_node_serialization test_node_template test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template test_renderer_safety test_stack_safety test_stack_safety_unchecked test_cli
 
 if !MUSTACHE_THREAD_SANITIZER_ENABLED
 check_PROGRAMS += test_allocation_failure
@@ -29,6 +29,12 @@ test_length_aware_api_SOURCES = test_length_aware_api.cpp
 test_tokenizer_safety_SOURCES = test_tokenizer_safety.cpp
 test_compiled_template_SOURCES = test_compiled_template.cpp
 test_renderer_safety_SOURCES = test_renderer_safety.cpp
+test_stack_safety_SOURCES = test_stack_safety.cpp
+test_stack_safety_unchecked_SOURCES = test_stack_safety.cpp
+test_stack_safety_unchecked_CPPFLAGS = \
+	$(AM_CPPFLAGS) \
+	-DMUSTACHE_STACK_UNCHECKED=1 \
+	-DMUSTACHE_TEST_STACK_EXPECT_UNCHECKED=1
 test_allocation_failure_SOURCES = test_allocation_failure.cpp
 # Replacement new/delete use malloc/free; GCC -Werror treats that pairing as
 # mismatched-new-delete after inlining into std::make_unique.
@@ -133,7 +139,7 @@ EXTRA_DIST = \
 	fuzz/corpus/tokenizer/unclosed-tag \
 	fuzz/corpus/tokenizer/valid-section
 
-TESTS = test_utils test_misc test_data_behavior test_node_serialization test_node_template test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template test_renderer_safety test_cli
+TESTS = test_utils test_misc test_data_behavior test_node_serialization test_node_template test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template test_renderer_safety test_stack_safety test_stack_safety_unchecked test_cli
 
 if !MUSTACHE_THREAD_SANITIZER_ENABLED
 TESTS += test_allocation_failure
