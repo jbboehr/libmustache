@@ -345,6 +345,106 @@ void testContainerCurrentContext()
       "the implicit iterator did not traverse a compatibility list");
 }
 
+void testDottedNameLookup()
+{
+  using mustache::Data;
+  struct Fixture {
+      const char * name;
+      const char * source;
+      Data data;
+      const char * expected;
+  };
+  // The first component searches the context stack. Each remaining component
+  // resolves only within the value found for the previous component.
+  const Fixture fixtures[] = {
+      {"literal key collision", "{{a.b}}|{{{a.b}}}|{{&a.b}}",
+          Data::object(
+              {{"a.b", Data::string("literal")}, {"a", Data::object({{"b", Data::string("nested & value")}})}}),
+          "nested &amp; value|nested & value|nested & value"},
+      {"literal key without a path", "[{{a.b}}]", Data::object({{"a.b", Data::string("literal")}}), "[]"},
+      {"truthy dotted section", "{{#a.b}}yes{{/a.b}}{{^a.b}}no{{/a.b}}",
+          Data::object({{"a.b", Data::boolean(false)}, {"a", Data::object({{"b", Data::boolean(true)}})}}), "yes"},
+      {"falsey dotted section", "{{#a.b}}yes{{/a.b}}{{^a.b}}no{{/a.b}}",
+          Data::object({{"a.b", Data::boolean(true)}, {"a", Data::object({{"b", Data::boolean(false)}})}}), "no"},
+      {"dotted section context", "{{#a.b}}{{value}}{{/a.b}}",
+          Data::object({{"a.b", Data::object({{"value", Data::string("literal")}})},
+              {"a", Data::object({{"b", Data::object({{"value", Data::string("nested")}})}})}}),
+          "nested"},
+      {"parent supplies the first component", "{{#scope}}{{a.b}}{{/scope}}",
+          Data::object({{"a", Data::object({{"b", Data::string("parent")}})}, {"a.b", Data::string("parent literal")},
+              {"scope", Data::object({{"a.b", Data::string("current literal")}})}}),
+          "parent"},
+      {"nearest first component wins", "{{#scope}}{{a.b}}{{/scope}}",
+          Data::object({{"a", Data::object({{"b", Data::string("parent")}})},
+              {"scope",
+                  Data::object(
+                      {{"a", Data::object({{"b", Data::string("current")}})}, {"a.b", Data::string("literal")}})}}),
+          "current"},
+      {"missing child does not restart lookup", "{{#scope}}[{{a.b}}]{{/scope}}",
+          Data::object({{"a", Data::object({{"b", Data::string("parent")}})},
+              {"scope", Data::object({{"a", Data::object()}, {"a.b", Data::string("literal")}})}}),
+          "[]"},
+      {"scalar first component shadows parent", "{{#scope}}[{{a.b}}]{{/scope}}",
+          Data::object({{"a", Data::object({{"b", Data::string("parent")}})},
+              {"scope", Data::object({{"a", Data::string("scalar")}, {"a.b", Data::string("literal")}})}}),
+          "[]"},
+      {"null first component shadows parent", "{{#scope}}[{{a.b}}]{{/scope}}",
+          Data::object({{"a", Data::object({{"b", Data::string("parent")}})},
+              {"scope", Data::object({{"a", Data::null()}, {"a.b", Data::string("literal")}})}}),
+          "[]"},
+      {"false first component shadows parent", "{{#scope}}[{{a.b}}]{{/scope}}",
+          Data::object({{"a", Data::object({{"b", Data::string("parent")}})},
+              {"scope", Data::object({{"a", Data::boolean(false)}, {"a.b", Data::string("literal")}})}}),
+          "[]"},
+      {"later component does not search parents", "[{{a.b.c}}]",
+          Data::object({{"a", Data::object({{"b", Data::object()}})}, {"c", Data::string("parent")},
+              {"a.b.c", Data::string("literal")}}),
+          "[]"},
+      {"every component is resolved separately", "{{a.b.c}}",
+          Data::object({{"a.b.c", Data::string("whole literal")},
+              {"a",
+                  Data::object({{"b.c", Data::string("suffix literal")},
+                      {"b", Data::object({{"c", Data::string("nested")}})}})}}),
+          "nested"},
+      {"scalar context and implicit iterator", "{{#items}}{{.}}:{{a.b}};{{/items}}",
+          Data::object({{"items", Data::array({Data::string("first"), Data::string("second")})},
+              {"a", Data::object({{"b", Data::string("parent")}})}, {"a.b", Data::string("literal")}}),
+          "first:parent;second:parent;"},
+      {"plain name context lookup", "{{name}}|{{#scope}}{{name}}{{/scope}}|{{#fallback}}{{name}}{{/fallback}}",
+          Data::object({{"name", Data::string("parent")}, {"scope", Data::object({{"name", Data::string("current")}})},
+              {"fallback", Data::object({{"marker", Data::boolean(true)}})}}),
+          "parent|current|parent"},
+  };
+
+  for (const Fixture& fixture : fixtures) {
+    const auto check = [&](const char * representation, const std::string& output) {
+      if (output != fixture.expected) {
+        std::fprintf(stderr, "%s (%s)\n  expected: %s\n  actual:   %s\n", fixture.name, representation,
+            fixture.expected, output.c_str());
+        ++failures;
+      }
+    };
+    mustache::Mustache engine;
+    mustache::Node root;
+    engine.tokenize(fixture.source, &root);
+    std::string output;
+    engine.render(&root, &fixture.data, NULL, &output);
+    check("Node", output);
+    check("compiled", mustache::render(mustache::compile(fixture.source), fixture.data));
+
+    const auto legacyBytes = root.serializeValue();
+    const auto legacy = mustache::Node::unserializeOwned(
+        std::string_view(reinterpret_cast<const char *>(legacyBytes.data()), legacyBytes.size()));
+    output.clear();
+    engine.render(legacy.get(), &fixture.data, NULL, &output);
+    check("legacy", output);
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+    const auto archived = mustache::loadArchivedTemplate(mustache::serializeArchivedTemplate(root));
+    check("archived", mustache::render(archived, fixture.data));
+#endif
+  }
+}
+
 void testLimitDefaultsAndOutputAccounting()
 {
   mustache::RenderLimits defaults;
@@ -906,6 +1006,7 @@ static_assert(
 int main()
 {
   testContainerCurrentContext();
+  testDottedNameLookup();
   testLimitDefaultsAndOutputAccounting();
   testEscapedOutputAliasing();
   testDepthAndWorkLimits();

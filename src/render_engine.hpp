@@ -716,14 +716,11 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
         return data;
       }
 
-      if (const Data * found = findInMap(data, name)) {
-        return found;
-      }
-
       if (renderer_._strictPaths) {
-        return NULL;
+        return findInMap(data, name);
       }
 
+      // Only the first path component searches enclosing contexts.
       auto dataParts = node.dataParts();
       const RenderString initial = dataParts ? dataParts.value() : name;
       const Data * reference = NULL;
