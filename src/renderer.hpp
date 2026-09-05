@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <functional>
 #include <map>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -59,7 +60,7 @@ class Renderer {
 
     template <typename PartialSource> friend class detail::RenderEngine;
 
-    typedef std::function<const Node *(const std::string&)> PartialResolver;
+    typedef std::function<std::shared_ptr<const Node>(const std::string&)> PartialResolver;
 
     struct IndentationFrame {
         explicit IndentationFrame(std::vector<std::string_view> components = {}) :

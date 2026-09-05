@@ -73,22 +73,25 @@ std::string Mustache::render(const CompiledTemplate& compiled, const Data& data,
 std::string Mustache::render(
     const CompiledTemplate& compiled, const Data& data, const PartialMap& partials, const RenderLimits& limits) const
 {
-  if (compiled.empty()) {
+  // A callback can replace the caller's handle before this render finishes.
+  const auto state = compiled.state;
+  if (!state) {
     throw Exception("Empty compiled template");
   }
 
   std::string output;
   Renderer compiledRenderer;
-  compiledRenderer.init(&compiled.state->root, &data, NULL, &output, limits);
-  compiledRenderer.setPartialResolver([&partials](const std::string& name) -> const Node * {
+  compiledRenderer.init(&state->root, &data, NULL, &output, limits);
+  compiledRenderer.setPartialResolver([&partials](const std::string& name) -> std::shared_ptr<const Node> {
     PartialMap::const_iterator partial = partials.find(name);
     if (partial == partials.end()) {
-      return NULL;
+      return {};
     }
     if (partial->second.empty()) {
       throw Exception("Empty compiled partial");
     }
-    return &partial->second.state->root;
+    // Alias the root while retaining the compiled state for this partial call.
+    return std::shared_ptr<const Node>(partial->second.state, &partial->second.state->root);
   });
   compiledRenderer.render();
   return output;

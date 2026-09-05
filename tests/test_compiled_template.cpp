@@ -1,7 +1,9 @@
 #include "mustache_config.h"
 
 #include <cstdio>
+#include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -10,7 +12,9 @@
 #include "compiled_template.hpp"
 #include "data.hpp"
 #include "exception.hpp"
+#include "lambda.hpp"
 #include "mustache.hpp"
+#include "render_engine.hpp"
 
 namespace {
 
@@ -100,6 +104,110 @@ void testCompiledPartials()
   expect(rejected, "a referenced empty compiled partial was accepted");
 }
 
+void testPartialOwnershipScope()
+{
+  // Keep application owners alive: the assertions detect missing retention
+  // without releasing memory that a borrowed node might still reference.
+  const auto outer = std::make_shared<mustache::Node>();
+  const auto inner = std::make_shared<mustache::Node>();
+  const mustache::detail::OwnedPartialSource::Resolver resolver =
+      [&](const std::string& name) -> std::shared_ptr<const mustache::Node> {
+    if (name == "outer") {
+      return outer;
+    }
+    if (name == "inner") {
+      return inner;
+    }
+    return {};
+  };
+  const mustache::detail::OwnedPartialSource source(&resolver, nullptr, nullptr);
+  const auto outerName = mustache::detail::RenderString::fromView("outer");
+  const auto innerName = mustache::detail::RenderString::fromView("inner");
+
+  const bool found = source.withPartial(outerName, [&](mustache::detail::OwnedNodeView) {
+    expect(outer.use_count() > 1, "the resolver did not retain the active partial");
+    expect(inner.use_count() == 1, "an unused partial was retained");
+    const bool nested = source.withPartial(innerName, [&](mustache::detail::OwnedNodeView) {
+      expect(outer.use_count() > 1, "a nested lookup released the outer partial");
+      expect(inner.use_count() > 1, "a nested lookup did not retain its partial");
+    });
+    expect(nested, "a nested partial was not found");
+    expect(inner.use_count() == 1, "a completed nested partial was retained");
+  });
+  expect(found, "an existing partial was not found");
+  expect(outer.use_count() == 1, "a completed partial was retained");
+
+  bool propagated = false;
+  try {
+    source.withPartial(outerName, [&](mustache::detail::OwnedNodeView) {
+      expect(outer.use_count() > 1, "a throwing callback did not retain its partial");
+      throw std::runtime_error("partial callback failed");
+    });
+  } catch (const std::runtime_error&) {
+    propagated = true;
+  }
+  expect(propagated, "a partial callback exception was swallowed");
+  expect(outer.use_count() == 1, "a partial was retained after a callback exception");
+
+  const bool missing =
+      source.withPartial(mustache::detail::RenderString::fromView("missing"), [](mustache::detail::OwnedNodeView) {
+        expect(false, "a missing partial invoked its callback");
+      });
+  expect(!missing, "a missing partial was reported as found");
+}
+
+class CallbackLambda final : public mustache::Lambda {
+  public:
+    explicit CallbackLambda(std::function<void()> callback) :
+        callback_(std::move(callback))
+    {}
+
+    std::string invoke() override
+    {
+      callback_();
+      return "";
+    }
+
+  private:
+    std::function<void()> callback_;
+};
+
+void testPartialLookupDuringCallback()
+{
+  const auto compiled = mustache::compile("{{add}}{{>late}}");
+  mustache::PartialMap partials;
+  auto add = std::make_unique<CallbackLambda>([&]() {
+    partials.emplace("late", mustache::compile("added"));
+  });
+  const auto data = mustache::Data::object({{"add", mustache::Data::lambda(std::move(add))}});
+  expect(mustache::render(compiled, data, partials) == "added",
+      "a partial added by a callback was not visible to the next lookup");
+}
+
+void testPartialReplacementAndErasureDuringCallback()
+{
+  const auto root = mustache::compile("{{>piece}}|{{>piece}}");
+  // These owners stay alive throughout each render. This checks live lookup
+  // behavior through the public API, not last-owner lifetime handling.
+  const auto original = mustache::compile("{{update}}original");
+  const auto replacement = mustache::compile("replacement");
+  for (const bool erase : {false, true}) {
+    mustache::PartialMap partials{{"piece", original}};
+    auto update = std::make_unique<CallbackLambda>([&]() {
+      if (erase) {
+        partials.erase("piece");
+      } else {
+        partials.at("piece") = replacement;
+      }
+    });
+    const auto data = mustache::Data::object({{"update", mustache::Data::lambda(std::move(update))}});
+    const auto output = mustache::render(root, data, partials);
+    expect(output == (erase ? "original|" : "original|replacement"),
+        erase ? "an erased partial was still visible to the next lookup"
+              : "a replacement partial was not visible to the next lookup");
+  }
+}
+
 void testStandalonePartialIndentation()
 {
   mustache::Data data = mustache::Data::object({{"content", mustache::Data::string("<\n->")}});
@@ -162,6 +270,9 @@ int main()
   testHandleOwnershipAndReuse();
   testMemberConfigurationAndLimits();
   testCompiledPartials();
+  testPartialOwnershipScope();
+  testPartialLookupDuringCallback();
+  testPartialReplacementAndErasureDuringCallback();
   testStandalonePartialIndentation();
   testEmbeddedNulAndEmptyHandle();
   return failures == 0 ? 0 : 1;

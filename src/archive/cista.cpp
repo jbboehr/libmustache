@@ -1763,10 +1763,12 @@ std::string render(const ArchivedTemplate& archived, const Data& data)
 
 std::string render(const ArchivedTemplate& archived, const Data& data, const RenderLimits& limits)
 {
-  if (archived.empty()) {
+  // A callback can replace the caller's handle before this render finishes.
+  const auto state = archived.state;
+  if (!state) {
     throw Exception("Empty archived template");
   }
-  return mustache_benchmark::renderProtectedArchive(archived.state->graph, data, limits);
+  return mustache_benchmark::renderProtectedArchive(state->graph, data, limits);
 }
 
 std::string Mustache::render(const ArchivedTemplate& archived, const Data& data) const

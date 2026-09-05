@@ -320,7 +320,7 @@ class OwnedNodeView {
 */
 class OwnedPartialSource {
   public:
-    using Resolver = std::function<const Node *(const std::string&)>;
+    using Resolver = std::function<std::shared_ptr<const Node>(const std::string&)>;
 
     OwnedPartialSource(const Resolver * resolver, const Node::Partials * external, const Node * root) noexcept :
         resolver_(resolver),
@@ -342,9 +342,9 @@ class OwnedPartialSource {
       }
 
       if (resolver_ != NULL && *resolver_) {
-        const Node * partial = (*resolver_)(*key);
-        if (partial != NULL) {
-          std::forward<Callback>(callback)(OwnedNodeView::fromNode(partial));
+        const std::shared_ptr<const Node> partial = (*resolver_)(*key);
+        if (partial) {
+          std::forward<Callback>(callback)(OwnedNodeView::fromNode(partial.get()));
           return true;
         }
       }
