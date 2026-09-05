@@ -33,6 +33,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t * data, std::size_t size)
     std::abort();
   }
 
+  // Exercise reconstruction even when the legacy format cannot represent the tree.
+  mustache::Node::TemplateStringLimits templateLimits;
+  templateLimits.maxOutputBytes = 64 * 1024;
+  templateLimits.maxNestingDepth = limits.maxNestingDepth + 2;
+  templateLimits.maxNodes = limits.maxNodes + 1;
+  static_cast<void>(root.to_template_string("{{", "}}", templateLimits));
+  static_cast<void>(root.children_to_template_string("{{", "}}", templateLimits));
+
   // The parser counts sections and excludes the root; serialization counts
   // every node, including the root and an innermost closing node. Dotted-name
   // budgets likewise derive from the parser's byte and node budgets.
@@ -42,20 +50,21 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t * data, std::size_t size)
   serializationLimits.maxDataPartsPerNode = limits.maxTagBytes + 1;
   serializationLimits.maxDataParts = limits.maxInputBytes + limits.maxNodes;
 
-  const std::vector<uint8_t> serial = root.serializeValue(serializationLimits);
+  std::vector<uint8_t> serial;
+  try {
+    serial = root.serializeValue(serializationLimits);
+  } catch (const mustache::Exception& error) {
+    if (std::string_view(error.what()) == "Legacy serialization cannot preserve custom section delimiters") {
+      return 0;
+    }
+    throw;
+  }
   const char * serialData = serial.empty() ? "" : reinterpret_cast<const char *>(serial.data());
   std::unique_ptr<mustache::Node> decoded =
       mustache::Node::unserializeOwned(std::string_view(serialData, serial.size()), serializationLimits);
   if (decoded->type != mustache::Node::TypeRoot) {
     std::abort();
   }
-
-  mustache::Node::TemplateStringLimits templateLimits;
-  templateLimits.maxOutputBytes = 64 * 1024;
-  templateLimits.maxNestingDepth = limits.maxNestingDepth + 2;
-  templateLimits.maxNodes = limits.maxNodes + 1;
-  static_cast<void>(root.to_template_string("{{", "}}", templateLimits));
-  static_cast<void>(root.children_to_template_string("{{", "}}", templateLimits));
 
   return 0;
 }

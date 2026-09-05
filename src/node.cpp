@@ -192,6 +192,12 @@ void serializeNode(
 {
   checkSerialBudget(state, depth);
   validateNodeShape(node.type, static_cast<size_t>(node.flags), node.data.has_value(), node.children.size());
+  // Legacy readers restore default section delimiters; custom values would be lost.
+  if (node.type == Node::TypeSection &&
+      ((node.startSequence.has_value() && *node.startSequence != "{{") ||
+          (node.stopSequence.has_value() && *node.stopSequence != "}}"))) {
+    throw Exception("Legacy serialization cannot preserve custom section delimiters");
+  }
   if ((node.flags & Node::FlagPartialIndent) != 0 && !partialIndentationMetadata) {
     throw Exception("Invalid serial partial indentation metadata");
   }

@@ -161,16 +161,24 @@ class Node {
     //! Set data
     MUSTACHE_API void setData(const std::string& value);
 
-    /*! Legacy owning-pointer serializer. Prefer serializeValue(). */
+    /*! Legacy owning-pointer serializer. Prefer serializeValue().
+
+        Rejects sections with explicit non-default delimiters, as serializeValue() does.
+    */
     MUSTACHE_API std::vector<uint8_t> * serialize() const;
 
-    /*! Legacy owning-pointer serializer. Prefer serializeValue(). */
+    /*! As serialize(), with explicit resource limits. */
     MUSTACHE_API std::vector<uint8_t> * serialize(const SerializationLimits& limits) const;
 
-    //! Serialize into an owned value.
+    /*! Serialize into an owned legacy-format value.
+
+        Rejects sections with explicit non-default delimiters because the
+        legacy format cannot preserve them. Use source caching or the archived
+        template API for templates with custom section delimiters.
+    */
     MUSTACHE_API std::vector<uint8_t> serializeValue() const;
 
-    //! Serialize into an owned value with explicit resource limits.
+    //! As serializeValue(), with explicit resource limits.
     MUSTACHE_API std::vector<uint8_t> serializeValue(const SerializationLimits& limits) const;
 
     /*! Reconstruct this node using compatibility defaults. */

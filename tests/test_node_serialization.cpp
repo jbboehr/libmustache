@@ -426,6 +426,146 @@ void testComplexTokenizerCompatibility()
   expectBytes(*serializedAgain, *serial, "complex tokenizer output must retain its exact legacy bytes");
 }
 
+class SectionResultLambda final : public mustache::Lambda {
+  public:
+    explicit SectionResultLambda(std::string result) :
+        result(std::move(result))
+    {}
+
+    std::string invoke() override
+    {
+      return result;
+    }
+
+    std::string invoke(std::string_view, mustache::LambdaRenderContext) override
+    {
+      return result;
+    }
+
+  private:
+    std::string result;
+};
+
+void testLegacyWritesRejectCustomSectionDelimiters()
+{
+  struct Fixture {
+      const char * start;
+      const char * stop;
+      const char * source;
+      const char * result;
+  };
+  const Fixture fixtures[] = {
+      {"<%", "%>", "<%#section%>text<%/section%>", "<%name%>"},
+      {"<%", "}}", "<%#section}}text<%/section}}", "<%name}}"},
+      {"{{", "%>", "{{#section%>text{{/section%>", "{{name%>"},
+      {"{{", "}}", "{{#outer}}{{=<% %>=}}<%#section%>text<%/section%><%/outer%>", "<%name%>"},
+  };
+  for (const Fixture& fixture : fixtures) {
+    mustache::Mustache engine;
+    engine.setStartSequence(fixture.start);
+    engine.setStopSequence(fixture.stop);
+    mustache::Node root;
+    engine.tokenize(fixture.source, &root);
+    const auto data =
+        mustache::Data::object({{"name", mustache::Data::string("Ada")}, {"outer", mustache::Data::boolean(true)},
+            {"section", mustache::Data::lambda(std::make_unique<SectionResultLambda>(fixture.result))}});
+    std::string output;
+    engine.render(&root, &data, NULL, &output);
+    expect(output == "Ada", "custom section delimiters did not render the callback result");
+
+    const auto expectRejected = [&](const char * api, auto&& serialize) {
+      bool rejected = false;
+      try {
+        serialize();
+      } catch (const mustache::Exception& error) {
+        rejected = true;
+        expect(std::string(error.what()) == "Legacy serialization cannot preserve custom section delimiters",
+            "custom section delimiter rejection did not explain the legacy format limitation");
+      }
+      if (!rejected) {
+        std::fprintf(stderr, "%s accepted lossy section delimiters in %s\n", api, fixture.source);
+        ++failures;
+      }
+    };
+    std::vector<uint8_t> destination{0x42};
+    expectRejected("serializeValue", [&]() {
+      destination = root.serializeValue();
+    });
+    expectRejected("serializeValue(limits)", [&]() {
+      destination = root.serializeValue(mustache::Node::SerializationLimits());
+    });
+    expectBytes(destination, {0x42}, "failed serialization replaced the caller's previous bytes");
+    expectRejected("serialize", [&]() {
+      const std::unique_ptr<std::vector<uint8_t>> bytes(root.serialize());
+    });
+    expectRejected("serialize(limits)", [&]() {
+      const std::unique_ptr<std::vector<uint8_t>> bytes(root.serialize(mustache::Node::SerializationLimits()));
+    });
+
+    output.clear();
+    engine.render(&root, &data, NULL, &output);
+    expect(output == "Ada", "rejected legacy serialization changed the source template");
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+    const auto archived = mustache::loadArchivedTemplate(mustache::serializeArchivedTemplate(root));
+    expect(mustache::render(archived, data) == "Ada", "supported archives lost custom section delimiters");
+#endif
+  }
+}
+
+void testLegacyDelimiterCompatibility()
+{
+  const std::vector<std::vector<uint8_t>> noChildren;
+  const auto historicalManualBytes =
+      makeSerialNode(mustache::Node::TypeSection, mustache::Node::FlagNone, true, "section", noChildren);
+  mustache::Node manualSection(mustache::Node::TypeSection, "section");
+  expectBytes(manualSection.serializeValue(), historicalManualBytes,
+      "an unset manual section delimiter changed its historical legacy bytes");
+
+  const auto expectManualRejected = [&](const char * message) {
+    bool rejected = false;
+    try {
+      (void)manualSection.serializeValue();
+    } catch (const mustache::Exception&) {
+      rejected = true;
+    }
+    expect(rejected, message);
+  };
+  manualSection.startSequence = "";
+  expectManualRejected("an explicitly empty manual section opening delimiter was serialized");
+  manualSection.startSequence.reset();
+  manualSection.stopSequence = "";
+  expectManualRejected("an explicitly empty manual section closing delimiter was serialized");
+
+  const char * sources[] = {"{{#section}}text{{/section}}", "{{=<% %>=}}<%name%>",
+      "{{=<% %>=}}<%^missing%><%name%><%/missing%>", "{{=<% %>=}}<%={{ }}=%>{{#section}}text{{/section}}"};
+  mustache::Mustache engine;
+  const auto data = mustache::Data::object({{"name", mustache::Data::string("Ada")},
+      {"section", mustache::Data::lambda(std::make_unique<SectionResultLambda>("{{name}}"))}});
+  for (const char * source : sources) {
+    mustache::Node root;
+    engine.tokenize(source, &root);
+    const auto bytes = root.serializeValue();
+    const auto decoded = mustache::Node::unserializeOwned(byteView(bytes));
+    std::string output;
+    engine.render(decoded.get(), &data, NULL, &output);
+    expect(output == "Ada", "representable delimiters changed behavior after legacy serialization");
+    expectBytes(decoded->serializeValue(), bytes, "representable delimiters changed the legacy byte format");
+  }
+
+  // Captured before the write guard from a template with custom section delimiters.
+  // Those bytes contain no delimiter metadata; existing readers use defaults.
+  const auto existingBytes = decodeHex("4d5500010000000000010000003f4d5500400000000800020000002973656374696f6e00"
+                                       "4d550002000000050000000000007465787400"
+                                       "4d5500800000000800000000000073656374696f6e00");
+  const auto existing = mustache::Node::unserializeOwned(byteView(existingBytes));
+  const auto oldData = mustache::Data::object({{"name", mustache::Data::string("Ada")},
+      {"section", mustache::Data::lambda(std::make_unique<SectionResultLambda>("<%name%>"))}});
+  std::string output;
+  engine.render(existing.get(), &oldData, NULL, &output);
+  expect(output == "<%name%>", "reading existing legacy section bytes changed behavior");
+  expectBytes(existing->serializeValue(), existingBytes, "existing legacy section bytes no longer round-trip");
+}
+
 void testStandalonePartialMetadataRoundTrip()
 {
   std::string source("  {{>partial}}\n");
@@ -622,6 +762,8 @@ int main()
   testStrictDecoderValidation();
   testOffsetAndScalarCompatibility();
   testComplexTokenizerCompatibility();
+  testLegacyWritesRejectCustomSectionDelimiters();
+  testLegacyDelimiterCompatibility();
   testStandalonePartialMetadataRoundTrip();
   testDecoderDepthLimit();
   testSerializationLimits();
