@@ -354,7 +354,9 @@ higher maximum.
 
 For the legacy output-buffer API, `maxOutputBytes` applies to the initial
 top-level buffer plus all bytes appended to every output buffer during the
-render, including buffers passed to `renderForLambda()`. Escaped output is
+render, including buffers passed to `renderForLambda()`. Escaped lambda
+interpolation counts its evaluated result once, plus any bytes added by
+escaping; callback output still counts separately. Escaped output is
 sized before it is appended, so exhausting the limit cannot partially append
 one escaped scalar. A failed render can leave the caller's output buffer
 holding a prefix of the intended result; discard or clear it before reuse.

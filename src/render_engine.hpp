@@ -778,12 +778,26 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
 
           Tokenizer tokenizer;
           Node nodeFromLambda;
-          renderer_._tokenizeLambda(&tokenizer, invoked, &nodeFromLambda, node.flags() & Node::FlagEscape);
+          renderer_._tokenizeLambda(&tokenizer, invoked, &nodeFromLambda, false);
           renderer_._indentationStack.emplace_back();
           const auto indentationGuard = onRenderScopeExit([this]() {
             renderer_._indentationStack.pop_back();
           });
-          renderNode(OwnedNodeView::fromNode(&nodeFromLambda), depth + 1);
+          if (node.flags() & Node::FlagEscape) {
+            // Interpolation escapes the complete evaluated result, including partials.
+            std::string evaluated;
+            {
+              std::string * previousOutput = renderer_._output;
+              renderer_._output = &evaluated;
+              const auto outputGuard = onRenderScopeExit([this, previousOutput]() {
+                renderer_._output = previousOutput;
+              });
+              renderNode(OwnedNodeView::fromNode(&nodeFromLambda), depth + 1);
+            }
+            renderer_._appendEscaped(evaluated, true);
+          } else {
+            renderNode(OwnedNodeView::fromNode(&nodeFromLambda), depth + 1);
+          }
           break;
         }
         case Data::TypeNone:

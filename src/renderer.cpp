@@ -194,7 +194,7 @@ void Renderer::_append(std::string_view value)
   }
 }
 
-void Renderer::_appendEscaped(std::string_view value)
+void Renderer::_appendEscaped(std::string_view value, bool inputAlreadyCounted)
 {
   if (_output == NULL) {
     throw Exception("Missing output buffer");
@@ -202,7 +202,7 @@ void Renderer::_appendEscaped(std::string_view value)
   if (!value.empty() && value.data() == _output->data()) {
     // Appending to _output can invalidate value when they share storage.
     const std::string stableValue(value);
-    _appendEscaped(stableValue);
+    _appendEscaped(stableValue, inputAlreadyCounted);
     return;
   }
   const std::size_t maximum = std::min(_limits.maxOutputBytes, _output->max_size());
@@ -220,7 +220,8 @@ void Renderer::_appendEscaped(std::string_view value)
     }
     addition += bytes;
   }
-  _consumeOutputBytes(addition);
+  // Lambda evaluation already charged its bytes; only escape expansion is new output.
+  _consumeOutputBytes(inputAlreadyCounted ? addition - value.size() : addition);
 
   for (const char character : value) {
     const std::string_view escaped = escapedValue(character);

@@ -615,6 +615,146 @@ void testLambdaNodeAccounting()
   expectException("lambda tokenizer aggregate node bound", "Render node visit limit exceeded", [&]() {
     static_cast<void>(mustache::render(source, data, limits));
   });
+
+  mustache::Data depthData = mustache::Data::object({{"name", mustache::Data::string("Ada")},
+      {"value", mustache::Data::lambda(std::make_unique<FixedLambda>("{{name}}"))}});
+  limits = mustache::RenderLimits();
+  limits.maxNestingDepth = 4;
+  expect(
+      mustache::render(source, depthData, limits) == "Ada", "exact escaped-lambda nesting limit rejected valid output");
+  limits.maxNestingDepth = 3;
+  expectException("escaped lambda nesting limit", "Render nesting limit exceeded", [&]() {
+    static_cast<void>(mustache::render(source, depthData, limits));
+  });
+}
+
+void testLambdaInterpolationOutput()
+{
+  struct Fixture {
+      const char * name;
+      const char * source;
+      std::string result;
+      std::string expected;
+      std::size_t callbackOutputBytes = 0;
+  };
+  const Fixture fixtures[] = {
+      {"literal", "{{value}}", "Tom & Ada", "Tom &amp; Ada"},
+      {"text before a tag", "{{value}}", "Tom & {{name}}", "Tom &amp; Ada"},
+      {"partial output", "{{value}}", "{{>piece}}", "Tom &amp; Ada"},
+      {"quoted text", "{{value}}", "\"Ada's\" & {{name}}", "&quot;Ada&#039;s&quot; &amp; Ada"},
+      {"indented partial", "  {{>wrapper}}", "{{>piece}}", "  Tom &amp; Ada\n  next\n"},
+      {"unescaped interpolation", "{{{value}}}", "Tom & {{name}}", "Tom & Ada"},
+      {"ampersand interpolation", "{{&value}}", "{{>piece}}", "Tom & Ada"},
+      {"section lambda", "{{#value}}ignored{{/value}}", "{{>piece}}", "Tom & Ada"},
+      {"nested interpolation", "{{value}}", "{{inner}}", "tea &amp;amp; coffee"},
+      {"escaped string in result", "{{value}}", "{{text}}", "2 &amp;lt; 3 &amp;amp; 5 &amp;gt; 4"},
+      {"unescaped tag in result", "{{value}}", "{{{text}}}", "2 &lt; 3 &amp; 5 &gt; 4"},
+      {"alternate outer delimiters", "{{=<% %>=}}<%value%>", "<%name%> & {{name}}", "&lt;%name%&gt; &amp; Ada"},
+      {"unescaped alternate outer delimiters", "{{=<% %>=}}<%&value%>", "<%name%> & {{name}}", "<%name%> & Ada"},
+      {"empty result", "{{value}}", "", ""},
+      {"binary result", "{{value}}", std::string("A\0B", 3), std::string("A\0B", 3)},
+      {"callback output budget", "{{value}}x", "{{#callback}}{{/callback}}", "abcx", 3},
+  };
+
+  mustache::Mustache engine;
+  mustache::Node::Partials partials;
+  partials.emplace("piece", std::make_unique<mustache::Node>());
+  engine.tokenize("Tom & Ada", partials.at("piece").get());
+  partials.emplace("wrapper", std::make_unique<mustache::Node>());
+  engine.tokenize("{{value}}\nnext\n", partials.at("wrapper").get());
+  const mustache::PartialMap compiledPartials{
+      {"piece", mustache::compile("Tom & Ada")}, {"wrapper", mustache::compile("{{value}}\nnext\n")}};
+
+  for (const Fixture& fixture : fixtures) {
+    const auto data = mustache::Data::object(
+        {{"name", mustache::Data::string("Ada")}, {"text", mustache::Data::string("2 < 3 & 5 > 4")},
+            {"value", mustache::Data::lambda(std::make_unique<FixedLambda>(fixture.result))},
+            {"inner", mustache::Data::lambda(std::make_unique<FixedLambda>("tea & coffee"))},
+            {"callback", mustache::Data::lambda(std::make_unique<CallbackRenderingLambda>())}});
+    mustache::Node root;
+    engine.tokenize(fixture.source, &root);
+    const auto compiled = mustache::compile(fixture.source);
+    const auto legacyBytes = root.serializeValue();
+    const auto legacy = mustache::Node::unserializeOwned(
+        std::string_view(reinterpret_cast<const char *>(legacyBytes.data()), legacyBytes.size()));
+
+    const auto check = [&](const char * representation, auto&& render) {
+      const std::string label = std::string(fixture.name) + " (" + representation + ")";
+      mustache::RenderLimits limits;
+      limits.maxOutputBytes = fixture.expected.size() + fixture.callbackOutputBytes;
+      expect(render(limits) == fixture.expected, label.c_str());
+      if (!fixture.expected.empty()) {
+        --limits.maxOutputBytes;
+        expectException(label.c_str(), "Render output byte limit exceeded", [&]() {
+          static_cast<void>(render(limits));
+        });
+      }
+    };
+    const auto renderNode = [&](const mustache::Node * node, const mustache::RenderLimits& limits) {
+      std::string output;
+      engine.render(node, &data, &partials, &output, limits);
+      return output;
+    };
+    check("Node", [&](const mustache::RenderLimits& limits) {
+      return renderNode(&root, limits);
+    });
+    check("compiled", [&](const mustache::RenderLimits& limits) {
+      return mustache::render(compiled, data, compiledPartials, limits);
+    });
+    check("legacy", [&](const mustache::RenderLimits& limits) {
+      return renderNode(legacy.get(), limits);
+    });
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+    const auto archived = mustache::loadArchivedTemplate(mustache::serializeArchivedTemplate(root, partials));
+    check("archived", [&](const mustache::RenderLimits& limits) {
+      return mustache::render(archived, data, limits);
+    });
+#endif
+  }
+}
+
+void testLambdaInterpolationFailure()
+{
+  mustache::Mustache engine;
+  mustache::Node root;
+  engine.tokenize("before {{value}} after", &root);
+  const auto data = mustache::Data::object({{"name", mustache::Data::string("Ada")},
+      {"value", mustache::Data::lambda(std::make_unique<FixedLambda>("Tom & {{name}}"))}});
+  const std::string prefix = "prefix:before ";
+  // Fail during evaluation, then during final escaping after evaluation succeeds.
+  const std::size_t remainingBudgets[] = {2, std::string("Tom &amp; Ada").size() - 1};
+  for (const std::size_t remaining : remainingBudgets) {
+    std::string output = "prefix:";
+    mustache::RenderLimits limits;
+    limits.maxOutputBytes = prefix.size() + remaining;
+    engine.renderer.init(&root, &data, NULL, &output, limits);
+    expectException("escaped lambda failure", "Render output byte limit exceeded", [&]() {
+      engine.renderer.render();
+    });
+    expect(output == prefix, "a failed escaped lambda appended part of its evaluated result");
+
+    mustache::Node recovered(mustache::Node::TypeOutput, "ok");
+    engine.renderer.setNode(&recovered);
+    engine.renderer.render();
+    expect(output == prefix + "ok", "a failed escaped lambda did not restore the caller's output buffer");
+  }
+
+  mustache::LambdaRenderContext retained;
+  const auto callbackData = mustache::Data::object(
+      {{"value", mustache::Data::lambda(std::make_unique<FixedLambda>("temporary{{#fail}}{{/fail}}"))},
+          {"fail", mustache::Data::lambda(std::make_unique<ThrowingScopedLambda>(&retained))}});
+  std::string output = "prefix:";
+  engine.renderer.init(&root, &callbackData, NULL, &output);
+  expectException("escaped lambda callback failure", "Scoped lambda failed", [&]() {
+    engine.renderer.render();
+  });
+  expect(output == prefix, "a callback exception exposed temporary escaped-lambda output");
+  expect(!retained.active(), "a callback exception left its escaped-lambda context active");
+
+  mustache::Node recovered(mustache::Node::TypeOutput, "ok");
+  engine.renderer.setNode(&recovered);
+  engine.renderer.render();
+  expect(output == prefix + "ok", "a callback exception did not restore escaped-lambda render state");
 }
 
 void testScopedLambdaContext()
@@ -773,6 +913,8 @@ int main()
   testPartialIndentationOutputAccounting();
   testLambdaTemplateBudget();
   testLambdaNodeAccounting();
+  testLambdaInterpolationOutput();
+  testLambdaInterpolationFailure();
   testScopedLambdaContext();
   testSerializedWorkerThreadLambdaRendering();
   testFailureStateAndCallbackWindow();

@@ -112,7 +112,7 @@ class Renderer {
 
     //! Appends bounded output
     void _append(std::string_view value);
-    void _appendEscaped(std::string_view value);
+    void _appendEscaped(std::string_view value, bool inputAlreadyCounted = false);
 
     //! Applies indentation to literal partial source, never dynamic values
     void _appendTemplateOutput(std::string_view value);
