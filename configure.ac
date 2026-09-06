@@ -350,7 +350,7 @@ AM_CONDITIONAL([MUSTACHE_SPEC_TEST_ENABLED],
 
 AC_ARG_ENABLE([archived-templates],
     [AS_HELP_STRING([--enable-archived-templates@<:@=auto|yes|no@:>@],
-        [build archived-template support when private symbol visibility is available @<:@default=auto@:>@])],
+        [build archived-template support on little-endian targets with private symbol visibility @<:@default=auto@:>@])],
     [], [enable_archived_templates=auto])
 AS_CASE([$enable_archived_templates],
     [auto|yes|no], [],
@@ -386,7 +386,20 @@ mustache_archived_templates_requested=$enable_archived_templates
 enable_archived_templates=no
 AS_IF([test "x$mustache_archived_templates_requested" != "xno"], [
     AS_IF([test "x$mustache_cv_cxx_visibility_hidden" = "xyes"], [
-        enable_archived_templates=yes
+        AC_C_BIGENDIAN(
+            [mustache_archive_little_endian=no],
+            [mustache_archive_little_endian=yes],
+            [mustache_archive_little_endian=no],
+            [mustache_archive_little_endian=no])
+        AS_IF([test "x$mustache_archive_little_endian" = "xyes"], [
+            enable_archived_templates=yes
+        ], [
+            AS_IF([test "x$mustache_archived_templates_requested" = "xyes"], [
+                AC_MSG_ERROR([archived-template support requires a little-endian target])
+            ], [
+                AC_MSG_NOTICE([archived-template support disabled: requires a little-endian target])
+            ])
+        ])
     ], [
         AS_IF([test "x$mustache_archived_templates_requested" = "xyes"], [
             AC_MSG_ERROR([archived-template support requires private C++ symbol visibility])
@@ -395,11 +408,11 @@ AS_IF([test "x$mustache_archived_templates_requested" != "xno"], [
 ])
 AS_IF([test "x$enable_archived_templates" != "xyes" &&
         test "x$with_system_cista" = "xyes"], [
-    AC_MSG_ERROR([--with-system-cista requires archived-template support and private C++ symbol visibility])
+    AC_MSG_ERROR([--with-system-cista requires archived-template support])
 ])
 AS_IF([test "x$enable_archived_templates" != "xyes" &&
         test "x$with_system_xxhash" = "xyes"], [
-    AC_MSG_ERROR([--with-system-xxhash requires archived-template support and private C++ symbol visibility])
+    AC_MSG_ERROR([--with-system-xxhash requires archived-template support])
 ])
 AS_IF([test "x$enable_archived_templates" = "xyes"], [
     AS_IF([test "x$with_system_xxhash" = "xyes"], [

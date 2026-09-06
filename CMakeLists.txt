@@ -180,7 +180,18 @@ if(NOT MUSTACHE_ENABLE_ARCHIVED_TEMPLATES STREQUAL "OFF")
                 "archived-template support requires private C++ symbol visibility")
         endif()
     else()
-        set(MUSTACHE_HAVE_ARCHIVED_TEMPLATES ON)
+        # TestBigEndian also supports our CMake 3.18 minimum and cross builds.
+        include(TestBigEndian)
+        test_big_endian(MUSTACHE_ARCHIVE_BIG_ENDIAN)
+        if("${MUSTACHE_ARCHIVE_BIG_ENDIAN}" STREQUAL "0")
+            set(MUSTACHE_HAVE_ARCHIVED_TEMPLATES ON)
+        elseif(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES STREQUAL "ON")
+            message(FATAL_ERROR
+                "archived-template support requires a little-endian target")
+        else()
+            message(STATUS
+                "Archived-template support disabled: requires a little-endian target")
+        endif()
     endif()
 endif()
 message(STATUS

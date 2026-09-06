@@ -7,11 +7,18 @@ while Cista remains responsible for integrity and first-phase structural
 validation. No `cista::*` type appears in the installed API.
 
 This format remains experimental and optional. CMake and Autotools enable it
-automatically when the required private-symbol controls are available, while
-explicit require and disable modes remain available. Production archives use
-XXH3 through the bundled or selected xxHash implementation; zlib is only an
-optional dependency of the separate checksum benchmark. Generation 2 is pinned
-so dependency changes and future API work cannot silently change cache bytes.
+automatically on little-endian targets when the required private-symbol controls
+are available. Explicit require mode rejects unsupported targets during
+configuration; disable mode omits the archive API.
+
+The const Cista reader cannot convert the little-endian payload in place on a
+big-endian target. This applies even when archives are produced and consumed
+on the same target.
+
+Production archives use XXH3 through the bundled or selected xxHash
+implementation; zlib is only an optional dependency of the separate checksum
+benchmark. Generation 2 is pinned so dependency changes and future API work
+cannot silently change cache bytes.
 
 ## Preamble layout
 

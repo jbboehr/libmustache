@@ -67,7 +67,8 @@ The accepted values are `AUTO`, `ON`, and `OFF`. A format set to `ON` makes
 configuration fail if its dependency is unavailable.
 
 Experimental archived-template support also defaults to `AUTO`: it is built
-when the required private-symbol controls are available, and omitted otherwise.
+on little-endian targets when the required private-symbol controls are available,
+and omitted otherwise.
 Use `ON` to require that capability or `OFF` to disable the API explicitly. The
 feature uses pinned private Cista and xxHash snapshots by default; packagers can
 independently select system installations:
@@ -187,10 +188,10 @@ JSON and YAML support are independently auto-detected by default. Use
 `--with-json=yes` or `--with-yaml=yes` to require the corresponding dependency,
 and `--without-json` or `--without-yaml` to disable an adapter explicitly.
 
-Archived-template support is auto-detected through private-symbol controls by
-default. Use `--enable-archived-templates` to require the feature or
-`--disable-archived-templates` to omit it explicitly. Enabling it selects the
-bundled Cista and xxHash snapshots; add `--with-system-cista` and/or
+Archived-template support is auto-detected on little-endian targets with
+private-symbol controls by default. Use `--enable-archived-templates` to require
+the feature or `--disable-archived-templates` to omit it explicitly. Enabling it
+selects the bundled Cista and xxHash snapshots; add `--with-system-cista` and/or
 `--with-system-xxhash` to require system installations instead. Use
 `CISTA_CFLAGS`, `XXHASH_CFLAGS` and `XXHASH_LIBS`, or `PKG_CONFIG_PATH` for
 custom locations.

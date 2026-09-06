@@ -44,6 +44,7 @@ function(mustache_configure_archive_mode NAME MODE)
             "-DMUSTACHE_ENABLE_ARCHIVED_TEMPLATES=${MODE}"
             -DMUSTACHE_ARCHIVE_VISIBILITY_HIDDEN_SUPPORTED=OFF
             -DMUSTACHE_ARCHIVE_VISIBILITY_INLINES_HIDDEN_SUPPORTED=OFF
+            ${ARGN}
         RESULT_VARIABLE MUSTACHE_CONFIGURE_RESULT
         OUTPUT_VARIABLE MUSTACHE_CONFIGURE_OUTPUT
         ERROR_VARIABLE MUSTACHE_CONFIGURE_ERROR)
@@ -52,6 +53,48 @@ function(mustache_configure_archive_mode NAME MODE)
         "${MUSTACHE_CONFIGURE_OUTPUT}${MUSTACHE_CONFIGURE_ERROR}"
         PARENT_SCOPE)
 endfunction()
+
+# Replace only CMake's target-byte-order probe. Real cross-builds separately
+# verify detection; these cases exercise the project's feature-selection policy.
+foreach(byte_order IN ITEMS big_endian unknown)
+    set(MUSTACHE_ENDIAN_MODULES "${MUSTACHE_TEST_BINARY_ROOT}/${byte_order}-modules")
+    file(MAKE_DIRECTORY "${MUSTACHE_ENDIAN_MODULES}")
+    if(byte_order STREQUAL "big_endian")
+        set(MUSTACHE_PROBE_RESULT 1)
+    else()
+        set(MUSTACHE_PROBE_RESULT "")
+    endif()
+    file(WRITE "${MUSTACHE_ENDIAN_MODULES}/TestBigEndian.cmake"
+        "function(test_big_endian result)\n"
+        "  set(\"\${result}\" \"${MUSTACHE_PROBE_RESULT}\" PARENT_SCOPE)\n"
+        "endfunction()\n")
+    foreach(mode IN ITEMS AUTO ON OFF)
+        mustache_configure_archive_mode("${mode}_${byte_order}" "${mode}"
+            "-DCMAKE_MODULE_PATH=${MUSTACHE_ENDIAN_MODULES}"
+            -DMUSTACHE_ARCHIVE_VISIBILITY_HIDDEN_SUPPORTED=ON
+            -DMUSTACHE_ARCHIVE_VISIBILITY_INLINES_HIDDEN_SUPPORTED=ON)
+        if(mode STREQUAL "ON")
+            if(MUSTACHE_CONFIGURE_RESULT EQUAL 0 OR
+                    NOT MUSTACHE_CONFIGURE_LOG MATCHES
+                        "archived-template support requires a little-endian target")
+                message(FATAL_ERROR
+                    "ON did not reject ${byte_order} archives:\n${MUSTACHE_CONFIGURE_LOG}")
+            endif()
+        else()
+            if(NOT MUSTACHE_CONFIGURE_RESULT EQUAL 0)
+                message(FATAL_ERROR
+                    "${mode} should configure without ${byte_order} archives:\n${MUSTACHE_CONFIGURE_LOG}")
+            endif()
+            file(READ
+                "${MUSTACHE_TEST_BINARY_ROOT}/${mode}_${byte_order}/src/mustache_config.h"
+                MUSTACHE_ENDIAN_CONFIG_HEADER)
+            if(MUSTACHE_ENDIAN_CONFIG_HEADER MATCHES
+                    "#define MUSTACHE_HAVE_ARCHIVED_TEMPLATES 1")
+                message(FATAL_ERROR "${mode} enabled unsupported ${byte_order} archives")
+            endif()
+        endif()
+    endforeach()
+endforeach()
 
 mustache_configure_archive_mode(auto_without_visibility AUTO)
 if(NOT MUSTACHE_CONFIGURE_RESULT EQUAL 0)
