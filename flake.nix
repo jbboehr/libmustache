@@ -4,6 +4,10 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
     systems.url = "github:nix-systems/default-linux";
+    agent-badge = {
+      url = "github:jbboehr/agent-badge.ts/master";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     flake-utils = {
       url = "github:numtide/flake-utils";
       inputs.systems.follows = "systems";
@@ -26,6 +30,7 @@
   outputs = {
     self,
     nixpkgs,
+    agent-badge,
     flake-utils,
     mustache_spec,
     gitignore,
@@ -237,7 +242,7 @@
           inputsFrom = [packages.libmustache packages.libmustache-cmake];
           packages =
             pre-commit-check.enabledPackages
-            ++ [pkgs.cista pkgs.llvmPackages.clang-tools pkgs.xxhash pkgs.zlib];
+            ++ [agent-badge.packages.${system}.default pkgs.cista pkgs.llvmPackages.clang-tools pkgs.xxhash pkgs.zlib];
           shellHook = pre-commit-check.shellHook;
         };
 
