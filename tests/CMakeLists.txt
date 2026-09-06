@@ -259,6 +259,22 @@ if(MUSTACHE_IS_TOP_LEVEL)
             "-DMUSTACHE_TEST_CONFIG=$<CONFIG>"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/check_public_compiled_template_boundary.cmake")
 endif()
+if(MUSTACHE_IS_TOP_LEVEL AND UNIX AND NOT CMAKE_CROSSCOMPILING)
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        add_test(NAME pkgconfig_install_paths
+            COMMAND "${CMAKE_COMMAND}"
+                "-DMUSTACHE_TEST_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
+                "-DMUSTACHE_TEST_BINARY_ROOT=${CMAKE_CURRENT_BINARY_DIR}/pkgconfig-install-paths"
+                "-DMUSTACHE_TEST_GENERATOR=${CMAKE_GENERATOR}"
+                "-DMUSTACHE_TEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+                "-DMUSTACHE_TEST_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
+                "-DMUSTACHE_TEST_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+                "-DMUSTACHE_TEST_CONFIG=$<CONFIG>"
+                "-DMUSTACHE_TEST_PKG_CONFIG=${PKG_CONFIG_EXECUTABLE}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/check_pkgconfig_install_paths.cmake")
+    endif()
+endif()
 if(MUSTACHE_IS_TOP_LEVEL AND NOT MSVC)
     add_test(NAME cmake_archive_feature_modes
         COMMAND "${CMAKE_COMMAND}"

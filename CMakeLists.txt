@@ -435,26 +435,16 @@ configure_file(
     @ONLY
 )
 
-# Resolve the prefix relative to the installed pkg-config file so that
-# `cmake --install --prefix` and relocated install trees remain usable.
-set(prefix "\${pcfiledir}/../..")
-set(exec_prefix "\${prefix}")
-if(IS_ABSOLUTE "${CMAKE_INSTALL_LIBDIR}")
-    set(libdir "${CMAKE_INSTALL_LIBDIR}")
-else()
-    set(libdir "\${prefix}/${CMAKE_INSTALL_LIBDIR}")
-endif()
-if(IS_ABSOLUTE "${CMAKE_INSTALL_INCLUDEDIR}")
-    set(includedir "${CMAKE_INSTALL_INCLUDEDIR}")
-else()
-    set(includedir "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
-endif()
-set(VERSION "${PROJECT_VERSION}")
+# Generate escaped, configured paths instead of relying on the incompatible
+# pcfiledir quoting rules in pkg-config implementations. Regenerate at install
+# time so cmake --install --prefix still selects the effective prefix.
 configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/mustache.pc.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/mustache.pc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/generate_pkgconfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/generate_pkgconfig.cmake"
     @ONLY
 )
+set(MUSTACHE_PKGCONFIG_FILE "${CMAKE_CURRENT_BINARY_DIR}/mustache.pc")
+include("${CMAKE_CURRENT_BINARY_DIR}/generate_pkgconfig.cmake")
 
 function(mustache_apply_build_options target)
     if(MSVC)
@@ -538,7 +528,16 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/mustacheConfigVersion.cmake"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/mustache"
 )
-install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/mustache.pc"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
-)
+string(CONFIGURE [=[
+set(pkgconfig_build_dir [==[@CMAKE_CURRENT_BINARY_DIR@]==])
+# Separate output files also keep installations to different prefixes independent.
+string(SHA256 pkgconfig_id "${CMAKE_INSTALL_PREFIX}")
+set(MUSTACHE_PKGCONFIG_FILE "${pkgconfig_build_dir}/pkgconfig-${pkgconfig_id}/mustache.pc")
+include("${pkgconfig_build_dir}/generate_pkgconfig.cmake")
+set(pkgconfig_directory [==[@CMAKE_INSTALL_LIBDIR@/pkgconfig]==])
+if(NOT IS_ABSOLUTE "${pkgconfig_directory}")
+    set(pkgconfig_directory "${CMAKE_INSTALL_PREFIX}/${pkgconfig_directory}")
+endif()
+file(INSTALL DESTINATION "${pkgconfig_directory}" TYPE FILE FILES "${MUSTACHE_PKGCONFIG_FILE}")
+]=] MUSTACHE_INSTALL_PKGCONFIG @ONLY)
+install(CODE "${MUSTACHE_INSTALL_PKGCONFIG}")

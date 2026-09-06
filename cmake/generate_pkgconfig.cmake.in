@@ -1,0 +1,27 @@
+# Evaluated both while configuring and while installing. CMAKE_INSTALL_PREFIX
+# is the effective prefix; DESTDIR belongs only to the file installation.
+set(prefix "${CMAKE_INSTALL_PREFIX}")
+set(exec_prefix "\${prefix}")
+set(libdir [==[@CMAKE_INSTALL_LIBDIR@]==])
+set(includedir [==[@CMAKE_INSTALL_INCLUDEDIR@]==])
+if(NOT IS_ABSOLUTE "${libdir}")
+    set(libdir "\${prefix}/${libdir}")
+endif()
+if(NOT IS_ABSOLUTE "${includedir}")
+    set(includedir "\${prefix}/${includedir}")
+endif()
+
+# The template quotes directory flags. Protect characters special inside those
+# double quotes, while retaining ${prefix} for explicit consumer overrides.
+foreach(directory IN ITEMS prefix libdir includedir)
+    string(REGEX REPLACE "([\"\\\\])" "\\\\\\1" ${directory} "${${directory}}")
+endforeach()
+set(MUSTACHE_CXX_STANDARD_FLAG [==[@MUSTACHE_CXX_STANDARD_FLAG@]==])
+set(MUSTACHE_CONSUMER_EXPORT_CPPFLAGS [==[@MUSTACHE_CONSUMER_EXPORT_CPPFLAGS@]==])
+set(MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE [==[@MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE@]==])
+set(VERSION [==[@PROJECT_VERSION@]==])
+configure_file(
+    [==[@CMAKE_CURRENT_SOURCE_DIR@/mustache.pc.in]==]
+    "${MUSTACHE_PKGCONFIG_FILE}"
+    @ONLY
+)

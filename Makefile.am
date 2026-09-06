@@ -22,6 +22,7 @@ EXTRA_DIST = \
 	.github/workflows/ci.yml \
 	cmake/mustache_config.h.in \
 	cmake/mustacheConfig.cmake.in \
+	cmake/generate_pkgconfig.cmake.in \
 	cmake/check_cista_version_algorithm.cpp \
 	default.nix \
 	flake.nix \
@@ -38,6 +39,7 @@ EXTRA_DIST = \
 	spec/specs \
 	tests/check_archive_feature_modes.cmake \
 	tests/check_cmake_config_header.cmake \
+	tests/check_pkgconfig_install_paths.cmake \
 	tests/copy_cmake_test_source.cmake \
 	tests/check_windows_exports.cmake \
 	tests/cmake-consumer/CMakeLists.txt \

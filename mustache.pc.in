@@ -7,6 +7,6 @@ Name: Mustache
 Description: Library for mustache
 URL: https://github.com/jbboehr/libmustache
 Version: @VERSION@
-Libs: -L${libdir} -lmustache
+Libs: -L"${libdir}" -lmustache
 Requires.private: @MUSTACHE_PKGCONFIG_REQUIRES_PRIVATE@
-Cflags: -I${includedir} @MUSTACHE_CXX_STANDARD_FLAG@ @MUSTACHE_CONSUMER_EXPORT_CPPFLAGS@
+Cflags: -I"${includedir}" @MUSTACHE_CXX_STANDARD_FLAG@ @MUSTACHE_CONSUMER_EXPORT_CPPFLAGS@
