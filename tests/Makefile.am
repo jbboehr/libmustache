@@ -173,7 +173,7 @@ endif
 TESTS_ENVIRONMENT = \
 	top_srcdir=$(top_srcdir) \
 	top_builddir=$(top_builddir) \
-	mustache_spec_dir=@MUSTACHE_SPEC_DIR@
+	mustache_spec_dir="@MUSTACHE_SPEC_DIR@"
 
 clean-local:
 	rm -rf logs

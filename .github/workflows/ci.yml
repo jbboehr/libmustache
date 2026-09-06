@@ -84,10 +84,13 @@ jobs:
 
       - name: Configure
         run: |
+          spec_dir="$RUNNER_TEMP/mustache spec"
+          cp -R spec/specs "$spec_dir"
           mkdir build-autotools
           cd build-autotools
           ../configure \
             --prefix="$RUNNER_TEMP/libmustache" \
+            --with-mustache-spec="$spec_dir" \
             --enable-warnings-as-errors
 
       - name: Build and test
