@@ -94,6 +94,123 @@ void testExactCallbackBytes()
   }
 }
 
+class ForwardSection final : public mustache::Lambda {
+  public:
+    using Calls = std::vector<std::pair<std::string, std::string>>;
+
+    explicit ForwardSection(Calls& calls) :
+        calls_(calls)
+    {}
+
+    std::string invoke() override
+    {
+      throw std::runtime_error("section callback invoked as a variable");
+    }
+
+    std::string invoke(std::string_view text, mustache::LambdaRenderContext context) override
+    {
+      const mustache::Node label(mustache::Node::TypePartial, "label");
+      calls_.emplace_back(text, context.render(label));
+      return "[" + std::string(text) + "]";
+    }
+
+  private:
+    Calls& calls_;
+};
+
+void testForwardedSectionInPartial()
+{
+  struct Fixture {
+      const char * name;
+      const char * partial;
+      const char * body;
+      const char * expected;
+  };
+  const Fixture fixtures[] = {
+      {"default delimiters", "{{#wrap}}{{ name }} / {{>label}}{{/wrap}};", "{{ name }} / {{>label}}",
+          "ROOT|[Ada / Ada@home];[Bo / Bo@home];|ROOT"},
+      {"alternate opening delimiters", "{{=<% %>=}}<%#wrap%><% name %> / <%>label%> / {{name}}<%/wrap%>;",
+          "<% name %> / <%>label%> / {{name}}", "ROOT|[Ada / Ada@home / {{name}}];[Bo / Bo@home / {{name}}];|ROOT"},
+      {"delimiter change in body", "{{#wrap}}{{ name }} / {{=<% %>=}}<%>label%> / {{name}}<%/wrap%>;",
+          "{{ name }} / {{=<% %>=}}<%>label%> / {{name}}",
+          "ROOT|[Ada / Ada@home / {{name}}];[Bo / Bo@home / {{name}}];|ROOT"},
+  };
+  constexpr std::string_view source = "{{name}}|{{#items}}{{>card}}{{/items}}|{{name}}";
+  constexpr std::string_view labelSource = "{{name}}@{{site}}";
+  const char * expectedLabels[] = {"Ada@home", "Bo@home"};
+
+  for (const auto& fixture : fixtures) {
+    ForwardSection::Calls calls;
+    auto items = mustache::Data::array();
+    items.push_back(mustache::Data::object({{"name", mustache::Data::string("Ada")}}));
+    items.push_back(mustache::Data::object({{"name", mustache::Data::string("Bo")}}));
+    const auto data =
+        mustache::Data::object({{"name", mustache::Data::string("ROOT")}, {"site", mustache::Data::string("home")},
+            {"items", std::move(items)}, {"wrap", mustache::Data::lambda(std::make_unique<ForwardSection>(calls))}});
+
+    const auto check = [&](const char * representation, auto&& render) {
+      calls.clear();
+      const auto checkText = [&](const char * observation, std::string_view expected, const std::string& actual) {
+        if (actual != expected) {
+          std::fprintf(stderr, "%s (%s), %s:\n  expected: %s\n  actual:   %s\n", fixture.name, representation,
+              observation, std::string(expected).c_str(), actual.c_str());
+          ++failures;
+        }
+      };
+      try {
+        checkText("output", fixture.expected, render());
+        if (calls.size() != 2) {
+          std::fprintf(
+              stderr, "%s (%s): expected 2 section callbacks, got %zu\n", fixture.name, representation, calls.size());
+          ++failures;
+          return;
+        }
+        for (std::size_t i = 0; i < calls.size(); ++i) {
+          checkText(i == 0 ? "first section text" : "second section text", fixture.body, calls[i].first);
+          checkText(i == 0 ? "first callback partial" : "second callback partial", expectedLabels[i], calls[i].second);
+        }
+      } catch (const std::exception& error) {
+        std::fprintf(stderr, "%s (%s) threw: %s\n", fixture.name, representation, error.what());
+        ++failures;
+      }
+    };
+
+    mustache::Mustache engine;
+    mustache::Node root;
+    engine.tokenize(source, &root);
+    mustache::Node::Partials partials;
+    for (const auto& entry :
+        {std::pair<std::string, std::string_view>{"card", fixture.partial}, {"label", labelSource}}) {
+      auto partial = std::make_unique<mustache::Node>();
+      engine.tokenize(entry.second, partial.get());
+      partials.emplace(entry.first, std::move(partial));
+    }
+    check("owned", [&]() {
+      std::string output;
+      engine.render(&root, &data, &partials, &output);
+      return output;
+    });
+
+    const auto compiled = mustache::compile(source);
+    const mustache::PartialMap compiledPartials = {
+        {"card", mustache::compile(fixture.partial)}, {"label", mustache::compile(labelSource)}};
+    check("compiled", [&]() {
+      return mustache::render(compiled, data, compiledPartials);
+    });
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+    check("archive from owned", [&]() {
+      const auto archived = mustache::loadArchivedTemplate(mustache::serializeArchivedTemplate(root, partials));
+      return mustache::render(archived, data);
+    });
+    check("archive from compiled", [&]() {
+      const auto archived =
+          mustache::loadArchivedTemplate(mustache::serializeArchivedTemplate(compiled, compiledPartials));
+      return mustache::render(archived, data);
+    });
+#endif
+  }
+}
+
 void testLegacyWriteGuard()
 {
   mustache::Tokenizer tokenizer;
@@ -431,6 +548,7 @@ int main()
 {
   try {
     testExactCallbackBytes();
+    testForwardedSectionInPartial();
     testDeepLegacyWrite();
     testLegacyWriteGuard();
     testSourceOwnershipAndDiscard();
