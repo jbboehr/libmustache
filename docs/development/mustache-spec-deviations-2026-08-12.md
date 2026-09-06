@@ -1,7 +1,7 @@
 # Mustache specification conformance ledger
 
 **Date:** 2026-08-12
-**Last revised:** 2026-08-15
+**Last revised:** 2026-09-06
 **Specification revision:** `5d3b58ea35ae309c40d7a8111bfedc4c5bcd43a6`
 
 This ledger records the exact conformance baseline before the memory-safety
@@ -14,6 +14,12 @@ The executable source of truth is
 failure that starts passing is treated as an unexpected pass so its ledger
 entry must be reviewed and removed. An unlisted failure, a missing expectation,
 or a change in the pinned suite inventory fails the test executable.
+
+The runner reads the pinned specification's generated JSON fixtures through
+libyaml, using JSON scalar types and preserving quoted text byte for byte.
+This keeps specification coverage available when the library's JSON feature
+is disabled. The lambda suite still uses the C++ callbacks in
+`tests/fixtures/lambdas.cpp`.
 
 ## Current result
 

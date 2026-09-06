@@ -10,7 +10,7 @@ check_PROGRAMS += test_json_numeric_locale
 endif
 
 if MUSTACHE_SPEC_TEST_ENABLED
-check_PROGRAMS += test_spec
+check_PROGRAMS += test_spec test_spec_data
 endif
 
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
@@ -18,6 +18,7 @@ check_PROGRAMS += test_cista_archive test_archived_template test_render_equivale
 endif
 
 test_spec_SOURCES = test_spec.cpp test_spec.hpp spec_expectations.hpp ./fixtures/lambdas.cpp ./fixtures/lambdas.hpp
+test_spec_data_SOURCES = test_spec_data.cpp test_spec.hpp spec_expectations.hpp ./fixtures/lambdas.cpp ./fixtures/lambdas.hpp
 test_utils_SOURCES = test_utils.cpp
 test_misc_SOURCES = test_misc.cpp
 test_data_behavior_SOURCES = test_data_behavior.cpp
@@ -159,7 +160,7 @@ TESTS += test_json_numeric_locale
 endif
 
 if MUSTACHE_SPEC_TEST_ENABLED
-TESTS += test_spec check_spec_execution_count.sh
+TESTS += test_spec test_spec_data check_spec_execution_count.sh
 endif
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
 TESTS += test_cista_archive test_archived_template test_render_equivalence test_fuzz_cista_archive

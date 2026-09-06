@@ -273,7 +273,7 @@ mustache_spec_enabled=no
 AS_IF([test "x$with_mustache_spec" != "xno"], [
     mustache_spec_enabled=yes
     AS_IF([test -n "$with_mustache_spec"], [
-        AS_IF([test -f "$with_mustache_spec/comments.yml"], [
+        AS_IF([test -f "$with_mustache_spec/comments.json"], [
             AC_SUBST([MUSTACHE_SPEC_DIR], [$with_mustache_spec])
         ], [
             AC_MSG_FAILURE([mustache spec missing (--without-mustache-spec to disable)])

@@ -8,6 +8,9 @@ if(MUSTACHE_HAVE_LIBYAML)
     )
     target_link_libraries(test_spec PRIVATE mustache_static ${MUSTACHE_YAML_TARGET})
     mustache_apply_build_options(test_spec)
+    add_executable(test_spec_data test_spec_data.cpp fixtures/lambdas.cpp)
+    target_link_libraries(test_spec_data PRIVATE mustache_static ${MUSTACHE_YAML_TARGET})
+    mustache_apply_build_options(test_spec_data)
 endif()
 
 add_executable(test_utils test_utils.cpp)
@@ -128,6 +131,7 @@ endif()
 
 if(MUSTACHE_HAVE_LIBYAML)
     add_test(NAME spec COMMAND test_spec "${MUSTACHE_SPEC_DIR}")
+    add_test(NAME spec_data COMMAND test_spec_data)
 endif()
 if(WIN32 AND MUSTACHE_HAVE_LIBYAML)
     add_test(NAME spec_crlf

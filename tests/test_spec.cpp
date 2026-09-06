@@ -7,7 +7,9 @@
 #include <cstdint>
 #include <filesystem>
 #include <limits>
+#include <locale>
 #include <memory>
+#include <sstream>
 #include <string_view>
 #include <system_error>
 #include <utility>
@@ -60,7 +62,7 @@ int main(int argc, char * argv[])
       break;
     }
     const std::string file = iterator->path().filename().string();
-    if (file.empty() || file.front() == '.' || iterator->path().extension() != ".yml") {
+    if (file.empty() || file.front() == '.' || iterator->path().extension() != ".json") {
       continue;
     }
 
@@ -114,7 +116,12 @@ int main(int argc, char * argv[])
 
     // parse the file
     std::cout << fileName.string() << "\n";
-    parse_file(fileData.data(), fileData.size());
+    try {
+      parse_file(fileData.data(), fileData.size());
+    } catch (const std::exception& error) {
+      std::cerr << "Unable to load " << fileName.string() << ": " << error.what() << "\n";
+      return 1;
+    }
   }
 
   // Summarize
@@ -149,35 +156,45 @@ int main(int argc, char * argv[])
 
 void parse_file(const char * fileData, std::size_t length)
 {
-  // start yaml parser
+  // The generated JSON fixtures make scalar types unambiguous. libyaml reads
+  // their structure even when the library's optional JSON adapter is disabled.
   yaml_parser_t parser;
   yaml_document_t document;
-  yaml_parser_initialize(&parser);
+  if (!yaml_parser_initialize(&parser)) {
+    throw std::bad_alloc();
+  }
 
   const unsigned char * input = reinterpret_cast<const unsigned char *>(fileData);
 
   yaml_parser_set_input_string(&parser, input, length);
-  yaml_parser_load(&parser, &document);
-
-  mustache_spec_parse_document(&document);
-
-  yaml_document_delete(&document);
+  const bool loaded = yaml_parser_load(&parser, &document) != 0;
   yaml_parser_delete(&parser);
+  if (!loaded) {
+    throw std::runtime_error("Unable to parse specification fixture");
+  }
+  try {
+    mustache_spec_parse_document(&document);
+  } catch (...) {
+    yaml_document_delete(&document);
+    throw;
+  }
+  yaml_document_delete(&document);
 }
 
 void mustache_spec_parse_document(yaml_document_t * document)
 {
   yaml_node_t * node = yaml_document_get_root_node(document);
-  if (node->type != YAML_MAPPING_NODE) {
-    return;
+  if (node == nullptr || node->type != YAML_MAPPING_NODE) {
+    throw std::runtime_error("Specification fixture root must be an object");
   }
 
   yaml_node_pair_t * pair;
   for (pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; pair++) {
     yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
     yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
-    char * keyValue = reinterpret_cast<char *>(keyNode->data.scalar.value);
-    if (strcmp(keyValue, "tests") == 0 && valueNode->type == YAML_SEQUENCE_NODE) {
+    const std::string_view keyValue(
+        reinterpret_cast<const char *>(keyNode->data.scalar.value), keyNode->data.scalar.length);
+    if (keyValue == "tests" && valueNode->type == YAML_SEQUENCE_NODE) {
       mustache_spec_parse_tests(document, valueNode);
     }
   }
@@ -213,9 +230,10 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
   for (pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; ++pair) {
     yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
     yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
-    char * keyValue = reinterpret_cast<char *>(keyNode->data.scalar.value);
-    if (strcmp(keyValue, "name") == 0 && valueNode->type == YAML_SCALAR_NODE) {
-      test->name.assign(reinterpret_cast<char *>(valueNode->data.scalar.value));
+    const std::string_view keyValue(
+        reinterpret_cast<const char *>(keyNode->data.scalar.value), keyNode->data.scalar.length);
+    if (keyValue == "name" && valueNode->type == YAML_SCALAR_NODE) {
+      test->name.assign(reinterpret_cast<char *>(valueNode->data.scalar.value), valueNode->data.scalar.length);
       break;
     }
   }
@@ -234,32 +252,35 @@ void mustache_spec_parse_test(yaml_document_t * document, yaml_node_t * node)
   for (pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; pair++) {
     yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
     yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
-    char * keyValue = reinterpret_cast<char *>(keyNode->data.scalar.value);
+    const std::string_view keyValue(
+        reinterpret_cast<const char *>(keyNode->data.scalar.value), keyNode->data.scalar.length);
+
+    if (keyValue == "data") {
+      mustache_spec_parse_data(document, valueNode, &test->data);
+      continue;
+    }
 
     if (valueNode->type == YAML_SCALAR_NODE) {
-      char * valueValue = reinterpret_cast<char *>(valueNode->data.scalar.value);
-      if (strcmp(keyValue, "name") == 0) {
+      const std::string_view valueValue(
+          reinterpret_cast<const char *>(valueNode->data.scalar.value), valueNode->data.scalar.length);
+      if (keyValue == "name") {
         test->name.assign(valueValue);
-      } else if (strcmp(keyValue, "desc") == 0) {
+      } else if (keyValue == "desc") {
         test->desc.assign(valueValue);
-      } else if (strcmp(keyValue, "template") == 0) {
+      } else if (keyValue == "template") {
         test->tmpl.assign(valueValue);
-      } else if (strcmp(keyValue, "expected") == 0) {
+      } else if (keyValue == "expected") {
         test->expected.assign(valueValue);
-      } else if (strcmp(keyValue, "data") == 0) {
-        mustache_spec_parse_data(document, valueNode, &test->data);
       }
     } else if (valueNode->type == YAML_MAPPING_NODE) {
-      if (strcmp(keyValue, "data") == 0) {
-        mustache_spec_parse_data(document, valueNode, &test->data);
-      } else if (strcmp(keyValue, "partials") == 0) {
+      if (keyValue == "partials") {
         mustache_spec_parse_partials(document, valueNode, &test->partials);
       }
     }
   }
 
   mustache::Mustache mustache;
-  bool isLambdaSuite = 0 == strcmp(currentSuite, "~lambdas.yml");
+  bool isLambdaSuite = 0 == strcmp(currentSuite, "~lambdas.json");
 
   // Load lambdas?
   if (isLambdaSuite) {
@@ -291,7 +312,8 @@ void mustache_spec_parse_data(yaml_document_t * document, yaml_node_t * node, mu
     for (pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; pair++) {
       yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
       yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
-      char * keyValue = reinterpret_cast<char *>(keyNode->data.scalar.value);
+      const std::string keyValue(
+          reinterpret_cast<const char *>(keyNode->data.scalar.value), keyNode->data.scalar.length);
       mustache::Data child;
       mustache_spec_parse_data(document, valueNode, &child);
       data->set(keyValue, std::move(child));
@@ -310,15 +332,31 @@ void mustache_spec_parse_data(yaml_document_t * document, yaml_node_t * node, mu
       data->push_back(std::move(child));
     }
   } else if (node->type == YAML_SCALAR_NODE) {
-    char * keyValue = reinterpret_cast<char *>(node->data.scalar.value);
-    if (strcmp(keyValue, "0") == 0 || strcmp(keyValue, "false") == 0) {
-      data->init(mustache::Data::TypeString, 0);
-    } else if (strcmp(keyValue, "null") == 0) {
-      data->init(mustache::Data::TypeNone, 0);
+    const std::string_view value(reinterpret_cast<const char *>(node->data.scalar.value), node->data.scalar.length);
+    if (node->data.scalar.style == YAML_DOUBLE_QUOTED_SCALAR_STYLE) {
+      *data = mustache::Data::string(std::string(value));
+    } else if (value == "null") {
+      *data = mustache::Data::null();
+    } else if (value == "true" || value == "false") {
+      *data = mustache::Data::boolean(value == "true");
+    } else if (value.find_first_of(".eE") != std::string_view::npos) {
+      // Older libc++ versions lack floating-point from_chars. A classic-locale
+      // stream keeps JSON decimal parsing portable and locale-independent.
+      std::istringstream stream{std::string(value)};
+      stream.imbue(std::locale::classic());
+      double parsed = 0;
+      if (!(stream >> std::noskipws >> parsed) || !stream.eof()) {
+        throw std::runtime_error("Unsupported specification number");
+      }
+      *data = mustache::Data::floating(parsed);
     } else {
-      std::string value(keyValue, node->data.scalar.length);
-      mustache::trimDecimal(value);
-      *data = mustache::Data::string(std::move(value));
+      std::int64_t parsed = 0;
+      const char * end = value.data() + value.size();
+      const auto result = std::from_chars(value.data(), end, parsed);
+      if (result.ec != std::errc() || result.ptr != end) {
+        throw std::runtime_error("Unsupported specification number");
+      }
+      *data = mustache::Data::integer(parsed);
     }
   }
 }
@@ -335,14 +373,11 @@ void mustache_spec_parse_partials(yaml_document_t * document, yaml_node_t * node
   for (pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; pair++) {
     yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
     yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
-    char * keyValue = reinterpret_cast<char *>(keyNode->data.scalar.value);
-    char * valueValue = reinterpret_cast<char *>(valueNode->data.scalar.value);
-
-    std::string ckey(keyValue);
-    std::string tmpl(valueValue);
+    const std::string ckey(reinterpret_cast<const char *>(keyNode->data.scalar.value), keyNode->data.scalar.length);
+    const std::string tmpl(reinterpret_cast<const char *>(valueNode->data.scalar.value), valueNode->data.scalar.length);
 
     std::unique_ptr<mustache::Node>& partial = (*partials)[ckey];
     partial = std::make_unique<mustache::Node>();
-    mustache.tokenize(&tmpl, partial.get());
+    mustache.tokenize(tmpl, partial.get());
   }
 }

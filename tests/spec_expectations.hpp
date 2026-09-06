@@ -39,12 +39,13 @@ struct SpecSuiteRecord {
 // A known failure that starts passing is an unexpected pass until this entry is
 // removed. A missing or duplicated entry fails the inventory validation.
 static SpecExpectationRecord specExpectations[] = {
-    {"~dynamic-names.yml", NULL, SpecExpectedSkip, "dynamic partial names are not implemented", 21, 0},
-    {"~inheritance.yml", NULL, SpecExpectedSkip, "template inheritance is not implemented", 22, 0}};
+    {"~dynamic-names.json", NULL, SpecExpectedSkip, "dynamic partial names are not implemented", 21, 0},
+    {"~inheritance.json", NULL, SpecExpectedSkip, "template inheritance is not implemented", 22, 0}};
 
-static SpecSuiteRecord specSuites[] = {{"comments.yml", 12, 0, 0}, {"delimiters.yml", 14, 0, 0},
-    {"interpolation.yml", 39, 0, 0}, {"inverted.yml", 22, 0, 0}, {"partials.yml", 11, 0, 0}, {"sections.yml", 30, 0, 0},
-    {"~dynamic-names.yml", 21, 0, 0}, {"~inheritance.yml", 22, 0, 0}, {"~lambdas.yml", 10, 0, 0}};
+static SpecSuiteRecord specSuites[] = {{"comments.json", 12, 0, 0}, {"delimiters.json", 14, 0, 0},
+    {"interpolation.json", 39, 0, 0}, {"inverted.json", 22, 0, 0}, {"partials.json", 11, 0, 0},
+    {"sections.json", 30, 0, 0}, {"~dynamic-names.json", 21, 0, 0}, {"~inheritance.json", 22, 0, 0},
+    {"~lambdas.json", 10, 0, 0}};
 
 static std::size_t unexpectedSuiteTests = 0;
 static std::size_t unexpectedSuiteFiles = 0;

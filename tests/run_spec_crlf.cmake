@@ -7,7 +7,7 @@ endif()
 file(REMOVE_RECURSE "${CRLF_SPEC_DIR}")
 file(MAKE_DIRECTORY "${CRLF_SPEC_DIR}")
 file(GLOB specification_files LIST_DIRECTORIES FALSE
-    "${MUSTACHE_SPEC_DIR}/*.yml")
+    "${MUSTACHE_SPEC_DIR}/*.json")
 
 foreach(specification_file IN LISTS specification_files)
     get_filename_component(filename "${specification_file}" NAME)
