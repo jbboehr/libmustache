@@ -59,6 +59,13 @@ cmake -E chdir "$cmake_full" \
   ctest --parallel "$jobs" --output-on-failure
 cmake --install "$cmake_full"
 
+# Exercise the inputs used by the sample render targets from the release archive.
+for example in standard complex deep; do
+  "$cmake_prefix/bin/mustachec" \
+    -t "$source_dir/tests/fixtures/$example.mustache" \
+    -d "$source_dir/tests/fixtures/$example.yml"
+done
+
 for linkage in shared static; do
   consumer_build="$scratch/consumer-$linkage"
   cmake -S "$source_dir/tests/cmake-consumer" -B "$consumer_build" \
