@@ -393,7 +393,7 @@ if(MUSTACHE_NEED_CISTA)
             endif()
             if(NOT MUSTACHE_CISTA_VERSION_PROBE_RESULT EQUAL 0)
                 message(FATAL_ERROR
-                    "The selected Cista runtime type-version algorithm does not match libmustache's allocation-free generation-2 adapter")
+                    "The selected Cista runtime type-version algorithm does not match libmustache's allocation-free archive adapter")
             endif()
         endif()
     endif()

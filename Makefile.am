@@ -15,6 +15,7 @@ EXTRA_DIST = \
 	benchmarks/test-cista-archive.cpp \
 	docs/development/abi-6-source-migration-2026-08-20.md \
 	docs/development/cista-archive-format-v2.md \
+	docs/development/cista-archive-format-v3.md \
 	CMakeLists.txt \
 	.clang-tidy \
 	.appveyor.yml \

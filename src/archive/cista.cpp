@@ -33,6 +33,20 @@
 #include <utility>
 #include <vector>
 
+namespace mustache {
+namespace detail {
+
+// Keep backing-buffer identity private while preserving source sharing in archives.
+struct ArchiveSourceAccess {
+    static const std::string * buffer(const Node& node) noexcept
+    {
+      return node.sectionSource_.get();
+    }
+};
+
+} // namespace detail
+} // namespace mustache
+
 namespace mustache_benchmark {
 
 #if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
@@ -83,7 +97,7 @@ class ArchiveReadException final : public mustache::Exception {
 
 constexpr std::size_t archivePreambleSize = 24;
 constexpr std::array<std::uint8_t, 8> archivePreambleMagic = {'M', 'U', 'S', 'T', 'A', 'R', 'C', 0};
-constexpr std::uint64_t archiveFormatGeneration = 2;
+constexpr std::uint64_t archiveFormatGeneration = 3;
 constexpr std::size_t archiveFormatGenerationOffset = archivePreambleMagic.size();
 constexpr std::size_t archiveCompatibilityFingerprintOffset = archiveFormatGenerationOffset + sizeof(std::uint64_t);
 #if defined(MUSTACHE_CISTA_RUNTIME_VERSION_XXH3)
@@ -100,7 +114,7 @@ constexpr cista::mode archiveModeIntegrity = archiveVersionMode | cista::mode::W
 #endif
 constexpr std::size_t renderNestingCeiling = mustache::detail::renderNestingCeiling;
 static_assert(std::is_unsigned_v<cista::hash_t> && sizeof(cista::hash_t) == sizeof(std::uint64_t),
-    "archive generation 2 requires a 64-bit unsigned Cista type version");
+    "archive generation 3 requires a 64-bit unsigned Cista type version");
 
 template <cista::mode Mode> std::uint64_t archiveCompatibilityFingerprint() noexcept;
 
@@ -220,6 +234,7 @@ enum Presence : std::uint8_t {
   HasData = 1,
   HasStartSequence = 2,
   HasStopSequence = 4,
+  HasOriginalSectionText = 8,
 };
 
 template <cista::mode Mode> std::uint64_t archiveTypeVersion() noexcept
@@ -333,6 +348,7 @@ template <cista::mode Mode> std::uint64_t archiveCompatibilityFingerprint() noex
   hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, data));
   hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, startSequence));
   hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, stopSequence));
+  hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, originalSectionText));
   hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, firstChild));
   hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, nextSibling));
   hash = appendCompatibilityOffset(hash, cista_member_offset(ArchiveNode, type));
@@ -362,7 +378,7 @@ template <cista::mode Mode> std::uint64_t archiveCompatibilityFingerprint() noex
 }
 
 #if defined(MUSTACHE_CISTA_ARCHIVE_PRODUCTION_ONLY)
-constexpr std::string_view archiveCompatibilityTagPrefix = "libmustache-cista-v2-";
+constexpr std::string_view archiveCompatibilityTagPrefix = "libmustache-cista-v3-";
 
 std::array<char, archiveCompatibilityTagPrefix.size() + 16> makeArchiveCompatibilityTag(
     std::uint64_t fingerprint) noexcept
@@ -692,6 +708,7 @@ class ArchiveBuilder {
       }
       ++nodeCount_;
       validateMinimumSize();
+      const NodeTypeValue type = nodeTypeValue(source);
       if (source.data.has_value()) {
         addStringBytes(source.data->size());
       }
@@ -701,7 +718,13 @@ class ArchiveBuilder {
       if (source.stopSequence.has_value()) {
         addStringBytes(source.stopSequence->size());
       }
-      const NodeTypeValue type = nodeTypeValue(source);
+      if (type == static_cast<NodeTypeValue>(mustache::Node::TypeSection) && source.originalSectionText()) {
+        const std::string * buffer = mustache::detail::ArchiveSourceAccess::buffer(source);
+        if (sourceOffsets_.find(buffer) == sourceOffsets_.end()) {
+          addStringBytes(buffer->size());
+          sourceOffsets_.emplace(buffer, invalidIndex);
+        }
+      }
       if (isSerializableType(type) && typeUsesDataParts(static_cast<mustache::Node::Type>(type)) &&
           source.data.has_value()) {
         const std::size_t parts =
@@ -785,6 +808,17 @@ class ArchiveBuilder {
         archived.presence |= HasStopSequence;
         archived.stopSequence = appendString(*source.stopSequence);
       }
+      if (const auto original = source.originalSectionText()) {
+        const std::string * buffer = mustache::detail::ArchiveSourceAccess::buffer(source);
+        std::uint32_t& offset = sourceOffsets_.at(buffer);
+        if (offset == invalidIndex) {
+          offset = appendString(*buffer).offset;
+        }
+        archived.presence |= HasOriginalSectionText;
+        archived.originalSectionText.offset =
+            static_cast<std::uint32_t>(offset + static_cast<std::size_t>(original->data() - buffer->data()));
+        archived.originalSectionText.length = static_cast<std::uint32_t>(original->size());
+      }
       std::uint32_t previousChild = invalidIndex;
       for (const std::unique_ptr<mustache::Node>& child : source.children) {
         const std::uint32_t childIndex = appendNode(*child);
@@ -800,6 +834,7 @@ class ArchiveBuilder {
     }
 
     ArchiveGraph graph_{};
+    std::map<const std::string *, std::uint32_t> sourceOffsets_;
     const CistaArchiveLimits& limits_;
     std::size_t cistaHeaderBytes_;
     std::size_t nodeCount_ = 0;
@@ -936,7 +971,7 @@ class ArchiveValidator {
       if ((node.flags & mustache::Node::FlagPartialIndent) != 0 && !partialIndentationMetadata) {
         fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive partial indentation metadata");
       }
-      if ((node.presence & ~(HasData | HasStartSequence | HasStopSequence)) != 0) {
+      if ((node.presence & ~(HasData | HasStartSequence | HasStopSequence | HasOriginalSectionText)) != 0) {
         fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive node presence bits");
       }
       if (node.reserved0 != 0 || node.reserved1 != 0 || node.reserved2 != 0) {
@@ -964,6 +999,13 @@ class ArchiveValidator {
               (node.startSequence.offset != 0 || node.startSequence.length != 0 || node.stopSequence.offset != 0 ||
                   node.stopSequence.length != 0))) {
         fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive section delimiters");
+      }
+
+      validateString(node.originalSectionText);
+      const bool hasOriginal = (node.presence & HasOriginalSectionText) != 0;
+      if ((hasOriginal && type != mustache::Node::TypeSection) ||
+          (!hasOriginal && (node.originalSectionText.offset != 0 || node.originalSectionText.length != 0))) {
+        fail(ArchiveFailureReason::InvalidArchive, "Invalid Cista archive original section text");
       }
 
       validateDataParts(node, type, data);
@@ -1214,8 +1256,7 @@ class ArchiveNodeView {
 
     mustache::detail::RenderString originalSectionText() const noexcept
     {
-      // Generation 2 does not contain original section source.
-      return {};
+      return string(node().originalSectionText, HasOriginalSectionText);
     }
 
   private:

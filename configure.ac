@@ -440,7 +440,7 @@ AS_IF([test "x$enable_archived_templates" = "xyes"], [
     AS_IF([test "x$cross_compiling" != "xyes"], [
         AS_UNSET([mustache_cv_cista_version_algorithm])
     ])
-    AC_CACHE_CHECK([whether the Cista runtime type-version algorithm matches the generation-2 adapter],
+    AC_CACHE_CHECK([whether the Cista runtime type-version algorithm matches the archive adapter],
         [mustache_cv_cista_version_algorithm], [
         mustache_save_CPPFLAGS=$CPPFLAGS
         mustache_save_LIBS=$LIBS
@@ -478,7 +478,7 @@ int main()
     AS_CASE([$mustache_cv_cista_version_algorithm],
         [yes], [],
         [unknown], [AC_MSG_ERROR([cross-compiling Cista archive support requires a cached mustache_cv_cista_version_algorithm=yes result from a matching native dependency witness])],
-        [AC_MSG_ERROR([the selected Cista runtime type-version algorithm does not match libmustache's allocation-free generation-2 adapter])])
+        [AC_MSG_ERROR([the selected Cista runtime type-version algorithm does not match libmustache's allocation-free archive adapter])])
 ])
 PKG_CHECK_MODULES([ZLIB], [zlib], [mustache_have_zlib=yes], [
     mustache_have_zlib=no

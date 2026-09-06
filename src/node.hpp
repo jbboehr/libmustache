@@ -15,6 +15,10 @@
 
 namespace mustache {
 
+namespace detail {
+struct ArchiveSourceAccess;
+}
+
 /*! \class Node
     \brief Represents a token
 
@@ -232,6 +236,7 @@ class Node {
 
   private:
     friend class Tokenizer;
+    friend struct detail::ArchiveSourceAccess;
 
     std::shared_ptr<const std::string> sectionSource_;
     std::size_t sectionBegin_ = 0;

@@ -115,6 +115,7 @@ EXTRA_DIST = \
 	verify_fuzzer_smoke_safety.cmake \
 	verify_unix_export_platform.cmake \
 	fixtures/cista-archive-v2-x86_64-le-itanium.hex \
+	fixtures/cista-archive-v3-x86_64-le-itanium.hex \
 	fuzz_node_unserialize.cpp \
 	fuzz_tokenizer.cpp \
 	fuzz_data_parser.cpp \

@@ -56,6 +56,8 @@ class MUSTACHE_API ArchivedTemplateException : public Exception {
     maxArchiveBytes applies to the complete framed archive on both writer and
     loader paths. The maxTotalStringBytes and maxTotalDataParts budgets are
     aggregate limits across the complete archived template and its partials.
+    String bytes include each retained source buffer once, in addition to node
+    data, delimiters, and partial names.
 */
 struct ArchivedTemplateLimits {
     std::size_t maxArchiveBytes;
@@ -132,7 +134,12 @@ class ArchivedTemplate {
     friend class Mustache;
 };
 
-//! Serializes a Node graph using the protected archived-template format.
+/*! Serializes a Node graph, including retained original section text.
+
+    Constructed or legacy-decoded sections without source metadata retain
+    reconstruction behavior. Call root.discardSource() after AST edits to
+    explicitly select reconstruction instead of preserving original text.
+*/
 MUSTACHE_API std::vector<std::uint8_t> serializeArchivedTemplate(const Node& root,
     const Node::Partials& partials = Node::Partials(), const ArchivedTemplateLimits& limits = ArchivedTemplateLimits());
 

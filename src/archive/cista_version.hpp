@@ -19,7 +19,7 @@ namespace {
 namespace archive_data = cista::offset;
 
 constexpr std::uint64_t archiveGraphMagic = UINT64_C(0x4D55535443495354);
-constexpr std::uint32_t archiveSchemaVersion = 1;
+constexpr std::uint32_t archiveSchemaVersion = 2;
 constexpr std::uint32_t invalidIndex = std::numeric_limits<std::uint32_t>::max();
 
 struct ArchiveSlice {
@@ -31,6 +31,7 @@ struct ArchiveNode {
     ArchiveSlice data;
     ArchiveSlice startSequence;
     ArchiveSlice stopSequence;
+    ArchiveSlice originalSectionText;
     std::uint32_t firstChild = invalidIndex;
     std::uint32_t nextSibling = invalidIndex;
     std::uint16_t type = 0;

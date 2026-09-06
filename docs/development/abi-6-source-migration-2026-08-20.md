@@ -287,6 +287,13 @@ value. Existing bytes remain readable and retain reconstruction behavior.
 Calling `discardSource()` explicitly accepts loss of original spelling; it does
 not remove the separate custom-delimiter restriction.
 
+Archive generation 3 preserves retained original section text, including shared
+source from compiled partials. Its compatibility tag changes; generation-1 and
+generation-2 archives are rejected and must be regenerated from source. Sections
+without original metadata still reconstruct their callback text. See the
+[generation-3 format contract](cista-archive-format-v3.md) for source budgets
+and validation.
+
 Project benchmarks compared validated decoding with cached-source reparsing,
 including warm and fresh-process cases, PHP serialization, and APCu fetch/store
 overhead. They selected source for current cross-request caches and rejected the

@@ -88,7 +88,7 @@ pkg-config metadata. Custom system locations can be supplied through
 explicit `MUSTACHE_ENABLE_CISTA_BENCHMARK` comparison and is not a production
 archive dependency. The experimental format preamble and Cista validation
 responsibilities are specified in the
-[archive format document](docs/development/cista-archive-format-v2.md).
+[archive format document](docs/development/cista-archive-format-v3.md).
 
 When enabled, `mustache_config.h` defines
 `MUSTACHE_HAVE_ARCHIVED_TEMPLATES`. The preferred public API serializes an

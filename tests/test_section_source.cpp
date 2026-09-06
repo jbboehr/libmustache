@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "compiled_template.hpp"
@@ -81,6 +82,15 @@ void testExactCallbackBytes()
     calls.clear();
     expect(mustache::render(compiled, data) == "OK", "compiled callback result changed");
     expect(calls == std::vector<std::string>{fixture.body}, "compiled callback did not receive exact section bytes");
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+    for (const auto& bytes :
+        {mustache::serializeArchivedTemplate(root), mustache::serializeArchivedTemplate(compiled)}) {
+      calls.clear();
+      const auto archived = mustache::loadArchivedTemplate(bytes);
+      expect(mustache::render(archived, data) == "OK", "archived callback result changed");
+      expect(calls == std::vector<std::string>{fixture.body}, "archived callback did not receive exact section bytes");
+    }
+#endif
   }
 }
 
@@ -235,6 +245,13 @@ void testPartialsAndBudgets()
   limits.maxLambdaTemplateBytes = 24; // Two 10-byte inputs and two "OK" results.
   expect(mustache::render(compiled, data, partials, limits) == "OKOK", "exact callback byte budget was rejected");
   expect(calls == std::vector<std::string>({"{{ name }}", "{{ name }}"}), "compiled partial lost exact source");
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+  const auto archived = mustache::loadArchivedTemplate(mustache::serializeArchivedTemplate(compiled, partials));
+  calls.clear();
+  expect(
+      mustache::render(archived, data, limits) == "OKOK", "archived partial rejected the exact callback byte budget");
+  expect(calls == std::vector<std::string>({"{{ name }}", "{{ name }}"}), "archived partial lost exact source");
+#endif
   calls.clear();
   limits.maxLambdaTemplateBytes = 21; // First call consumes 12; second input does not fit.
   try {
@@ -245,6 +262,17 @@ void testPartialsAndBudgets()
         "original text was rejected for an unexpected reason");
   }
   expect(calls.size() == 1, "callback ran before its original input passed the byte budget");
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+  calls.clear();
+  try {
+    static_cast<void>(mustache::render(archived, data, limits));
+    expect(false, "archived original section text bypassed the lambda byte budget");
+  } catch (const mustache::Exception& error) {
+    expect(std::string_view(error.what()) == "Render lambda template byte limit exceeded",
+        "archived original text was rejected for an unexpected reason");
+  }
+  expect(calls.size() == 1, "archived callback ran before its original input passed the byte budget");
+#endif
 
   mustache::Mustache engine;
   mustache::Node root;
@@ -263,6 +291,133 @@ void testPartialsAndBudgets()
   expect(calls == std::vector<std::string>{"{{name}}"}, "discardSource did not reach owned partials");
 }
 
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+std::vector<std::uint8_t> archiveAtExactStringBudget(
+    const mustache::Node& root, const mustache::Node::Partials& partials, std::size_t stringBytes)
+{
+  mustache::ArchivedTemplateLimits limits;
+  limits.maxNestingDepth = 128;
+  limits.maxTotalStringBytes = stringBytes;
+  const auto bytes = mustache::serializeArchivedTemplate(root, partials, limits);
+  expect(static_cast<bool>(mustache::loadArchivedTemplate(bytes, limits)), "exact archive string budget rejected");
+
+  --limits.maxTotalStringBytes;
+  bool rejected = false;
+  try {
+    static_cast<void>(mustache::serializeArchivedTemplate(root, partials, limits));
+  } catch (const mustache::Exception& error) {
+    rejected = std::string_view(error.what()) == "Cista archive string byte limit exceeded";
+  }
+  expect(rejected, "archive writer did not reject a string budget one byte below the stored bytes");
+
+  rejected = false;
+  try {
+    static_cast<void>(mustache::loadArchivedTemplate(bytes, limits));
+  } catch (const mustache::ArchivedTemplateException& error) {
+    rejected = error.reason() == mustache::ArchivedTemplateError::LimitExceeded;
+  }
+  expect(rejected, "archive loader did not reject a string budget one byte below the stored bytes");
+  return bytes;
+}
+
+void testArchivedSourceLifetimeAndFallback()
+{
+  std::vector<std::pair<mustache::ArchivedTemplate, std::string>> cases;
+  {
+    mustache::Node root;
+    mustache::Tokenizer tokenizer;
+    tokenizer.tokenize("{{#call}}{{ original }}{{/call}}", &root);
+    root.children.front()->children.front()->setData("changed");
+    cases.emplace_back(mustache::loadArchivedTemplate(mustache::serializeArchivedTemplate(root)), "{{ original }}");
+    root.discardSource();
+    cases.emplace_back(mustache::loadArchivedTemplate(mustache::serializeArchivedTemplate(root)), "{{changed}}");
+
+    tokenizer.tokenize("{{#call}}{{/call}}", &root);
+    root.children.front()->children.insert(root.children.front()->children.begin(),
+        std::make_unique<mustache::Node>(mustache::Node::TypeOutput, "edited"));
+    cases.emplace_back(mustache::loadArchivedTemplate(mustache::serializeArchivedTemplate(root)), "");
+    root.discardSource();
+    cases.emplace_back(mustache::loadArchivedTemplate(mustache::serializeArchivedTemplate(root)), "edited");
+
+    tokenizer.tokenize("{{#call}}{{name}}{{/call}}", &root);
+    const auto legacyBytes = root.serializeValue();
+    const auto legacy = mustache::Node::unserializeOwned(
+        std::string_view(reinterpret_cast<const char *>(legacyBytes.data()), legacyBytes.size()));
+    cases.emplace_back(mustache::loadArchivedTemplate(mustache::serializeArchivedTemplate(*legacy)), "{{name}}");
+
+    auto partial = std::make_unique<mustache::Node>();
+    tokenizer.tokenize("{{#call}}{{ partial }}{{/call}}", partial.get());
+    tokenizer.tokenize("{{>piece}}", &root);
+    root.partials.emplace("piece", std::move(partial));
+    cases.emplace_back(mustache::loadArchivedTemplate(mustache::serializeArchivedTemplate(root)), "{{ partial }}");
+  }
+  std::vector<std::string> calls;
+  auto data = mustache::Data::object();
+  data.set("call", mustache::Data::lambda(std::make_unique<Capture>(calls)));
+  for (const auto& entry : cases) {
+    calls.clear();
+    expect(mustache::render(entry.first, data) == "OK", "archived callback result changed after source destruction");
+    expect(calls == std::vector<std::string>{entry.second}, "archived original/absent/empty section text changed");
+  }
+}
+
+void testArchivedSourceStorage()
+{
+  constexpr std::size_t bodySize = 64 * 1024;
+  for (std::size_t depth : {1U, 16U, 64U}) {
+    std::string source;
+    for (std::size_t i = 0; i < depth; ++i)
+      source += "{{#s}}";
+    source += std::string(bodySize, 'x');
+    for (std::size_t i = 0; i < depth; ++i)
+      source += "{{/s}}";
+    mustache::Tokenizer::Limits parseLimits;
+    parseLimits.maxNestingDepth = 128;
+    mustache::Node root;
+    mustache::Tokenizer().tokenize(source, &root, parseLimits);
+    // One source buffer (body + 12 bytes per section), one output body,
+    // and six bytes of node data/delimiters per section and closing node.
+    static_cast<void>(archiveAtExactStringBudget(root, {}, 2 * bodySize + 18 * depth));
+  }
+}
+
+void testArchivedSharedSourceAcrossPartials()
+{
+  const std::string source =
+      "outside-before|{{#call}}A {{ x }}{{/call}}|outside-middle|{{#call}}B {{ y }}{{/call}}|outside-after";
+  mustache::Node parsed;
+  mustache::Tokenizer().tokenize(source, &parsed);
+  std::vector<std::unique_ptr<mustache::Node>> sections;
+  for (auto& child : parsed.children) {
+    if (child->type == mustache::Node::TypeSection) {
+      sections.push_back(std::move(child));
+    }
+  }
+  expect(sections.size() == 2, "shared-source fixture did not produce two sections");
+
+  mustache::Node root;
+  root.type = mustache::Node::TypeRoot;
+  root.children.push_back(std::move(sections[0]));
+  root.children.push_back(std::make_unique<mustache::Node>(mustache::Node::TypePartial, "piece"));
+  auto partial = std::make_unique<mustache::Node>();
+  partial->type = mustache::Node::TypeRoot;
+  partial->children.push_back(std::move(sections[1]));
+  mustache::Node::Partials partials;
+  partials.emplace("piece", std::move(partial));
+
+  // The detached sections retain the complete input once. Ordinary node
+  // strings use 15 bytes per section, plus five each for the partial tag/name.
+  const auto bytes = archiveAtExactStringBudget(root, partials, source.size() + 40);
+  std::vector<std::string> calls;
+  auto data = mustache::Data::object();
+  data.set("call", mustache::Data::lambda(std::make_unique<Capture>(calls)));
+  expect(mustache::render(mustache::loadArchivedTemplate(bytes), data) == "OKOK",
+      "shared-source archive changed the rendered callback results");
+  expect(calls == std::vector<std::string>({"A {{ x }}", "B {{ y }}"}),
+      "shared-source archive lost a detached section's exact callback text");
+}
+#endif
+
 void testTokenizerHarness()
 {
   constexpr std::string_view source = "{{#call}}{{ name }}{{/call}}";
@@ -280,6 +435,11 @@ int main()
     testLegacyWriteGuard();
     testSourceOwnershipAndDiscard();
     testPartialsAndBudgets();
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+    testArchivedSourceLifetimeAndFallback();
+    testArchivedSourceStorage();
+    testArchivedSharedSourceAcrossPartials();
+#endif
     testTokenizerHarness();
   } catch (const std::exception& error) {
     std::fprintf(stderr, "section source test failed: %s\n", error.what());

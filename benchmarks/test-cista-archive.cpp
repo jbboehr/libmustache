@@ -319,7 +319,7 @@ std::vector<std::uint8_t> readGoldenArchive()
   if (topSourceDirectory == nullptr || *topSourceDirectory == '\0') {
     throw std::runtime_error("top_srcdir is required to locate the golden Cista archive");
   }
-  const std::string path = std::string(topSourceDirectory) + "/tests/fixtures/cista-archive-v2-x86_64-le-itanium.hex";
+  const std::string path = std::string(topSourceDirectory) + "/tests/fixtures/cista-archive-v3-x86_64-le-itanium.hex";
   std::ifstream stream(path);
   if (!stream) {
     throw std::runtime_error("unable to open the golden Cista archive");
@@ -438,7 +438,7 @@ void testProtectedArchiveVectorValidation(const std::vector<std::uint8_t>& archi
       std::size_t elementAlignment;
   };
   const std::array<VectorLayout, 3> layouts = {{
-      {"nodes", firstVectorOffset, 40, 4},
+      {"nodes", firstVectorOffset, 48, 4},
       {"partials", firstVectorOffset + serializedVectorSize, 12, 4},
       {"strings", firstVectorOffset + serializedVectorSize * 2, 1, 1},
   }};
@@ -549,6 +549,91 @@ void testProtectedArchiveVectorValidation(const std::vector<std::uint8_t>& archi
   }
 }
 
+void testProtectedSectionSourceValidation()
+{
+  mustache::Node root;
+  mustache::Tokenizer().tokenize("{{#call}}body{{/call}}", &root);
+  const auto archive = mustache_benchmark::serializeCistaArchive(root);
+  // Generation 3 uses 48-byte nodes, with the new source slice at byte 24.
+  constexpr std::size_t graphOffset = archivePreambleSize + 16;
+  constexpr std::size_t nodesPointer = graphOffset + 24;
+  constexpr std::size_t vectorSize = sizeof(std::intptr_t) + 16;
+  const auto relativeNodes = readNativeArchiveField<std::intptr_t>(archive, nodesPointer);
+  expect(relativeNodes >= 0, "source validation fixture has a negative node-table offset");
+  const std::size_t nodes = nodesPointer + static_cast<std::size_t>(relativeNodes);
+  const auto firstChild = readNativeArchiveField<std::uint32_t>(archive, nodes + 32);
+  const std::size_t section = nodes + static_cast<std::size_t>(firstChild) * 48;
+  expect(readNativeArchiveField<std::uint16_t>(archive, section + 40) == mustache::Node::TypeSection,
+      "source validation fixture does not start with a section");
+  const auto stringBytes =
+      readNativeArchiveField<std::uint32_t>(archive, nodesPointer + 2 * vectorSize + sizeof(std::intptr_t));
+
+  const auto reject = [&](auto mutate, const char * description) {
+    auto changed = archive;
+    mutate(changed);
+    rewriteProtectedArchiveIntegrity(&changed, graphOffset);
+    bool rejected = false;
+    try {
+      mustache_benchmark::validateCistaArchive(
+          std::string_view(reinterpret_cast<const char *>(changed.data()), changed.size()));
+    } catch (const mustache::Exception&) {
+      rejected = true;
+    }
+    expect(rejected, description);
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+    rejected = false;
+    try {
+      static_cast<void>(mustache::loadArchivedTemplate(changed));
+    } catch (const mustache::ArchivedTemplateException& error) {
+      rejected = error.reason() == mustache::ArchivedTemplateError::InvalidArchive;
+    }
+    expect(rejected, description);
+#endif
+  };
+  reject(
+      [&](auto& changed) {
+        writeNativeArchiveField(&changed, section + 24, stringBytes + 1);
+        writeNativeArchiveField(&changed, section + 28, std::uint32_t{0});
+      },
+      "source offset outside the string table was accepted");
+  reject(
+      [&](auto& changed) {
+        writeNativeArchiveField(&changed, section + 24, stringBytes);
+        writeNativeArchiveField(&changed, section + 28, std::uint32_t{1});
+      },
+      "source end outside the string table was accepted");
+  reject(
+      [&](auto& changed) {
+        writeNativeArchiveField(&changed, section + 28, std::numeric_limits<std::uint32_t>::max());
+      },
+      "oversized source range was accepted");
+  reject(
+      [&](auto& changed) {
+        changed.at(section + 44) &= static_cast<std::uint8_t>(~std::uint8_t{8});
+      },
+      "absent source with nonzero range was accepted");
+  reject(
+      [&](auto& changed) {
+        changed.at(nodes + 44) |= std::uint8_t{8};
+      },
+      "original source on a non-section node was accepted");
+  reject(
+      [&](auto& changed) {
+        writeNativeArchiveField(&changed, nodes + 24, std::uint32_t{1});
+      },
+      "absent source with a nonzero empty offset was accepted");
+
+  auto empty = archive;
+  writeNativeArchiveField(&empty, section + 24, stringBytes);
+  writeNativeArchiveField(&empty, section + 28, std::uint32_t{0});
+  rewriteProtectedArchiveIntegrity(&empty, graphOffset);
+  mustache_benchmark::validateCistaArchive(
+      std::string_view(reinterpret_cast<const char *>(empty.data()), empty.size()));
+#if defined(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
+  expect(static_cast<bool>(mustache::loadArchivedTemplate(empty)), "empty source at the string-table end was rejected");
+#endif
+}
+
 void expectPreambleMutationRejected(
     const std::vector<std::uint8_t>& archive, std::size_t offset, const mustache::Data& data, const char * description)
 {
@@ -642,12 +727,12 @@ int main()
     expect(archive.size() > archivePreambleSize, "Cista archive preamble has no payload");
     expect(std::equal(expectedMagic.begin(), expectedMagic.end(), archive.begin()),
         "Cista archive preamble magic changed");
-    expect(readLittleEndian(archive, 8, 8) == 2, "libmustache archive format generation changed");
+    expect(readLittleEndian(archive, 8, 8) == 3, "libmustache archive format generation changed");
     expect(readLittleEndian(archive, 16, 8) != 0, "libmustache archive compatibility fingerprint is empty");
     if (isGoldenPlatform(sizeof(void *))) {
-      expect(readLittleEndian(archive, 16, 8) == UINT64_C(0xCB437BCD4ADCBE5D),
+      expect(readLittleEndian(archive, 16, 8) == UINT64_C(0x3CE87268428B4ED5),
           "libmustache archive compatibility fingerprint changed");
-      expect(archive == readGoldenArchive(), "Cista archive differs from the version 2 golden fixture");
+      expect(archive == readGoldenArchive(), "Cista archive differs from the version 3 golden fixture");
     }
     const std::string_view bytes(reinterpret_cast<const char *>(archive.data()), archive.size());
     mustache_benchmark::validateCistaArchive(bytes);
@@ -984,6 +1069,7 @@ int main()
     constexpr std::size_t archiveGraphSerializedSizeOffset = archiveGraphOffset + 16;
     constexpr std::size_t archiveGraphNodesPointerOffset = archiveGraphOffset + 24;
     testProtectedArchiveVectorValidation(modeArchives[2], data);
+    testProtectedSectionSourceValidation();
 
     std::vector<std::uint8_t> unprotectedMutation = modeArchives[0];
 #if defined(_MSC_VER) && defined(_M_IX86)
@@ -1029,7 +1115,7 @@ int main()
         "graph magic without integrity");
 
     unprotectedMutation = modeArchives[0];
-    writeNativeArchiveField(&unprotectedMutation, archiveGraphSchemaOffset, std::uint32_t{2});
+    writeNativeArchiveField(&unprotectedMutation, archiveGraphSchemaOffset, std::uint32_t{3});
     expectOperationRejected(
         [&unprotectedMutation, &data]() {
           (void)mustache_benchmark::renderCistaArchive(

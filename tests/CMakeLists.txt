@@ -483,11 +483,11 @@ if(MUSTACHE_ENABLE_FUZZING)
         file(COPY "${MUSTACHE_CISTA_FUZZ_CORPUS_SOURCE}/"
             DESTINATION "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}")
         file(READ
-            "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/cista-archive-v2-x86_64-le-itanium.hex"
+            "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/cista-archive-v3-x86_64-le-itanium.hex"
             MUSTACHE_CISTA_GOLDEN_HEX)
-        file(WRITE "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}/golden-v2"
+        file(WRITE "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}/golden-v3"
             "hex:${MUSTACHE_CISTA_GOLDEN_HEX}")
-        file(WRITE "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}/integrity-repair-v2"
+        file(WRITE "${MUSTACHE_CISTA_FUZZ_SEED_CORPUS}/integrity-repair-v3"
             "corrupt-integrity:${MUSTACHE_CISTA_GOLDEN_HEX}")
         add_test(NAME fuzz_cista_archive_smoke
             COMMAND "${CMAKE_COMMAND}"

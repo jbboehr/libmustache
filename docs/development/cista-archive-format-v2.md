@@ -1,5 +1,8 @@
 # Experimental Cista archive format generation 2
 
+This is the historical generation-2 specification. The current reader uses
+[generation 3](cista-archive-format-v3.md) and rejects generation-2 archives.
+
 The archived-template experiment prefixes its private Cista payload with a
 minimal libmustache-owned preamble. The preamble identifies the application
 format before Cista is entered; libmustache owns the native type-version gate,
