@@ -181,14 +181,29 @@ bool validateArchive(std::string_view bytes)
   return true;
 }
 
+void renderArchive(std::string_view bytes, const mustache::Data& data)
+{
+  try {
+    static_cast<void>(
+        mustache_benchmark::renderCistaArchive(bytes, data, fuzzArchiveLimits(maxFuzzInputBytes), fuzzRenderLimits()));
+  } catch (const mustache::Exception& error) {
+    // Structural validation does not guarantee that rendering fits its budget.
+    // Keep other failures visible, including validator/renderer disagreements.
+    const std::string_view message(error.what());
+    if (message != "Render output byte limit exceeded" && message != "Render nesting limit exceeded" &&
+        message != "Render node visit limit exceeded" && message != "Render lambda template byte limit exceeded") {
+      throw;
+    }
+  }
+}
+
 void renderValidatedArchive(std::string_view bytes)
 {
   if (!validateArchive(bytes)) {
     return;
   }
   mustache::Data data = makeData();
-  static_cast<void>(
-      mustache_benchmark::renderCistaArchive(bytes, data, fuzzArchiveLimits(maxFuzzInputBytes), fuzzRenderLimits()));
+  renderArchive(bytes, data);
 }
 
 void writeLittleEndian(std::uint8_t * destination, std::uint64_t value)
@@ -226,8 +241,7 @@ void exerciseIntegrityRepairProtocol(const std::uint8_t * data, std::size_t size
     std::abort();
   }
   mustache::Data dataObject = makeData();
-  static_cast<void>(mustache_benchmark::renderCistaArchive(
-      archive.view(), dataObject, fuzzArchiveLimits(maxFuzzInputBytes), fuzzRenderLimits()));
+  renderArchive(archive.view(), dataObject);
 }
 
 void exerciseArchiveBytes(const std::uint8_t * data, std::size_t size)

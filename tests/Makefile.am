@@ -14,7 +14,7 @@ check_PROGRAMS += test_spec
 endif
 
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
-check_PROGRAMS += test_cista_archive test_archived_template test_render_equivalence
+check_PROGRAMS += test_cista_archive test_archived_template test_render_equivalence test_fuzz_cista_archive
 endif
 
 test_spec_SOURCES = test_spec.cpp test_spec.hpp spec_expectations.hpp ./fixtures/lambdas.cpp ./fixtures/lambdas.hpp
@@ -86,6 +86,15 @@ if MUSTACHE_SYSTEM_XXHASH
 test_cista_archive_LDADD += $(XXHASH_LIBS)
 endif
 
+test_fuzz_cista_archive_SOURCES = \
+	test_fuzz_cista_archive.cpp \
+	../src/archive/cista.cpp \
+	../benchmarks/cista-archive.hpp \
+	../src/archive/xxh3.cpp
+test_fuzz_cista_archive_CPPFLAGS = $(test_cista_archive_CPPFLAGS)
+test_fuzz_cista_archive_CXXFLAGS = $(test_cista_archive_CXXFLAGS)
+test_fuzz_cista_archive_LDADD = $(test_cista_archive_LDADD)
+
 EXTRA_DIST = \
 	CMakeLists.txt \
 	archive_runtime_dependency_helpers.cmake \
@@ -153,7 +162,7 @@ if MUSTACHE_SPEC_TEST_ENABLED
 TESTS += test_spec check_spec_execution_count.sh
 endif
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
-TESTS += test_cista_archive test_archived_template test_render_equivalence
+TESTS += test_cista_archive test_archived_template test_render_equivalence test_fuzz_cista_archive
 if !MUSTACHE_THREAD_SANITIZER_ENABLED
 TESTS += check_archive_allocation_failure.sh
 endif
