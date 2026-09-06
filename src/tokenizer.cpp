@@ -226,6 +226,7 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root, const Limits& limit
   int currentFlags = Node::FlagNone;
 
   Node parsedRoot;
+  std::shared_ptr<const std::string> source;
   std::vector<ParseFrame> nodeStack;
   std::size_t nodeCount = 0;
   Node * node;
@@ -423,6 +424,14 @@ void Tokenizer::tokenize(std::string_view tmpl, Node * root, const Limits& limit
           if (currentType == Node::TypeSection) {
             pendingNode->startSequence = start;
             pendingNode->stopSequence = stop;
+            if (!source) {
+              source = std::make_shared<const std::string>(tmpl);
+            }
+            pendingNode->sectionSource_ = source;
+            pendingNode->sectionBegin_ = pos + tmpStopL + (inTripleTag && stop == "}}" ? 1 : 0);
+          } else if (currentType == Node::TypeStop && nodeStack.back().node->type == Node::TypeSection) {
+            Node * section = nodeStack.back().node;
+            section->sectionLength_ = tagStart - section->sectionBegin_;
           }
 
           node =

@@ -284,10 +284,12 @@ void appendGeneratedFragment(
 
 GeneratedCase makeCase(Random& random, std::size_t caseIndex, Coverage& coverage)
 {
+  // Section bodies must be exactly representable by the legacy format here.
+  // test_section_source checks rejection of triple-brace spelling in sections.
   GeneratedCase generated{"{{! structured property case }}\n"
                           "{{title}}|{{{title}}}|{{&title}}|{{count}}|{{ratio}}|{{missingLike}}\n"
                           "{{#enabled}}enabled{{/enabled}}{{^enabled}}disabled{{/enabled}}\n"
-                          "{{#user}}{{name}}@{{address.city}}/{{{html}}}{{/user}}\n"
+                          "{{#user}}{{name}}@{{address.city}}/{{&html}}{{/user}}\n"
                           "{{#items}}{{name}}={{value}}:{{#visible}}V{{/visible}}{{^visible}}H{{/visible}}:"
                           "{{#tags}}[{{.}}]{{/tags}}:{{>row}}{{/items}}\n"
                           "{{variableLambda}}|{{#sectionLambda}}raw {{title}}{{/sectionLambda}}\n"

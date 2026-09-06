@@ -20,6 +20,12 @@ implementation; zlib is only an optional dependency of the separate checksum
 benchmark. Generation 2 is pinned so dependency changes and future API work
 cannot silently change cache bytes.
 
+Generation 2 stores parsed nodes and section delimiters, but not the original
+section source. Section callbacks therefore receive reconstructed text, which
+can normalize tag spelling and omit delimiter directives. Cache template
+source when exact callback text is required. Preserving that text in archives
+requires a separate schema/format revision.
+
 ## Preamble layout
 
 The preamble is exactly 24 bytes. Its integers are unsigned and encoded

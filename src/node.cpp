@@ -31,14 +31,20 @@ struct SerialState {
 };
 
 struct TemplateStringState {
-    explicit TemplateStringState(const Node::TemplateStringLimits& limits) :
+    explicit TemplateStringState(
+        const Node::TemplateStringLimits& limits, size_t maxNestingDepth = templateStringImplementationMaxDepth) :
         limits(limits),
+        maxNestingDepth(std::min(limits.maxNestingDepth, maxNestingDepth)),
         nodes(0)
     {}
 
     const Node::TemplateStringLimits& limits;
+    size_t maxNestingDepth;
     size_t nodes;
 };
+
+std::string childrenTemplateString(
+    const Node& node, const std::string& start, const std::string& stop, TemplateStringState& state);
 
 bool isSerializableTypeValue(size_t type)
 {
@@ -248,6 +254,19 @@ void serializeNode(
     throw Exception("Serial child data exceeds format limit");
   }
   writeUint32(output, childrenSizePos, childrenSize);
+
+  if (const auto original = node.originalSectionText()) {
+    Node::TemplateStringLimits reconstructionLimits;
+    reconstructionLimits.maxNestingDepth = state.limits.maxNestingDepth - depth;
+    reconstructionLimits.maxNodes = state.limits.maxNodes;
+    reconstructionLimits.maxOutputBytes = state.limits.maxOutputBytes;
+    // The children already passed serialization's limits; the public
+    // reconstruction ceiling must not impose a stricter depth here.
+    TemplateStringState reconstructionState(reconstructionLimits, reconstructionLimits.maxNestingDepth);
+    if (childrenTemplateString(node, "{{", "}}", reconstructionState) != *original) {
+      throw Exception("Legacy serialization cannot preserve original section text");
+    }
+  }
 }
 
 class SerialReader {
@@ -419,7 +438,7 @@ std::unique_ptr<Node> unserializeOwnedRange(
 
 void checkTemplateStringBudget(TemplateStringState& state, size_t depth)
 {
-  if (depth >= state.limits.maxNestingDepth || depth >= templateStringImplementationMaxDepth) {
+  if (depth >= state.maxNestingDepth) {
     throw Exception("Template node nesting limit exceeded");
   }
   if (state.nodes >= state.limits.maxNodes) {
@@ -452,6 +471,15 @@ void appendNodeChildren(const Node& node, const std::string& start, const std::s
     }
     appendNodeTemplate(**it, start, stop, output, state, depth);
   }
+}
+
+std::string childrenTemplateString(
+    const Node& node, const std::string& start, const std::string& stop, TemplateStringState& state)
+{
+  std::string output;
+  checkTemplateStringBudget(state, 0);
+  appendNodeChildren(node, start, stop, output, state, 1, true);
+  return output;
 }
 
 const std::string& requireNodeData(const Node& node)
@@ -547,7 +575,10 @@ Node::Node(Node&& other) noexcept :
     child(std::move(other.child)),
     partials(std::move(other.partials)),
     startSequence(std::move(other.startSequence)),
-    stopSequence(std::move(other.stopSequence))
+    stopSequence(std::move(other.stopSequence)),
+    sectionSource_(std::move(other.sectionSource_)),
+    sectionBegin_(other.sectionBegin_),
+    sectionLength_(other.sectionLength_)
 {
   other.resetMovedFrom();
 }
@@ -564,6 +595,9 @@ Node& Node::operator=(Node&& other) noexcept
     partials = std::move(other.partials);
     startSequence = std::move(other.startSequence);
     stopSequence = std::move(other.stopSequence);
+    sectionSource_ = std::move(other.sectionSource_);
+    sectionBegin_ = other.sectionBegin_;
+    sectionLength_ = other.sectionLength_;
     other.resetMovedFrom();
   }
   return *this;
@@ -580,9 +614,47 @@ void Node::resetMovedFrom() noexcept
   partials.clear();
   startSequence.reset();
   stopSequence.reset();
+  sectionSource_.reset();
+  sectionBegin_ = 0;
+  sectionLength_ = 0;
 }
 
 Node::~Node() = default;
+
+std::optional<std::string_view> Node::originalSectionText() const noexcept
+{
+  if (type != TypeSection || !sectionSource_) {
+    return std::nullopt;
+  }
+  return std::string_view(*sectionSource_).substr(sectionBegin_, sectionLength_);
+}
+
+void Node::discardSource()
+{
+  // Gather before modifying anything, so allocation failure is transactional.
+  std::vector<Node *> nodes{this};
+  for (std::size_t index = 0; index < nodes.size(); ++index) {
+    Node * node = nodes[index];
+    if (node->child) {
+      nodes.push_back(node->child.get());
+    }
+    for (const auto& child : node->children) {
+      if (child) {
+        nodes.push_back(child.get());
+      }
+    }
+    for (const auto& partial : node->partials) {
+      if (partial.second) {
+        nodes.push_back(partial.second.get());
+      }
+    }
+  }
+  for (Node * node : nodes) {
+    node->sectionSource_.reset();
+    node->sectionBegin_ = 0;
+    node->sectionLength_ = 0;
+  }
+}
 
 std::string Node::children_to_template_string(const std::string& start, const std::string& stop) const
 {
@@ -592,11 +664,8 @@ std::string Node::children_to_template_string(const std::string& start, const st
 std::string Node::children_to_template_string(
     const std::string& start, const std::string& stop, const TemplateStringLimits& limits) const
 {
-  std::string output;
   TemplateStringState state(limits);
-  checkTemplateStringBudget(state, 0);
-  appendNodeChildren(*this, start, stop, output, state, 1, true);
-  return output;
+  return childrenTemplateString(*this, start, stop, state);
 }
 
 void Node::setData(const std::string& value)

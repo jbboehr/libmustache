@@ -305,6 +305,13 @@ class OwnedNodeView {
       return RenderString::fromOwned(node_->stopSequence.has_value() ? &*node_->stopSequence : NULL);
     }
 
+    RenderString originalSectionText() const noexcept
+    {
+      assert(node_ != NULL);
+      const auto text = node_->originalSectionText();
+      return text ? RenderString::fromView(*text) : RenderString();
+    }
+
   private:
     explicit OwnedNodeView(const Node * node) noexcept :
         node_(node)
@@ -683,6 +690,12 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
     std::string lambdaSectionText(NodeView node, std::string_view start, std::string_view stop, std::size_t depth)
     {
       std::string output;
+      if (const RenderString original = node.originalSectionText()) {
+        // Charge the input before invoking the callback and own its bytes even
+        // if the callback edits a mutable tree or discards its source metadata.
+        renderer_._appendLambdaTemplate(&output, original.value());
+        return output;
+      }
       auto children = node.children();
       while (children) {
         const NodeView child = children.value();

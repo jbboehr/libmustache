@@ -156,6 +156,11 @@ class CursorContractNodeView {
       return mustache::detail::RenderString();
     }
 
+    mustache::detail::RenderString originalSectionText() const noexcept
+    {
+      return {};
+    }
+
   private:
     enum class Kind {
       Null,

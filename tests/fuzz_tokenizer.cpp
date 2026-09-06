@@ -54,7 +54,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t * data, std::size_t size)
   try {
     serial = root.serializeValue(serializationLimits);
   } catch (const mustache::Exception& error) {
-    if (std::string_view(error.what()) == "Legacy serialization cannot preserve custom section delimiters") {
+    if (std::string_view(error.what()) == "Legacy serialization cannot preserve custom section delimiters" ||
+        std::string_view(error.what()) == "Legacy serialization cannot preserve original section text") {
       return 0;
     }
     throw;

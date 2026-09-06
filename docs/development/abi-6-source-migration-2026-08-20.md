@@ -239,6 +239,23 @@ their placement; the renderer defensively validates partial-indentation
 metadata but does not validate every property of a manually constructed tree.
 Consumers that build nodes directly remain responsible for canonical shapes.
 
+Parsed sections retain an immutable source buffer shared by sections from the
+same tokenization. `Node::originalSectionText()` returns the exact body as a
+borrowed `std::string_view`, or no value when source metadata is absent. An empty
+parsed body is a present empty view. Moving a section preserves its source
+ownership, even if its former root and the caller's input are destroyed.
+
+Direct edits to public node fields do not change the original callback text.
+After editing an AST, call `root.discardSource()` to switch all sections in that
+tree, container children, and owned partials to reconstruction from the edited
+nodes. Discarding source can invalidate previously borrowed source views. The
+operation leaves the tree unchanged if its traversal allocation fails.
+Reconstruction helpers such as `children_to_template_string()` continue to
+describe the AST and do not return retained original source.
+
+These fields change `Node`'s layout within the unreleased ABI 6 development
+branch. Rebuild consumers when updating between these development revisions.
+
 ## Serialized AST migration
 
 Prefer RAII and explicitly sized bytes:
@@ -261,6 +278,14 @@ Canonical ABI 5 fixtures remain readable by ABI 6. Do not infer the reverse:
 newly compiled ABI 6 templates may use metadata an ABI 5 decoder does not
 understand. Do not replace durable ABI 5 cache entries in place if old
 processes must continue reading them.
+
+The legacy writer rejects sections with non-default delimiters or original
+callback text that differs from reconstruction. For example, a section body
+containing `{{ name }}` cannot round-trip through a format that reconstructs
+`{{name}}`. This check applies independently of the section's current data
+value. Existing bytes remain readable and retain reconstruction behavior.
+Calling `discardSource()` explicitly accepts loss of original spelling; it does
+not remove the separate custom-delimiter restriction.
 
 Project benchmarks compared validated decoding with cached-source reparsing,
 including warm and fresh-process cases, PHP serialization, and APCu fetch/store

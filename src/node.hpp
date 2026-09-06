@@ -151,6 +151,19 @@ class Node {
     //! Destructor
     MUSTACHE_API ~Node();
 
+    /*! Original, unprocessed section body, or no value for a constructed or
+        legacy-decoded node. An empty body is a present, zero-length view.
+        The view borrows this node's immutable source ownership. AST edits do
+        not update it; call discardSource() on the tree after editing.
+    */
+    MUSTACHE_API std::optional<std::string_view> originalSectionText() const noexcept;
+
+    /*! Discard original section text throughout this tree, including container
+        children and owned partials. Callbacks then reconstruct text from nodes.
+        Allocation failure leaves the tree unchanged.
+    */
+    MUSTACHE_API void discardSource();
+
     /*! Reconstruct child template source using compatibility defaults. */
     MUSTACHE_API std::string children_to_template_string(const std::string& start, const std::string& stop) const;
 
@@ -163,7 +176,8 @@ class Node {
 
     /*! Legacy owning-pointer serializer. Prefer serializeValue().
 
-        Rejects sections with explicit non-default delimiters, as serializeValue() does.
+        Rejects sections whose delimiters or original text cannot be preserved,
+        as serializeValue() does.
     */
     MUSTACHE_API std::vector<uint8_t> * serialize() const;
 
@@ -172,9 +186,9 @@ class Node {
 
     /*! Serialize into an owned legacy-format value.
 
-        Rejects sections with explicit non-default delimiters because the
-        legacy format cannot preserve them. Use source caching or the archived
-        template API for templates with custom section delimiters.
+        Rejects sections with explicit non-default delimiters or original text
+        that differs from reconstruction, because the legacy format cannot
+        preserve them. Cache source to preserve exact section callback text.
     */
     MUSTACHE_API std::vector<uint8_t> serializeValue() const;
 
@@ -217,6 +231,12 @@ class Node {
         std::string_view serial, size_t offset, size_t * vpos, const SerializationLimits& limits);
 
   private:
+    friend class Tokenizer;
+
+    std::shared_ptr<const std::string> sectionSource_;
+    std::size_t sectionBegin_ = 0;
+    std::size_t sectionLength_ = 0;
+
     void resetMovedFrom() noexcept;
 };
 

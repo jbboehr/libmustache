@@ -228,6 +228,38 @@ void testTokenizationFailureIsTransactional()
       });
 }
 
+void testDiscardSourceFailureIsTransactional()
+{
+  const auto sectionsHaveSource = [](const mustache::Node& root, bool present) {
+    return root.children.at(0)->originalSectionText().has_value() == present &&
+        root.children.at(1)->originalSectionText().has_value() == present &&
+        root.child->children.at(0)->originalSectionText().has_value() == present &&
+        root.partials.at("piece")->children.at(0)->originalSectionText().has_value() == present;
+  };
+  exerciseAllocationFailures(
+      "discard section source",
+      []() {
+        mustache::Node root;
+        mustache::Tokenizer tokenizer;
+        tokenizer.tokenize("{{#one}}1{{/one}}{{#two}}2{{/two}}", &root);
+        root.child = std::make_unique<mustache::Node>();
+        tokenizer.tokenize("{{#three}}3{{/three}}", root.child.get());
+        auto partial = std::make_unique<mustache::Node>();
+        tokenizer.tokenize("{{#four}}4{{/four}}", partial.get());
+        root.partials.emplace("piece", std::move(partial));
+        return root;
+      },
+      [](mustache::Node& root) {
+        root.discardSource();
+      },
+      [&](const mustache::Node& root) {
+        expect(sectionsHaveSource(root, true), "allocation failure discarded part of the tree's original source");
+      },
+      [&](const mustache::Node& root) {
+        expect(sectionsHaveSource(root, false), "discardSource did not reach all owned sections");
+      });
+}
+
 #if defined(MUSTACHE_HAVE_LIBJSON) || defined(MUSTACHE_HAVE_LIBYAML)
 struct DataCase {
     DataCase()
@@ -510,6 +542,7 @@ int main(int argc, char ** argv)
     return 1;
   }
   testTokenizationFailureIsTransactional();
+  testDiscardSourceFailureIsTransactional();
 #ifdef MUSTACHE_HAVE_LIBJSON
   testJSONFailureDoesNotPublishPartialData();
 #endif

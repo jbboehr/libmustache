@@ -1212,6 +1212,12 @@ class ArchiveNodeView {
       return string(node().stopSequence, HasStopSequence);
     }
 
+    mustache::detail::RenderString originalSectionText() const noexcept
+    {
+      // Generation 2 does not contain original section source.
+      return {};
+    }
+
   private:
     friend class ArchiveChildCursor;
     friend class ArchiveDataPartCursor;
