@@ -11,6 +11,12 @@ foreach(MUSTACHE_REQUIRED_VARIABLE IN ITEMS
     endif()
 endforeach()
 
+# Keep new child caches separate from older runs against the original source.
+set(MUSTACHE_TEST_BINARY_ROOT "${MUSTACHE_TEST_BINARY_ROOT}/isolated")
+include("${CMAKE_CURRENT_LIST_DIR}/copy_cmake_test_source.cmake")
+set(MUSTACHE_SOURCE_COPY "${MUSTACHE_TEST_BINARY_ROOT}/source")
+mustache_copy_cmake_test_source("${MUSTACHE_TEST_SOURCE_DIR}" "${MUSTACHE_SOURCE_COPY}")
+
 file(READ "${MUSTACHE_TEST_SOURCE_DIR}/vendor/cista/cista.h"
     MUSTACHE_BASELINE_CISTA_HEADER_CONTENTS)
 set(MUSTACHE_CISTA_BASE_HASH
@@ -158,7 +164,7 @@ function(mustache_configure_and_build_probe MUSTACHE_NAME
         "${MUSTACHE_TEST_BINARY_ROOT}/${MUSTACHE_NAME}-bin")
     execute_process(
         COMMAND "${CMAKE_COMMAND}"
-            -S "${MUSTACHE_TEST_SOURCE_DIR}"
+            -S "${MUSTACHE_SOURCE_COPY}"
             -B "${MUSTACHE_BUILD_DIR}"
             ${MUSTACHE_GENERATOR_ARGUMENTS}
             "-DCMAKE_CXX_COMPILER=${MUSTACHE_TEST_CXX_COMPILER}"
@@ -217,7 +223,7 @@ function(mustache_expect_algorithm_drift_rejection MUSTACHE_CISTA_ROOT)
         "${MUSTACHE_TEST_BINARY_ROOT}/drift-build")
     execute_process(
         COMMAND "${CMAKE_COMMAND}"
-            -S "${MUSTACHE_TEST_SOURCE_DIR}"
+            -S "${MUSTACHE_SOURCE_COPY}"
             -B "${MUSTACHE_BUILD_DIR}"
             ${MUSTACHE_GENERATOR_ARGUMENTS}
             "-DCMAKE_CXX_COMPILER=${MUSTACHE_TEST_CXX_COMPILER}"

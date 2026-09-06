@@ -235,6 +235,16 @@ add_test(NAME archive_runtime_dependency_names
     COMMAND "${CMAKE_COMMAND}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/verify_archive_runtime_dependency_names.cmake")
 if(MUSTACHE_IS_TOP_LEVEL)
+    add_test(NAME cmake_config_header
+        COMMAND "${CMAKE_COMMAND}"
+            "-DMUSTACHE_TEST_SOURCE_DIR=${PROJECT_SOURCE_DIR}"
+            "-DMUSTACHE_TEST_BINARY_ROOT=${CMAKE_CURRENT_BINARY_DIR}/config-header"
+            "-DMUSTACHE_TEST_GENERATOR=${CMAKE_GENERATOR}"
+            "-DMUSTACHE_TEST_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}"
+            "-DMUSTACHE_TEST_GENERATOR_TOOLSET=${CMAKE_GENERATOR_TOOLSET}"
+            "-DMUSTACHE_TEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+            "-DMUSTACHE_TEST_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/check_cmake_config_header.cmake")
     add_test(NAME public_compiled_template_boundary
         COMMAND "${CMAKE_COMMAND}"
             "-DMUSTACHE_PUBLIC_HEADER=${PROJECT_SOURCE_DIR}/src/compiled_template.hpp"

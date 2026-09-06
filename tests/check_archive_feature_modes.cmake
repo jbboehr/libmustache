@@ -11,6 +11,12 @@ foreach(MUSTACHE_REQUIRED_VARIABLE IN ITEMS
     endif()
 endforeach()
 
+# Keep new child caches separate from older runs against the original source.
+set(MUSTACHE_TEST_BINARY_ROOT "${MUSTACHE_TEST_BINARY_ROOT}/isolated")
+include("${CMAKE_CURRENT_LIST_DIR}/copy_cmake_test_source.cmake")
+set(MUSTACHE_SOURCE_COPY "${MUSTACHE_TEST_BINARY_ROOT}/source")
+mustache_copy_cmake_test_source("${MUSTACHE_TEST_SOURCE_DIR}" "${MUSTACHE_SOURCE_COPY}")
+
 set(MUSTACHE_GENERATOR_ARGUMENTS -G "${MUSTACHE_TEST_GENERATOR}")
 if(DEFINED MUSTACHE_TEST_GENERATOR_PLATFORM AND
         NOT MUSTACHE_TEST_GENERATOR_PLATFORM STREQUAL "")
@@ -26,7 +32,7 @@ endif()
 function(mustache_configure_archive_mode NAME MODE)
     execute_process(
         COMMAND "${CMAKE_COMMAND}"
-            -S "${MUSTACHE_TEST_SOURCE_DIR}"
+            -S "${MUSTACHE_SOURCE_COPY}"
             -B "${MUSTACHE_TEST_BINARY_ROOT}/${NAME}"
             ${MUSTACHE_GENERATOR_ARGUMENTS}
             "-DCMAKE_CXX_COMPILER=${MUSTACHE_TEST_CXX_COMPILER}"
@@ -110,7 +116,7 @@ file(WRITE "${MUSTACHE_STATIC_BENCHMARK_ZLIB_ROOT}/include/zlib.h"
 file(WRITE "${MUSTACHE_STATIC_BENCHMARK_ZLIB_ROOT}/libz.a" "")
 execute_process(
     COMMAND "${CMAKE_COMMAND}"
-        -S "${MUSTACHE_TEST_SOURCE_DIR}"
+        -S "${MUSTACHE_SOURCE_COPY}"
         -B "${MUSTACHE_TEST_BINARY_ROOT}/static_benchmark_cross"
         ${MUSTACHE_GENERATOR_ARGUMENTS}
         "-DCMAKE_CXX_COMPILER=${MUSTACHE_TEST_CXX_COMPILER}"
@@ -136,7 +142,7 @@ endif()
 
 execute_process(
     COMMAND "${CMAKE_COMMAND}"
-        -S "${MUSTACHE_TEST_SOURCE_DIR}"
+        -S "${MUSTACHE_SOURCE_COPY}"
         -B "${MUSTACHE_TEST_BINARY_ROOT}/runtime_benchmark_cross"
         ${MUSTACHE_GENERATOR_ARGUMENTS}
         "-DCMAKE_CXX_COMPILER=${MUSTACHE_TEST_CXX_COMPILER}"

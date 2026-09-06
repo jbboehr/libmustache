@@ -37,6 +37,8 @@ EXTRA_DIST = \
 	src/archive/xxh3/xxh3.h \
 	spec/specs \
 	tests/check_archive_feature_modes.cmake \
+	tests/check_cmake_config_header.cmake \
+	tests/copy_cmake_test_source.cmake \
 	tests/check_windows_exports.cmake \
 	tests/cmake-consumer/CMakeLists.txt \
 	tests/cmake-consumer/main.cpp \

@@ -2,6 +2,17 @@ cmake_minimum_required(VERSION 3.18)
 
 project(mustache VERSION 0.6.0 LANGUAGES CXX)
 
+# Quoted public-header includes would select this file before the build header.
+if(NOT CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR AND
+        EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/mustache_config.h")
+    message(FATAL_ERROR
+        "A source-tree mustache_config.h conflicts with this out-of-source build:\n"
+        "  ${CMAKE_CURRENT_SOURCE_DIR}/src/mustache_config.h\n"
+        "Remove that generated header (or run make distclean in the previous "
+        "Autotools build), then rerun CMake. Use separate build directories "
+        "when switching configurations or build systems.")
+endif()
+
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
