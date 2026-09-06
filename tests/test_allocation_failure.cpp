@@ -67,6 +67,9 @@ bool disarm() noexcept
 #pragma GCC diagnostic ignored "-Wmismatched-new-delete"
 #endif
 
+// These replacements cover ordinary new/new[] only. Direct malloc/realloc calls
+// (including Cista's vector storage) and aligned allocation overloads bypass
+// this failure injector.
 void * operator new(std::size_t size)
 {
   if (allocation_failure_test::shouldFail()) {

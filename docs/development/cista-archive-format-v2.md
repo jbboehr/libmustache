@@ -159,10 +159,18 @@ without changing the archive graph layout; each build must publish a distinct
 tag and reject the other build's archive at the compatibility preamble. A
 second mutation changes only Cista's recursive vector hashing rule and must be
 rejected by the build-time dependency witness. These checks cover dependency
-hash drift without relying on the x86-64 golden fixture. The archive allocation
-regression separately injects every writer and reader allocation failure in
-fresh subprocesses, requiring `std::bad_alloc` propagation instead of process
-termination.
+hash drift without relying on the x86-64 golden fixture.
+
+The archive allocation regression sweeps failure points reached through the
+test's replacement ordinary `operator new` and `operator new[]` for its fixed
+writer and reader fixtures. Each injected failure runs in a fresh subprocess
+and must propagate as `std::bad_alloc` instead of terminating the process.
+
+This is not exhaustive allocator coverage. Direct `malloc` and `realloc` calls,
+aligned allocation overloads, and other allocation paths that bypass those
+replacements are not intercepted. For example, Cista's vector storage calls
+`malloc` directly, so its allocation failures are outside this regression's
+coverage.
 
 ## Fuzz coverage
 
