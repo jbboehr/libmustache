@@ -78,7 +78,6 @@ void writeFile(const std::string& path, const std::string& contents)
   }
 }
 
-#ifdef MUSTACHE_HAVE_LIBJSON
 std::string readFile(const std::string& path)
 {
   std::ifstream input(path, std::ios::in | std::ios::binary);
@@ -89,7 +88,6 @@ std::string readFile(const std::string& path)
   }
   return contents.str();
 }
-#endif
 
 struct Invocation {
     int result;
@@ -339,13 +337,19 @@ void testFileAndParseFailures(TestDirectory& directory, const std::string& valid
 
   const std::string invalidJson = directory.path("invalid.json");
   writeFile(invalidJson, "{]");
-  expectFailure(invoke({"-t", validTemplate, "-d", invalidJson}), "Invalid JSON data", "invalid JSON data");
+  const Invocation jsonFailure = invoke({"-t", validTemplate, "-d", invalidJson});
+  expectFailure(jsonFailure, "Invalid JSON data", "invalid JSON data");
+  expectFailure(jsonFailure, invalidJson, "JSON diagnostic filename");
+  expectFailure(jsonFailure, "at byte 2:", "JSON diagnostic position");
+  expectFailure(jsonFailure, "syntax error", "JSON diagnostic reason");
 #endif
 
 #ifdef MUSTACHE_HAVE_LIBYAML
   const std::string invalidYaml = directory.path("invalid.yml");
   writeFile(invalidYaml, "value: [unterminated\n");
-  expectFailure(invoke({"-t", validTemplate, "-d", invalidYaml}), "yaml", "invalid YAML data");
+  const Invocation yamlFailure = invoke({"-t", validTemplate, "-d", invalidYaml});
+  expectFailure(yamlFailure, "Failed to parse yaml document", "invalid YAML data");
+  expectFailure(yamlFailure, invalidYaml, "YAML diagnostic filename");
 #endif
 
   const std::string unknownData = directory.path("data.txt");
@@ -367,24 +371,51 @@ void testCompileAndRenderFailures(TestDirectory& directory, const std::string& v
   static_cast<void>(validData);
 #endif
   const std::string invalidTemplate = directory.path("invalid.mustache");
+  const std::string unchangedOutput = directory.path("unchanged-output.txt");
   writeFile(invalidTemplate, "{{#open}}");
+  writeFile(unchangedOutput, "existing output");
 #if defined(MUSTACHE_HAVE_LIBJSON) || defined(MUSTACHE_HAVE_LIBYAML)
-  expectFailure(invoke({"-t", invalidTemplate, "-d", validData}), "Unclosed section", "template tokenization failure");
+  const Invocation templateFailure = invoke({"-t", invalidTemplate, "-d", validData, "-o", unchangedOutput});
 #else
-  expectFailure(invoke({"-t", invalidTemplate}), "Unclosed section", "template tokenization failure");
+  const Invocation templateFailure = invoke({"-t", invalidTemplate, "-o", unchangedOutput});
 #endif
+  expectFailure(templateFailure, "Unclosed section", "template tokenization failure");
+  expectFailure(templateFailure, invalidTemplate, "template diagnostic filename");
+  expect(readFile(unchangedOutput) == "existing output", "template failure modified the existing output file");
+
+  const std::string locatedTemplate = directory.path("located-invalid.mustache");
+  writeFile(locatedTemplate, "hello\n{{");
+#if defined(MUSTACHE_HAVE_LIBJSON) || defined(MUSTACHE_HAVE_LIBYAML)
+  const Invocation locatedFailure = invoke({"-t", locatedTemplate, "-d", validData});
+#else
+  const Invocation locatedFailure = invoke({"-t", locatedTemplate});
+#endif
+  expectFailure(locatedFailure, locatedTemplate, "located template diagnostic filename");
+  expectFailure(locatedFailure, "at line 2, character 1", "template diagnostic position");
+
+  const std::string rootWithPartial = directory.path("with-partial.mustache");
+  const std::string invalidPartial = directory.path("invalid partial.mustache");
+  writeFile(rootWithPartial, "{{>piece}}");
+  writeFile(invalidPartial, "hello\n{{");
+  const Invocation partialFailure = invoke({"-t", rootWithPartial, "-l", "piece=" + invalidPartial});
+  expectFailure(partialFailure, "Unclosed tag", "partial tokenization failure");
+  expectFailure(partialFailure, invalidPartial, "partial diagnostic filename");
+  expectFailure(partialFailure, "partial 'piece'", "partial diagnostic name");
+  expectFailure(partialFailure, "at line 2, character 1", "partial diagnostic position");
 
   const std::string recursiveTemplate = directory.path("recursive.mustache");
   const std::string recursivePartial = directory.path("recursive-partial.mustache");
   writeFile(recursiveTemplate, "{{>loop}}");
   writeFile(recursivePartial, "{{>loop}}");
 #if defined(MUSTACHE_HAVE_LIBJSON) || defined(MUSTACHE_HAVE_LIBYAML)
-  expectFailure(invoke({"-t", recursiveTemplate, "-d", validData, "-l", "loop=" + recursivePartial}),
-      "Render nesting limit exceeded", "recursive partial render failure");
+  const Invocation renderFailure =
+      invoke({"-t", recursiveTemplate, "-d", validData, "-l", "loop=" + recursivePartial, "-o", unchangedOutput});
 #else
-  expectFailure(invoke({"-t", recursiveTemplate, "-l", "loop=" + recursivePartial}), "Render nesting limit exceeded",
-      "recursive partial render failure");
+  const Invocation renderFailure =
+      invoke({"-t", recursiveTemplate, "-l", "loop=" + recursivePartial, "-o", unchangedOutput});
 #endif
+  expectFailure(renderFailure, "Render nesting limit exceeded", "recursive partial render failure");
+  expect(readFile(unchangedOutput) == "existing output", "render failure modified the existing output file");
 }
 
 } // namespace

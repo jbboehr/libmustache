@@ -359,9 +359,42 @@ void testJSONData()
       "JSON duplicate-key last-value behavior changed");
 
   const std::string invalidUTF8("{\"key\":\"\xc3\x28\"}", 12);
-  expectJSONRejected("JSON invalid UTF-8", invalidUTF8, mustache::Data::ParseLimits(), "Invalid JSON data");
+  expectJSONRejected("JSON invalid UTF-8", invalidUTF8, mustache::Data::ParseLimits());
   const std::string byteOrderMark("\xef\xbb\xbf{}", 5);
   expectJSONRejected("JSON byte-order mark", byteOrderMark, mustache::Data::ParseLimits(), "Invalid JSON data");
+}
+
+void testJSONErrorDetails()
+{
+  struct Fixture {
+      const char * label;
+      const char * input;
+      const char * location;
+      const char * detail;
+  };
+  const Fixture fixtures[] = {
+      {"unexpected token", "{]", "at byte 2:", "syntax error"},
+      {"multiline value", "{\n  \"value\":\n}", "at byte 14:", "syntax error"},
+      {"end of input", "[", "at byte 2:", "end of input"},
+      {"UTF-8 byte offset", "{\"\xc3\xa9\":}", "at byte 7:", "syntax error"},
+      {"invalid UTF-8", "{\"key\":\"\xc3\x28\"}", "at byte 10:", "UTF-8"},
+      {"number overflow", "1e999", "at byte 5:", "number overflow"},
+  };
+  for (const auto& fixture : fixtures) {
+    try {
+      static_cast<void>(mustache::Data::fromJSON(std::string_view(fixture.input)));
+      std::fprintf(stderr, "JSON diagnostic (%s): input was accepted\n", fixture.label);
+      ++failures;
+    } catch (const mustache::Exception& exception) {
+      const std::string message = exception.what();
+      if (message.find("Invalid JSON data") != 0 || message.find(fixture.location) == std::string::npos ||
+          message.find(fixture.detail) == std::string::npos) {
+        std::fprintf(stderr, "JSON diagnostic (%s): expected '%s' and '%s', got '%s'\n", fixture.label,
+            fixture.location, fixture.detail, exception.what());
+        ++failures;
+      }
+    }
+  }
 }
 #endif
 
@@ -623,6 +656,7 @@ int main()
   testDirectData();
 #ifdef MUSTACHE_HAVE_LIBJSON
   testJSONData();
+  testJSONErrorDetails();
 #endif
 #ifdef MUSTACHE_HAVE_LIBYAML
   testYAMLData();

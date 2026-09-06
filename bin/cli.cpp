@@ -257,6 +257,18 @@ std::string readFile(const std::string& path, std::string_view description, std:
   return contents;
 }
 
+mustache::CompiledTemplate readTemplate(
+    const std::string& path, std::string_view description, const mustache::Tokenizer::Limits& limits)
+{
+  const std::string source = readFile(path, description, limits.maxInputBytes);
+  try {
+    return mustache::compile(source, limits);
+  } catch (const mustache::TokenizerException& exception) {
+    throw mustache::TokenizerException(
+        std::string(description) + " '" + path + "': " + exception.what(), exception.lineNo, exception.charNo);
+  }
+}
+
 DataFormat detectDataFormat(const std::string& path)
 {
   const std::size_t directorySeparator = path.find_last_of("/\\");
@@ -307,18 +319,21 @@ mustache::Data readData(const Options& options, const mustache::Data::ParseLimit
   if (source.empty()) {
     throw std::runtime_error("Data file is empty: " + options.dataPath);
   }
-  if (format == DataFormat::Json) {
-    return mustache::Data::fromJSON(std::string_view(source), limits);
+  try {
+    if (format == DataFormat::Json) {
+      return mustache::Data::fromJSON(std::string_view(source), limits);
+    }
+    return mustache::Data::fromYAML(std::string_view(source), limits);
+  } catch (const mustache::Exception& exception) {
+    throw mustache::Exception("data file '" + options.dataPath + "': " + exception.what());
   }
-  return mustache::Data::fromYAML(std::string_view(source), limits);
 }
 
 mustache::PartialMap readPartials(const Options& options, const mustache::Tokenizer::Limits& limits)
 {
   mustache::PartialMap partials;
   for (const auto& entry : options.partialPaths) {
-    const std::string source = readFile(entry.second, "partial '" + entry.first + "'", limits.maxInputBytes);
-    partials.emplace(entry.first, mustache::compile(source, limits));
+    partials.emplace(entry.first, readTemplate(entry.second, "partial '" + entry.first + "' file", limits));
   }
   return partials;
 }
@@ -370,8 +385,7 @@ int render(const Options& options, std::ostream& output)
   const mustache::Data::ParseLimits dataLimits;
   const mustache::RenderLimits renderLimits;
 
-  const std::string source = readFile(options.templatePath, "template file", tokenizerLimits.maxInputBytes);
-  const mustache::CompiledTemplate compiled = mustache::compile(source, tokenizerLimits);
+  const mustache::CompiledTemplate compiled = readTemplate(options.templatePath, "template file", tokenizerLimits);
   const mustache::PartialMap partials = readPartials(options, tokenizerLimits);
   const mustache::Data data = readData(options, dataLimits);
 

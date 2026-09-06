@@ -235,9 +235,9 @@ class MUSTACHE_LOCAL_CLASS Data::JSONDataBuilder final : public nlohmann::json_s
       return endContainer(Data::TypeArray);
     }
 
-    bool parse_error(std::size_t, const std::string&, const nlohmann::detail::exception&) override
+    bool parse_error(std::size_t position, const std::string&, const nlohmann::detail::exception& exception) override
     {
-      return false;
+      throw Exception("Invalid JSON data at byte " + std::to_string(position) + ": " + exception.what());
     }
 
     Data takeResult()
@@ -320,8 +320,8 @@ Data Data::parseJSON(std::string_view string, const Data::ParseLimits& limits)
   try {
     parsed = nlohmann::json::sax_parse(
         string.begin(), string.end(), &builder, nlohmann::json::input_format_t::json, true, false);
-  } catch (const nlohmann::json::exception&) {
-    throw Exception("Invalid JSON data");
+  } catch (const nlohmann::json::exception& exception) {
+    throw Exception(std::string("Invalid JSON data: ") + exception.what());
   }
   if (!parsed) {
     throw Exception("Invalid JSON data");
