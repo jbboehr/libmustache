@@ -365,10 +365,10 @@ if(MUSTACHE_NEED_CISTA)
                 SOURCES
                     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_cista_version_algorithm.cpp"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/archive/xxh3.cpp"
+                CXX_STANDARD 17
+                CXX_STANDARD_REQUIRED ON
+                CXX_EXTENSIONS OFF
                 CMAKE_FLAGS
-                    "-DCMAKE_CXX_STANDARD=17"
-                    "-DCMAKE_CXX_STANDARD_REQUIRED=ON"
-                    "-DCMAKE_CXX_EXTENSIONS=OFF"
                     "-DINCLUDE_DIRECTORIES=${MUSTACHE_CISTA_VERSION_PROBE_INCLUDE_DIRECTORIES}"
                 COMPILE_DEFINITIONS
                     ${MUSTACHE_CISTA_VERSION_PROBE_DEFINITIONS}

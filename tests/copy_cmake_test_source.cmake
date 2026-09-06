@@ -8,7 +8,8 @@ function(mustache_copy_cmake_test_source source destination)
         "${source}/mustache.pc.in"
         DESTINATION "${destination}")
     foreach(directory IN ITEMS cmake src src/archive src/archive/xxh3 benchmarks
-            tests tests/fixtures vendor/cista vendor/xxhash)
+            tests tests/fixtures tests/cmake-consumer tests/cmake-subproject
+            vendor/cista vendor/xxhash)
         file(GLOB inputs LIST_DIRECTORIES FALSE
             "${source}/${directory}/CMakeLists.txt"
             "${source}/${directory}/*.cmake"

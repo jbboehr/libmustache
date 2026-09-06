@@ -200,7 +200,7 @@ jobs:
           cmake -S tests/cmake-subproject -B build-subproject -G Ninja \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build-subproject --parallel
-          build-subproject/mustache_subproject_consumer
+          cmake -E chdir build-subproject ctest --output-on-failure
 
       - name: Verify installed package
         run: |

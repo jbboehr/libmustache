@@ -39,6 +39,7 @@ EXTRA_DIST = \
 	spec/specs \
 	tests/check_archive_feature_modes.cmake \
 	tests/check_cmake_config_header.cmake \
+	tests/check_cmake_subproject.cmake \
 	tests/check_pkgconfig_install_paths.cmake \
 	tests/copy_cmake_test_source.cmake \
 	tests/check_windows_exports.cmake \
@@ -46,7 +47,6 @@ EXTRA_DIST = \
 	tests/cmake-consumer/main.cpp \
 	tests/cmake-find-quiet/CMakeLists.txt \
 	tests/cmake-subproject/CMakeLists.txt \
-	tests/cmake-subproject/main.cpp \
 	vendor/cista/LICENSE \
 	vendor/cista/README.md \
 	vendor/cista/cista.h \

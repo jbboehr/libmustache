@@ -94,11 +94,22 @@ set(MUSTACHE_PUBLIC_HEADERS
     utils.hpp
 )
 
+# Match the installed include layout for add_subdirectory consumers. Copying
+# keeps quoted sibling includes local; configure_file tracks header edits.
+set(MUSTACHE_BUILD_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
+foreach(header IN LISTS MUSTACHE_PUBLIC_HEADERS)
+    configure_file("${header}"
+        "${MUSTACHE_BUILD_INCLUDE_DIR}/mustache/${header}" COPYONLY)
+endforeach()
+configure_file("${CMAKE_CURRENT_BINARY_DIR}/mustache_config.h"
+    "${MUSTACHE_BUILD_INCLUDE_DIR}/mustache/mustache_config.h" COPYONLY)
+
 function(mustache_configure_library target)
     target_compile_features(${target} PUBLIC cxx_std_${MUSTACHE_CXX_STANDARD})
     set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
     target_include_directories(${target}
         PUBLIC
+            $<BUILD_INTERFACE:${MUSTACHE_BUILD_INCLUDE_DIR}>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
