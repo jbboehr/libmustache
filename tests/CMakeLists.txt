@@ -43,6 +43,24 @@ add_executable(test_ownership test_ownership.cpp)
 target_link_libraries(test_ownership PRIVATE mustache_static)
 mustache_apply_build_options(test_ownership)
 
+include(CMakePushCheckState)
+cmake_push_check_state()
+string(APPEND CMAKE_REQUIRED_FLAGS " -fno-access-control")
+check_cxx_source_compiles([=[
+    class Value { int value = 0; };
+    int main() { return Value().value; }
+]=] MUSTACHE_TEST_PRIVATE_ACCESS)
+cmake_pop_check_state()
+if(MUSTACHE_TEST_PRIVATE_ACCESS)
+    add_executable(test_template_lifetime test_template_lifetime.cpp)
+    target_link_libraries(test_template_lifetime PRIVATE mustache_static)
+    mustache_apply_build_options(test_template_lifetime)
+    target_compile_options(test_template_lifetime PRIVATE -fno-access-control)
+    add_test(NAME template_lifetime COMMAND test_template_lifetime)
+else()
+    message(STATUS "Template lifetime observer unavailable: compiler cannot disable access checks")
+endif()
+
 add_executable(test_length_aware_api test_length_aware_api.cpp)
 target_link_libraries(test_length_aware_api PRIVATE mustache_static)
 mustache_apply_build_options(test_length_aware_api)

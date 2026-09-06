@@ -89,6 +89,19 @@ AC_DEFINE([HAVE_CXX17], [1], [Define if the compiler supports C++17])
 AC_DEFINE([HAVE_CXX11], [1],
     [Deprecated compatibility alias; C++17 support includes C++11])
 
+AC_CACHE_CHECK([whether $CXX supports private access for lifetime tests],
+    [mustache_cv_test_private_access], [
+    mustache_save_CXXFLAGS=$CXXFLAGS
+    CXXFLAGS="$CXXFLAGS -fno-access-control"
+    AC_COMPILE_IFELSE([
+        AC_LANG_PROGRAM([[class Value { int value = 0; };]],
+            [[return Value().value;]])
+    ], [mustache_cv_test_private_access=yes], [mustache_cv_test_private_access=no])
+    CXXFLAGS=$mustache_save_CXXFLAGS
+])
+AM_CONDITIONAL([MUSTACHE_TEST_PRIVATE_ACCESS],
+    [test "x$mustache_cv_test_private_access" = "xyes"])
+
 AC_CACHE_CHECK([whether the C++17 standard library provides floating-point std::to_chars],
     [mustache_cv_cxx17_floating_to_chars], [
     AC_LINK_IFELSE([

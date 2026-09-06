@@ -1,6 +1,10 @@
 
 check_PROGRAMS = test_utils test_misc test_data_behavior test_node_serialization test_node_template test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template test_section_source test_renderer_safety test_stack_safety test_stack_safety_unchecked test_cli
 
+if MUSTACHE_TEST_PRIVATE_ACCESS
+check_PROGRAMS += test_template_lifetime
+endif
+
 if !MUSTACHE_THREAD_SANITIZER_ENABLED
 check_PROGRAMS += test_allocation_failure
 endif
@@ -26,6 +30,8 @@ test_json_numeric_locale_SOURCES = test_json_numeric_locale.cpp
 test_node_serialization_SOURCES = test_node_serialization.cpp
 test_node_template_SOURCES = test_node_template.cpp
 test_ownership_SOURCES = test_ownership.cpp
+test_template_lifetime_SOURCES = test_template_lifetime.cpp
+test_template_lifetime_CXXFLAGS = $(AM_CXXFLAGS) -fno-access-control
 test_length_aware_api_SOURCES = test_length_aware_api.cpp
 test_tokenizer_safety_SOURCES = test_tokenizer_safety.cpp
 test_compiled_template_SOURCES = test_compiled_template.cpp
@@ -152,6 +158,10 @@ EXTRA_DIST = \
 	fuzz/corpus/tokenizer/valid-section
 
 TESTS = test_utils test_misc test_data_behavior test_node_serialization test_node_template test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template test_section_source test_renderer_safety test_stack_safety test_stack_safety_unchecked test_cli
+
+if MUSTACHE_TEST_PRIVATE_ACCESS
+TESTS += test_template_lifetime
+endif
 
 if !MUSTACHE_THREAD_SANITIZER_ENABLED
 TESTS += test_allocation_failure
