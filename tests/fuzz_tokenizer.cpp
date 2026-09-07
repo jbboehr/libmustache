@@ -11,7 +11,8 @@
 #include "node.hpp"
 #include "tokenizer.hpp"
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t * data, std::size_t size)
+// Unexpected errors must propagate even with MSVC's /EHsc extern "C" assumption.
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t * data, std::size_t size) noexcept(false)
 {
   mustache::Tokenizer::Limits limits;
   limits.maxInputBytes = 4096;

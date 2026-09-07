@@ -14,7 +14,7 @@
 #include "lambda.hpp"
 #include "mustache.hpp"
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t * data, std::size_t size);
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t * data, std::size_t size) noexcept(false);
 
 namespace {
 
