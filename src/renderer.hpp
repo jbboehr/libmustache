@@ -36,6 +36,7 @@ template <typename PartialSource> class RenderEngine;
     the byte budget across the complete render operation. Lambda-generated
     AST nodes are charged once when parsed and again when traversed. Nesting
     is always capped at 256 active nodes to protect the C++ call stack.
+    Literal callback results consume output budget without parsing charges.
 */
 struct RenderLimits {
     std::size_t maxOutputBytes;
@@ -93,6 +94,8 @@ class Renderer {
     //! Resource policy for the current render
     RenderLimits _limits;
 
+    LambdaStringMode _lambdaStringMode;
+
     //! Aggregate work consumed by the current render
     std::size_t _outputBytes;
     std::size_t _nodeVisits;
@@ -134,7 +137,7 @@ class Renderer {
     void _consumeLambdaNodes(const Node * node);
 
     //! Invokes a section lambda within a scoped render capability frame
-    std::string _invokeSectionLambda(Lambda * lambda, std::string_view text, ActiveRenderEngine * activeRenderEngine);
+    LambdaResult _invokeSectionLambda(Lambda * lambda, std::string_view text, ActiveRenderEngine * activeRenderEngine);
 
     //! Appends bounded source reconstructed for a lambda callback
     void _appendLambdaTemplate(std::string * output, std::string_view value);
@@ -181,6 +184,12 @@ class Renderer {
 
     //! Sets the current output buffer
     MUSTACHE_API void setOutput(std::string * output);
+
+    //! Sets the interpretation of ordinary callback strings. Preserved by clear() and init().
+    MUSTACHE_API void setLambdaStringMode(LambdaStringMode mode);
+
+    //! Returns the configured string mode, which defaults to Template.
+    MUSTACHE_API LambdaStringMode getLambdaStringMode() const noexcept;
 
     //! Renders using the stored variables
     MUSTACHE_API void render();

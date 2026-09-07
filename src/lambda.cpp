@@ -1,12 +1,43 @@
 #include "lambda.hpp"
 
 #include <mutex>
+#include <utility>
 
 #include "exception.hpp"
 #include "node.hpp"
 #include "renderer.hpp"
 
 namespace mustache {
+
+LambdaResult::LambdaResult(Kind kind, std::string text) :
+    kind_(kind),
+    text_(std::move(text))
+{}
+
+LambdaResult LambdaResult::fromString(std::string text)
+{
+  return LambdaResult(Kind::Inherit, std::move(text));
+}
+
+LambdaResult LambdaResult::literal(std::string text)
+{
+  return LambdaResult(Kind::Literal, std::move(text));
+}
+
+LambdaResult LambdaResult::templateSource(std::string text)
+{
+  return LambdaResult(Kind::Template, std::move(text));
+}
+
+LambdaResult::Kind LambdaResult::kind() const noexcept
+{
+  return kind_;
+}
+
+const std::string& LambdaResult::text() const noexcept
+{
+  return text_;
+}
 
 struct LambdaRenderContext::State {
     explicit State(Renderer * renderer) :
@@ -73,6 +104,21 @@ void LambdaRenderContext::invalidate() noexcept
 std::string Lambda::invoke(std::string *, Renderer *)
 {
   throw Exception("Legacy section lambda callback is not implemented");
+}
+
+std::string Lambda::invoke()
+{
+  throw Exception("Interpolation lambda callback is not implemented");
+}
+
+LambdaResult Lambda::invokeResult()
+{
+  return LambdaResult::fromString(invoke());
+}
+
+LambdaResult Lambda::invokeResult(std::string_view text, LambdaRenderContext context)
+{
+  return LambdaResult::fromString(invoke(text, std::move(context)));
 }
 
 // Passing the context by value gives each callback its own retainable capability handle.

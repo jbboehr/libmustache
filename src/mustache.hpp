@@ -41,6 +41,18 @@ class Mustache {
     //! Renderer
     Renderer renderer;
 
+    //! Sets ordinary callback string interpretation for all member render paths.
+    void setLambdaStringMode(LambdaStringMode mode)
+    {
+      renderer.setLambdaStringMode(mode);
+    }
+
+    //! Returns the configured callback string interpretation.
+    LambdaStringMode getLambdaStringMode() const noexcept
+    {
+      return renderer.getLambdaStringMode();
+    }
+
     //! Utility method for Tokenizer::tokenize()
     MUSTACHE_API void tokenize(std::string * tmpl, Node * root);
 
@@ -190,6 +202,14 @@ MUSTACHE_API std::string render(const CompiledTemplate& compiled, const Data& da
 //! Renders compiled templates and partials with explicit resource limits
 MUSTACHE_API std::string render(
     const CompiledTemplate& compiled, const Data& data, const PartialMap& partials, const RenderLimits& limits);
+
+//! Renders with explicit limits and ordinary callback string interpretation.
+MUSTACHE_API std::string render(
+    const CompiledTemplate& compiled, const Data& data, const RenderLimits& limits, LambdaStringMode mode);
+
+//! Renders with compiled partials, explicit limits, and callback string interpretation.
+MUSTACHE_API std::string render(const CompiledTemplate& compiled, const Data& data, const PartialMap& partials,
+    const RenderLimits& limits, LambdaStringMode mode);
 
 } // namespace mustache
 

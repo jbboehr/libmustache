@@ -761,6 +761,12 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
       return reference;
     }
 
+    bool isLiteralResult(const LambdaResult& result) const noexcept
+    {
+      return result.kind() == LambdaResult::Kind::Literal ||
+          (result.kind() == LambdaResult::Kind::Inherit && renderer_._lambdaStringMode == LambdaStringMode::Literal);
+    }
+
     template <typename NodeView> void renderValue(NodeView node, const Data& value, std::size_t depth)
     {
       switch (value.type()) {
@@ -783,7 +789,16 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
           break;
         }
         case Data::TypeLambda: {
-          std::string invoked = value.lambdaValue()->invoke();
+          const LambdaResult result = value.lambdaValue()->invokeResult();
+          const std::string& invoked = result.text();
+          if (isLiteralResult(result)) {
+            if (node.flags() & Node::FlagEscape) {
+              renderer_._appendEscaped(invoked);
+            } else {
+              renderer_._append(invoked);
+            }
+            break;
+          }
           renderer_._consumeLambdaTemplate(invoked.size());
 
           Tokenizer tokenizer;
@@ -848,7 +863,12 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
           const std::string_view start = startSequence.value();
           const std::string_view stop = stopSequence.value();
           const std::string text = lambdaSectionText(node, start, stop, depth);
-          const std::string invoked = renderer_._invokeSectionLambda(value.lambdaValue(), text, this);
+          const LambdaResult result = renderer_._invokeSectionLambda(value.lambdaValue(), text, this);
+          const std::string& invoked = result.text();
+          if (isLiteralResult(result)) {
+            renderer_._append(invoked);
+            break;
+          }
           renderer_._consumeLambdaTemplate(invoked.size());
 
           Tokenizer tokenizer;

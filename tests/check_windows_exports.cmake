@@ -30,6 +30,14 @@ set(required_exports
     "?fromJSON@Data@mustache@@"
     "?active@LambdaRenderContext@mustache@@"
     "?invoke@Lambda@mustache@@"
+    "?invokeResult@Lambda@mustache@@"
+    "?fromString@LambdaResult@mustache@@"
+    "?literal@LambdaResult@mustache@@"
+    "?templateSource@LambdaResult@mustache@@"
+    "?kind@LambdaResult@mustache@@"
+    "?text@LambdaResult@mustache@@"
+    "?setLambdaStringMode@Renderer@mustache@@"
+    "?getLambdaStringMode@Renderer@mustache@@"
     "?serialize@Node@mustache@@"
     "?serializeValue@Node@mustache@@"
     "?unserializeOwned@Node@mustache@@"
@@ -69,7 +77,7 @@ if(MUSTACHE_ARCHIVED_TEMPLATES)
         "\\?render@Mustache@mustache@@[^\n]*ArchivedTemplate@" 2
         "member render overloads")
     require_archive_export_count(
-        "\\?render@mustache@@[^\n]*ArchivedTemplate@" 2
+        "\\?render@mustache@@[^\n]*ArchivedTemplate@" 3
         "free render overloads")
 endif()
 foreach(required_export IN LISTS required_exports)

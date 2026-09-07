@@ -13,6 +13,40 @@ namespace mustache {
 class Node;
 class Renderer;
 
+//! Interpretation of ordinary strings returned by callbacks.
+enum class LambdaStringMode {
+  Template,
+  Literal
+};
+
+/*! Owned callback output with an explicit interpretation.
+
+    Inherit uses the renderer's string mode. Literal bypasses parsing without
+    disabling interpolation escaping. Template always requests evaluation.
+*/
+class LambdaResult {
+  public:
+    enum class Kind {
+      Inherit,
+      Literal,
+      Template
+    };
+
+    static MUSTACHE_API LambdaResult fromString(std::string text);
+    static MUSTACHE_API LambdaResult literal(std::string text);
+    static MUSTACHE_API LambdaResult templateSource(std::string text);
+
+    MUSTACHE_API Kind kind() const noexcept;
+
+    //! Borrows the owned text. The reference must not outlive this result.
+    MUSTACHE_API const std::string& text() const noexcept;
+
+  private:
+    LambdaResult(Kind kind, std::string text);
+    Kind kind_;
+    std::string text_;
+};
+
 /*! \class LambdaRenderContext
     \brief Callback-scoped access to the active renderer.
 
@@ -61,8 +95,8 @@ class MUSTACHE_API Lambda {
     //! Destructor
     virtual ~Lambda() {};
 
-    //! Invoke this lambda if it's being used as a variable
-    virtual std::string invoke() = 0;
+    //! Legacy string interpolation callback. The default implementation throws.
+    virtual std::string invoke();
 
     /*! Invoke this lambda through the legacy section callback.
 
@@ -90,6 +124,12 @@ class MUSTACHE_API Lambda {
         implementations may override only this overload for section use.
     */
     virtual std::string invoke(std::string_view text, LambdaRenderContext context);
+
+    //! Interpolation result. The default adapts invoke() using the renderer's string mode.
+    virtual LambdaResult invokeResult();
+
+    //! Section result. The default adapts the scoped string callback using the renderer's string mode.
+    virtual LambdaResult invokeResult(std::string_view text, LambdaRenderContext context);
 };
 
 } // namespace mustache

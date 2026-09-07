@@ -95,6 +95,10 @@ MUSTACHE_API std::string render(const ArchivedTemplate& archived, const Data& da
 //! Renders a previously validated archived template with resource limits.
 MUSTACHE_API std::string render(const ArchivedTemplate& archived, const Data& data, const RenderLimits& limits);
 
+//! Renders with explicit limits and ordinary callback string interpretation.
+MUSTACHE_API std::string render(
+    const ArchivedTemplate& archived, const Data& data, const RenderLimits& limits, LambdaStringMode mode);
+
 /*! \class ArchivedTemplate
     \brief Opaque, immutable handle over one validated archived template.
 
@@ -130,7 +134,7 @@ class ArchivedTemplate {
     friend MUSTACHE_API ArchivedTemplate loadArchivedTemplate(
         std::string_view bytes, const ArchivedTemplateLimits& limits);
     friend MUSTACHE_API std::string render(
-        const ArchivedTemplate& archived, const Data& data, const RenderLimits& limits);
+        const ArchivedTemplate& archived, const Data& data, const RenderLimits& limits, LambdaStringMode mode);
     friend class Mustache;
 };
 

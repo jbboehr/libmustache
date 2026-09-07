@@ -1513,8 +1513,8 @@ const void * validateProtectedArchive(std::string_view bytes, const mustache::Ar
   }
 }
 
-std::string renderProtectedArchive(
-    const void * validatedGraph, const mustache::Data& data, const mustache::RenderLimits& renderLimits)
+std::string renderProtectedArchive(const void * validatedGraph, const mustache::Data& data,
+    const mustache::RenderLimits& renderLimits, mustache::LambdaStringMode mode)
 {
   if (validatedGraph == nullptr) {
     throw mustache::Exception("Empty archived template");
@@ -1522,6 +1522,7 @@ std::string renderProtectedArchive(
   const ArchiveGraph& graph = *static_cast<const ArchiveGraph *>(validatedGraph);
   std::string output;
   mustache::Renderer renderer;
+  renderer.setLambdaStringMode(mode);
   renderer.init(nullptr, &data, nullptr, &output, renderLimits);
   ArchivePartialSource partialSource(graph);
   mustache::detail::RenderEngine<ArchivePartialSource> engine(renderer, partialSource);
@@ -1810,22 +1811,28 @@ std::string render(const ArchivedTemplate& archived, const Data& data)
 
 std::string render(const ArchivedTemplate& archived, const Data& data, const RenderLimits& limits)
 {
+  return render(archived, data, limits, LambdaStringMode::Template);
+}
+
+std::string render(
+    const ArchivedTemplate& archived, const Data& data, const RenderLimits& limits, LambdaStringMode mode)
+{
   // A callback can replace the caller's handle before this render finishes.
   const auto state = archived.state;
   if (!state) {
     throw Exception("Empty archived template");
   }
-  return mustache_benchmark::renderProtectedArchive(state->graph, data, limits);
+  return mustache_benchmark::renderProtectedArchive(state->graph, data, limits, mode);
 }
 
 std::string Mustache::render(const ArchivedTemplate& archived, const Data& data) const
 {
-  return mustache::render(archived, data);
+  return mustache::render(archived, data, RenderLimits(), getLambdaStringMode());
 }
 
 std::string Mustache::render(const ArchivedTemplate& archived, const Data& data, const RenderLimits& limits) const
 {
-  return mustache::render(archived, data, limits);
+  return mustache::render(archived, data, limits, getLambdaStringMode());
 }
 
 } // namespace mustache

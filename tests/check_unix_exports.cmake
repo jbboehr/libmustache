@@ -55,6 +55,14 @@ require_export_count("^_?mustache_version$" 1 "mustache_version")
 require_export_count("^_?mustache_version_int$" 1 "mustache_version_int")
 require_export_count("^_?_ZTIN8mustache9ExceptionE$" 1 "Exception RTTI")
 require_export_count("^_?_ZTVN8mustache9ExceptionE$" 1 "Exception vtable")
+require_export_count("^_?_ZN8mustache12LambdaResult10fromString.*$" 1 "inherited lambda result factory")
+require_export_count("^_?_ZN8mustache12LambdaResult7literal.*$" 1 "literal lambda result factory")
+require_export_count("^_?_ZN8mustache12LambdaResult14templateSource.*$" 1 "template lambda result factory")
+require_export_count("^_?_ZNK8mustache12LambdaResult4kindEv$" 1 "lambda result kind")
+require_export_count("^_?_ZNK8mustache12LambdaResult4text.*$" 1 "lambda result text")
+require_export_count("^_?_ZN8mustache6Lambda12invokeResult.*$" 2 "result callback overloads")
+require_export_count("^_?_ZN8mustache8Renderer19setLambdaStringMode.*$" 1 "lambda string mode setter")
+require_export_count("^_?_ZNK8mustache8Renderer19getLambdaStringModeEv$" 1 "lambda string mode getter")
 if(MUSTACHE_ARCHIVED_TEMPLATES)
     require_export_count(
         "^_?_ZN8mustache22ArchivedTemplateLimitsC1Ev$" 1
@@ -99,7 +107,7 @@ if(MUSTACHE_ARCHIVED_TEMPLATES)
         "^_?_ZN8mustache32archivedTemplateCompatibilityTagEv$" 1
         "archivedTemplateCompatibilityTag")
     require_export_count(
-        "^_?_ZN8mustache6render.*16ArchivedTemplate.*$" 2
+        "^_?_ZN8mustache6render.*16ArchivedTemplate.*$" 3
         "archived-template free render overloads")
     require_export_count(
         "^_?_ZNK8mustache8Mustache6render.*16ArchivedTemplate.*$" 2

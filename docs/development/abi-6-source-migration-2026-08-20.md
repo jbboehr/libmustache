@@ -79,7 +79,7 @@ compatibility with ABI 5.
 | `CompiledTemplate`, `PartialMap`, and free or member `compile()`/`render()` | Preferred | Use for application and extension code. |
 | Owned `Data` factories, accessors, builders, and value-returning parsers | Preferred | Use for all new data conversion. |
 | `Tokenizer::Limits`, `Data::ParseLimits`, `Node::SerializationLimits`, and `RenderLimits` | Preferred | Supply workload-specific limits at trust boundaries. |
-| `LambdaRenderContext` callback overload | Preferred | Use for section lambdas and binding callbacks. |
+| `Lambda::invokeResult()` and its `LambdaRenderContext` overload | Preferred | Return explicit literal/template results or inherit the configured string mode. |
 | `Mustache`, `Tokenizer`, public `Node`, and stateful `Renderer` APIs | Retained compatibility surface | Migrate ordinary rendering to compiled handles; keep only code that genuinely manipulates an AST here. |
 | `Data(Type, int)` and `Data::init()` | Retained compatibility adapter | Replace with named factories and builders. |
 | `Data::createFromJSON()` and `createFromYAML()` | Retained ownership adapter | Replace with `fromJSON()` and `fromYAML()`. |
@@ -105,7 +105,7 @@ The audit covered every installed public header:
 | `mustache.hpp` | Keeps the `Mustache` facade and C version functions; adds the preferred free and member compiled-template API and length-aware overloads. |
 | `compiled_template.hpp` | New opaque `CompiledTemplate` and `PartialMap` API. |
 | `data.hpp` | Replaces the public pointer representation; adds owned typed values, builders, accessors, length-aware parsers, and parse limits. |
-| `lambda.hpp` | Keeps both ABI 5 virtual entry points and adds the scoped section-callback API. |
+| `lambda.hpp` | Keeps both ABI 5 virtual entry points and adds scoped contexts and owning callback results. Rebuild against the current development headers. |
 | `node.hpp` | Replaces raw node ownership, removes `NodeStack`, makes nodes move-only, and adds checked value-returning serialization APIs. |
 | `renderer.hpp` | Makes borrowed inputs const, adds rendering limits and callback-state validation, and makes the stateful renderer non-copyable and non-movable. |
 | `tokenizer.hpp` | Keeps ABI 5 tokenizer operations and adds `std::string_view` and limited overloads. |
@@ -320,30 +320,65 @@ Therefore:
 
 ## Migrating lambdas
 
-Variable lambdas continue to override `invoke()`.
+Existing variable lambdas can continue overriding `std::string invoke()`.
+The renderer adapts their strings to `LambdaResult::fromString`, which uses
+the configured string mode. Template evaluation remains the default.
 
 Existing section lambdas that override
 `invoke(std::string *, Renderer *)` continue to dispatch through the legacy
 virtual method. The renderer pointer is valid only for the active callback and
 must never be retained.
 
-New and migrated section lambdas should override the scoped overload:
+New callbacks should override `invokeResult()`, or the scoped section overload
+shown below. The result owns its string and selects its interpretation:
+
+| Factory | Meaning |
+|---|---|
+| `LambdaResult::fromString(text)` | Use the renderer's configured string mode. |
+| `LambdaResult::literal(text)` | Return the bytes without parsing them as a template. |
+| `LambdaResult::templateSource(text)` | Evaluate the bytes as template source, regardless of the configured mode. |
+
+Literal results retain normal interpolation HTML escaping. Section results have
+no additional section-wide escaping. Template results preserve the existing
+delimiter rules: default delimiters for interpolation, the section's opening
+delimiters for sections. Literal results consume output budget without a parsing
+charge. Section input still consumes its existing lambda byte budget.
+
+For output already rendered through the callback context, return an explicit
+literal result to avoid another parse:
 
 ```cpp
 class SectionLambda : public mustache::Lambda {
   public:
-    std::string invoke() override { return {}; }
-
-    std::string invoke(
+    mustache::LambdaResult invokeResult(
         std::string_view,
         mustache::LambdaRenderContext context) override
     {
       mustache::Node name(
           mustache::Node::TypeVariable, "name", mustache::Node::FlagEscape);
-      return context.render(name);
+      return mustache::LambdaResult::literal(context.render(name));
     }
 };
 ```
+
+`Mustache::setLambdaStringMode(LambdaStringMode::Literal)` opts an engine into
+literal interpretation for ordinary callback strings on every member render path.
+The same setting is available on `Renderer` and survives `clear()` and `init()`.
+Explicit results override either mode. For free functions, append a mode after
+the render limits, for example:
+
+```cpp
+auto output = mustache::render(compiled, data, mustache::RenderLimits{},
+    mustache::LambdaStringMode::Literal);
+```
+
+New subclasses can override only the result callback they implement. Invoking an
+unimplemented legacy entry point throws. Direct callback callers should use
+`invokeResult()` when they need to preserve a result's interpretation.
+
+The new virtual methods and renderer configuration change the unreleased ABI 6
+layout. Rebuild consumers and bindings with the library, rather than mixing
+development snapshots. No archived-template format changes are required.
 
 Every copy of a `LambdaRenderContext` becomes inactive when that exact callback
 returns or throws. Later use throws without dereferencing the old renderer.

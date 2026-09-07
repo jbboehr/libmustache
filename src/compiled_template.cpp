@@ -81,6 +81,7 @@ std::string Mustache::render(
 
   std::string output;
   Renderer compiledRenderer;
+  compiledRenderer.setLambdaStringMode(getLambdaStringMode());
   compiledRenderer.init(&state->root, &data, NULL, &output, limits);
   compiledRenderer.setPartialResolver([&partials](const std::string& name) -> std::shared_ptr<const Node> {
     PartialMap::const_iterator partial = partials.find(name);
@@ -131,6 +132,22 @@ std::string render(
     const CompiledTemplate& compiled, const Data& data, const PartialMap& partials, const RenderLimits& limits)
 {
   Mustache mustache;
+  return mustache.render(compiled, data, partials, limits);
+}
+
+std::string render(
+    const CompiledTemplate& compiled, const Data& data, const RenderLimits& limits, LambdaStringMode mode)
+{
+  Mustache mustache;
+  mustache.setLambdaStringMode(mode);
+  return mustache.render(compiled, data, limits);
+}
+
+std::string render(const CompiledTemplate& compiled, const Data& data, const PartialMap& partials,
+    const RenderLimits& limits, LambdaStringMode mode)
+{
+  Mustache mustache;
+  mustache.setLambdaStringMode(mode);
   return mustache.render(compiled, data, partials, limits);
 }
 

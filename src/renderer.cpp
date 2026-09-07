@@ -46,6 +46,7 @@ Renderer::Renderer() :
     _partials(NULL),
     _output(NULL),
     _limits(),
+    _lambdaStringMode(LambdaStringMode::Template),
     _outputBytes(0),
     _nodeVisits(0),
     _lambdaTemplateBytes(0),
@@ -57,6 +58,22 @@ Renderer::Renderer() :
 
 Renderer::~Renderer()
 {}
+
+void Renderer::setLambdaStringMode(LambdaStringMode mode)
+{
+  if (_rendering) {
+    throw Exception("Renderer is already rendering");
+  }
+  if (mode != LambdaStringMode::Template && mode != LambdaStringMode::Literal) {
+    throw Exception("Invalid lambda string mode");
+  }
+  _lambdaStringMode = mode;
+}
+
+LambdaStringMode Renderer::getLambdaStringMode() const noexcept
+{
+  return _lambdaStringMode;
+}
 
 void Renderer::clear()
 {
@@ -375,7 +392,7 @@ void Renderer::_appendLambdaTemplate(std::string * output, std::string_view valu
   }
 }
 
-std::string Renderer::_invokeSectionLambda(
+LambdaResult Renderer::_invokeSectionLambda(
     Lambda * lambda, std::string_view text, ActiveRenderEngine * activeRenderEngine)
 {
   if (lambda == NULL) {
@@ -389,7 +406,7 @@ std::string Renderer::_invokeSectionLambda(
     context.invalidate();
     --_lambdaCallbackDepth;
   });
-  return lambda->invoke(text, context);
+  return lambda->invokeResult(text, context);
 }
 
 } // namespace mustache
