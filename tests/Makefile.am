@@ -165,25 +165,12 @@ EXTRA_DIST = \
 	fuzz/corpus/tokenizer/unclosed-tag \
 	fuzz/corpus/tokenizer/valid-section
 
-TESTS = test_utils test_misc test_data_behavior test_node_serialization test_node_template test_ownership test_length_aware_api test_tokenizer_safety test_compiled_template test_section_source test_renderer_safety test_lambda_results test_lambda_context test_stack_safety test_stack_safety_unchecked test_cli
-
-if MUSTACHE_TEST_PRIVATE_ACCESS
-TESTS += test_template_lifetime
-endif
-
-if !MUSTACHE_THREAD_SANITIZER_ENABLED
-TESTS += test_allocation_failure
-endif
-
-if MUSTACHE_JSON_ENABLED
-TESTS += test_json_numeric_locale
-endif
+TESTS = $(check_PROGRAMS)
 
 if MUSTACHE_SPEC_TEST_ENABLED
-TESTS += test_spec test_spec_data check_spec_execution_count.sh
+TESTS += check_spec_execution_count.sh
 endif
 if MUSTACHE_ARCHIVED_TEMPLATES_ENABLED
-TESTS += test_cista_archive test_archived_template test_render_equivalence test_fuzz_cista_archive
 if !MUSTACHE_THREAD_SANITIZER_ENABLED
 TESTS += check_archive_allocation_failure.sh
 endif
