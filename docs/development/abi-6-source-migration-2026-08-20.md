@@ -2,6 +2,8 @@
 
 **Date:** 2026-08-20
 
+**Last revised:** 2026-09-07
+
 **Target release:** libmustache 0.6.0 / shared-library ABI 6
 
 **Audience:** C++ applications and language bindings currently built against
@@ -55,6 +57,10 @@ branch. ABI 6 is not stable until 0.6.0 is released.
   shared-library consumer does not need nlohmann/json or libyaml development
   files. A static consumer needs libyaml only when the installed library was
   built with YAML support.
+- Experimental archived-template support defaults to automatic detection on
+  supported little-endian targets. Cista and xxHash are bundled privately by
+  default. Static consumers of a build using system xxHash also need that link
+  dependency, which the installed CMake and pkg-config metadata carry.
 - `mustache_config.h` defines `MUSTACHE_CXX_STANDARD` as `17` and
   `MUSTACHE_HAVE_CXX17`. `MUSTACHE_HAVE_CXX11` remains temporarily as a
   source-compatibility alias.
@@ -84,19 +90,25 @@ compatibility with ABI 5.
 | `Data(Type, int)` and `Data::init()` | Retained compatibility adapter | Replace with named factories and builders. |
 | `Data::createFromJSON()` and `createFromYAML()` | Retained ownership adapter | Replace with `fromJSON()` and `fromYAML()`. |
 | Pointer-returning `Node::serialize()` and `Node::unserialize()` | Retained ownership adapter | Replace with `serializeValue()` and `unserializeOwned()`. Persist source for new PHP caches today; legacy AST reads remain compatible through the window below. Follow the separate cache benchmark before adopting any replacement format. |
-| `Lambda::invoke(std::string *, Renderer *)` and `Renderer::renderForLambda()` | Downstream-gated transitional API | Keep until php-mustache uses scoped contexts. Never retain the renderer pointer. |
+| `Lambda::invoke(std::string *, Renderer *)` and `Renderer::renderForLambda()` | Retained through 0.6.x | Prefer scoped contexts. Never retain the renderer pointer. |
 | `Node::to_template_string()` and `children_to_template_string()` | Transitional API | Needed by compatibility code; not used by the bounded compiled renderer. |
 | Installed `Stack` template | Transitional API | No longer used by the renderer. Prefer a standard container. |
 | `MUSTACHE_HAVE_CXX11` | Transitional macro | Test `MUSTACHE_CXX_STANDARD` or `MUSTACHE_HAVE_CXX17` instead. |
 | Version functions, exceptions, and exported utility functions | Supported low-level API | Retained, subject to the signature changes below. |
 
-No compatibility surface currently carries a C++ `[[deprecated]]` attribute.
-That is deliberate: bindings commonly build with warnings as errors, and the
-primary downstream has not yet migrated. The project should first compile and
-test php-mustache against ABI 6, then decide which transitional APIs can be
-removed before 0.6.0 and which must remain through the 0.6 release series.
-Once ABI 6 is released, an exported method cannot be removed from a compatible
-0.6 update merely because the downstream migration has finished.
+The compatibility APIs and macros listed above remain through the 0.6 release
+series, including those labeled transitional. Version 0.6.0 adds no C++
+`[[deprecated]]` attributes, so existing compatibility calls do not introduce
+deprecation warnings in bindings that build with warnings as errors. Removing
+an exported API requires a separately announced incompatible release.
+
+php-mustache now builds against ABI 6. Its
+[September 6 integration report](https://github.com/jbboehr/php-mustache/blob/d868bb9e2ff800c1c21800769450ca18b5799f2f/docs/development/libmustache-update-2026-09-06.md)
+records PHPT, sanitizer, and archive-benchmark results against libmustache
+`e6b2de0`. The extension still uses public AST operations for compatibility,
+including AST-partial cloning. Successful downstream integration does not make
+those operations removable. Validate the final library revision with the
+supported downstream matrix before freezing ABI 6.
 
 The audit covered every installed public header:
 
@@ -104,6 +116,7 @@ The audit covered every installed public header:
 |---|---|
 | `mustache.hpp` | Keeps the `Mustache` facade and C version functions; adds the preferred free and member compiled-template API and length-aware overloads. |
 | `compiled_template.hpp` | New opaque `CompiledTemplate` and `PartialMap` API. |
+| `archived_template.hpp` | New optional owning `ArchivedTemplate` API, archive limits, compatibility tag, and categorized loading failures. |
 | `data.hpp` | Replaces the public pointer representation; adds owned typed values, builders, accessors, length-aware parsers, and parse limits. |
 | `lambda.hpp` | Keeps both ABI 5 virtual entry points and adds scoped contexts and owning callback results. Rebuild against the current development headers. |
 | `node.hpp` | Replaces raw node ownership, removes `NodeStack`, makes nodes move-only, and adds checked value-returning serialization APIs. |
@@ -301,22 +314,25 @@ legacy AST as the basis of a replacement format. A later Cista direct-view
 feasibility result cleared the native latency threshold. Follow-up runs found
 deep checking cheap, FNV-1a integrity expensive, and selected modern
 XXH3-backed `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` as the native default.
-The archive still used substantially more cache space and has not crossed the
-PHP/APCu boundary. It remains an optional experiment, not a release decision.
-Therefore:
+The subsequent
+[PHP/APCu benchmark](https://github.com/jbboehr/php-mustache/blob/d868bb9e2ff800c1c21800769450ca18b5799f2f/docs/development/libmustache-update-2026-09-06.md#archive-benchmark)
+passed the predeclared latency threshold for every medium and large workload
+against libmustache `e6b2de0`. That result covers a specific development
+revision. It does not establish persistence compatibility or performance for
+later archive generations. The 0.6 policy is:
 
 - retain checked reads of existing ABI 5 data throughout libmustache 0.6.x and
   php-mustache 0.x;
-- deprecate AST writes when the PHP compiled-handle path and source-cache
-  guidance ship;
+- keep legacy writer APIs available through 0.6.x, while recommending source
+  for new durable caches;
 - remove legacy reads only in a separately announced incompatible release;
 - use versioned cache keys when ABI 5 and ABI 6 processes can overlap;
 - treat serialized input as untrusted and supply request-appropriate limits;
   and
-- cache source rather than writing new durable AST entries today. Adopt an
-  archived-template replacement only if the hardened native rerun and the
-  one-fetch/one-render PHP/APCu benchmark satisfy the security, compatibility,
-  semantic, and performance gates recorded in the cache benchmark.
+- keep archived templates experimental and retain source for recompilation.
+  Use `archivedTemplateCompatibilityTag()` verbatim in archive cache keys.
+  Archive bytes may change independently of the compatible C++ API, and a
+  benchmark win does not make them a durable interchange format.
 
 ## Migrating lambdas
 
@@ -471,7 +487,7 @@ specific message is documented as stable.
 10. Run the consumer's normal, sanitizer, callback-retention, malformed-input,
     and cache round-trip tests before deployment.
 
-For php-mustache specifically, complete the owned zval-to-`Data` conversion,
-lambda-context migration, compiled-handle ownership, and source-cache guidance
-before deprecating AST writes. Keep checked reads for the compatibility window
-above.
+For php-mustache specifically, update its libmustache pin and rerun the
+supported PHPT matrix against the final release revision. Keep its AST
+compatibility operations and the checked reads described above. Prefer the
+owning compiled-template and scoped callback APIs for new integration work.

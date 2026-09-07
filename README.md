@@ -12,6 +12,9 @@ libraries plus the `mustachec` command-line renderer. It was originally written
 for [php-mustache](https://github.com/jbboehr/php-mustache), but can be consumed
 as an ordinary C++ library.
 
+See the [0.6.0 release notes](CHANGELOG.md) for upgrade requirements and
+compatibility changes.
+
 ## Requirements
 
 - A C++17 compiler and standard library with floating-point `std::to_chars`

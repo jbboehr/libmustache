@@ -2,6 +2,8 @@
 
 **Date:** 2026-08-20
 
+**Last revised:** 2026-09-07
+
 **libmustache baseline:** `3ce34e078d3091a91cc765edb968c49ef9421367`
 
 **php-mustache baseline reviewed:**
@@ -12,10 +14,36 @@ on `master`
 php-mustache migration without reopening settled library decisions or hiding
 downstream compatibility choices inside mechanical porting.
 
-This is the operational starting point. The authoritative library design and
-API details remain in the
+This records the original operational starting point. The authoritative
+library design and API details remain in the
 [modernization strategy](modernization-strategy-2026-08-11.md) and
 [ABI 6 source-migration guide](abi-6-source-migration-2026-08-20.md).
+
+## Status on 2026-09-07
+
+php-mustache has an ABI 6 integration. The
+[September 6 downstream report](https://github.com/jbboehr/php-mustache/blob/d868bb9e2ff800c1c21800769450ca18b5799f2f/docs/development/libmustache-update-2026-09-06.md)
+records PHPT, sanitizer, Valgrind, and optional archive-suite results against
+libmustache `e6b2de0`. Its one-fetch/one-render PHP 8.3/APCu benchmark passed
+the 20% median and p95 improvement threshold for all medium and large workloads.
+Those are reported results for that development revision, not a rerun against
+the final 0.6.0 library or its current archive generation.
+
+The later php-mustache development revision
+[`d868bb9`](https://github.com/jbboehr/php-mustache/tree/d868bb9e2ff800c1c21800769450ca18b5799f2f)
+has [green CI](https://github.com/jbboehr/php-mustache/actions/runs/34164260775).
+Its [lockfile](https://github.com/jbboehr/php-mustache/blob/d868bb9e2ff800c1c21800769450ca18b5799f2f/flake.lock)
+pins libmustache `c43ad03`, which predates this repository's `56a9891` revision
+reviewed on September 7. Update the pin and run the supported downstream matrix
+against the final release revision before freezing ABI 6.
+
+The extension still uses the public AST compatibility surface, including
+AST-partial cloning. The complete compiled-handle design below remains a
+direction for new work, not a description of every current PHP path. Libmustache
+0.6.x retains its exported compatibility APIs and checked legacy AST reads.
+Archived templates remain experimental, with source retained for recompilation
+and compatibility-tagged cache keys. The remaining sections preserve the
+original migration plan and its historical measurements.
 
 ## State at handoff
 
@@ -72,8 +100,9 @@ as a release commitment.
   window below. The archived-template representation subsequently passed the
   hardened native performance, semantic, compatibility, fuzzing, and security
   gates with versioning, deep checking, integrity, and modern XXH3 enabled. Do
-  not make archived bytes the default PHP cache value unless the remaining
-  one-fetch/one-render PHP/APCu benchmark also passes.
+  not make archived bytes the default PHP cache value solely from native
+  timings. The later PHP/APCu result is recorded above, and promoting the
+  experimental format still requires an explicit persistence decision.
 - Keep Cista entirely inside libmustache. The extension should receive a
   libmustache-owned `ArchivedTemplate`, not include Cista headers or expose
   Cista types in PHP-facing implementation interfaces. Ordinary inputs should
@@ -324,9 +353,9 @@ graphs both favored source, and serialization-plus-APCu-store cost strengthened
 that decision. A later checked Cista direct-view prototype removed the graph
 ownership penalty and was 73% to 81% faster than source compile plus render on
 the medium and large native workloads. Its payload was 4.35 to 4.80 times
-source, and PHP serialization and APCu have not been measured. The initial
-prototype timing used `WITH_STATIC_VERSION` alone. A later native mode matrix
-found `DEEP_CHECK` effectively free, while Cista's FNV-1a-based
+source. At that stage, PHP serialization and APCu had not been measured. The
+initial prototype timing used `WITH_STATIC_VERSION` alone. A later native mode
+matrix found `DEEP_CHECK` effectively free, while Cista's FNV-1a-based
 `WITH_INTEGRITY` made validation plus rendering 2.35 to 2.67 times as
 expensive. A checksum follow-up measured zlib CRC-32 about 6.5 times and
 XXH3-64 about 32 times as fast as FNV-1a; one XXH3 pass added 4.2% to 5.2% to
@@ -350,17 +379,17 @@ default to automatic detection of the required private-symbol controls. The
 production archive implementation has no zlib dependency; zlib remains only in
 the explicit CRC-32 benchmark.
 
-The next slice belongs in php-mustache: add a narrow experimental bridge and a
-one-fetch/one-render APCu experiment. That experiment
-must measure the actual Zend-string lifetime, alignment or aligned-copy cost,
-PHP serialization, APCu copying, payload size, peak memory, and writer cost;
-request-local reuse is not a substitute. Keep checked legacy reads through
+The downstream bridge and one-fetch/one-render APCu experiment have since
+been exercised, as recorded in the September 7 status above. Keep measurements
+bound to the tested revision and rerun them when adopting a later archive
+generation. Keep checked legacy reads through
 libmustache 0.6.x and php-mustache 0.x; removal requires a separately announced
 incompatible release.
 
 ## Test gates
 
-The migration is not complete until the following are green:
+The original acceptance criteria below remain useful when validating the final
+release revision:
 
 - complete existing PHPT inventory with intentional expectation changes
   documented separately;
@@ -392,5 +421,7 @@ exceptions and partial construction unwind safely; the supported PHPT matrix
 passes; and the AST benchmark has produced a documented format, cache, and
 compatibility-window decision.
 
-Only then should libmustache attach deprecation attributes, remove a
-downstream-gated compatibility adapter before 0.6.0, or declare ABI 6 stable.
+This was the original target for the full ownership migration. It is broader
+than the demonstrated ABI 6 integration above. The 0.6 release retains its
+exported compatibility APIs without compiler deprecation attributes. Freezing
+ABI 6 still requires verification against the final library revision.

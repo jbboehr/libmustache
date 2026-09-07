@@ -4,6 +4,14 @@ Date: 2026-08-22; measurements refreshed after review on 2026-08-23, with a
 Cista feasibility experiment on 2026-08-24, and with security-mode and
 checksum matrices on 2026-08-25
 
+Status updated on 2026-09-07. The measurements below retain their original
+revisions. The
+[downstream PHP/APCu report](https://github.com/jbboehr/php-mustache/blob/d868bb9e2ff800c1c21800769450ca18b5799f2f/docs/development/libmustache-update-2026-09-06.md#archive-benchmark)
+records a later run that passed the predeclared median and p95 threshold for
+every medium and large workload against libmustache `e6b2de0`. That result does
+not measure later archive generations or turn the experimental bytes into a
+durable interchange format.
+
 ## Decision
 
 Cache template source across PHP requests today, and do not use the legacy AST
@@ -23,10 +31,11 @@ On 2026-08-24, an opt-in Cista experiment rendered a checked immutable archive
 directly, without rebuilding `Node` trees or cloning partials. It was 73% to
 81% faster than source compilation plus rendering at median and p95 for the
 medium and large workloads. This clears the native portion of the predeclared
-20% threshold and removes the old partial-ownership penalty. It does not yet
-clear the PHP gate: PHP serialization and APCu fetch/store have not been
-measured, the payload is 4.35 to 4.80 times source, and the prototype does not
-support lambdas or inline-partial ownership.
+20% threshold and removes the old partial-ownership penalty. At that stage,
+PHP serialization and APCu fetch/store had not been measured, the payload was
+4.35 to 4.80 times source, and the prototype did not support lambdas or
+inline-partial ownership. Later implementation and downstream results are
+recorded separately above.
 
 A 2026-08-25 security-mode matrix measured `DEEP_CHECK` and `WITH_INTEGRITY`
 independently and together. Deep checking changed medium and large
@@ -47,10 +56,10 @@ Cista format was 16% to 33% slower than compiling and writing the legacy AST,
 or about 25 microseconds to 5.1 milliseconds per write on this noisy host. That
 is not a concern for the intended write-once, render-many lifecycle.
 
-Deep checking and libmustache semantic validation remain mandatory for an
-eventual archived-template format. The initial default should also enable
-Cista integrity with the pinned modern XXH3 implementation. None of these
-unkeyed checksums authenticates a hostile writer; the expected deployment does
+Deep checking and libmustache semantic validation remain mandatory for
+archived templates. The implemented default also enables Cista integrity with
+the pinned modern XXH3 implementation. None of these unkeyed checksums
+authenticates a hostile writer; the expected deployment does
 not currently require that property.
 
 Request-local compiled reuse remains useful when one request renders the same
@@ -59,13 +68,12 @@ and is not the primary cross-request optimization.
 
 The compatibility window is now explicit: libmustache keeps checked legacy AST
 reads throughout the 0.6 release series, and php-mustache keeps them throughout
-its 0.x release series. AST writes should be deprecated when source-cache
-guidance or a replacement format ships. Removing the reader requires a separate
-incompatible release decision and migration notice. New cache guidance should
-prefer source until the Cista design is exercised through php-mustache's actual
-one-fetch/one-render APCu boundary. A production format still requires a
-canonical compatibility model, full Mustache semantics, fuzzing, and an
-explicit security review.
+its 0.x release series. Libmustache's legacy writer APIs also remain available
+through 0.6.x, with source recommended for new durable caches. Removing those
+APIs requires a separately announced incompatible release. The successful
+PHP/APCu experiment does not change the experimental format's persistence
+status. Promoting it still requires a canonical compatibility model, full
+Mustache semantics, fuzzing, and an explicit security review.
 
 ## Predeclared threshold
 
@@ -82,8 +90,9 @@ cleared 20%, but medium and large partial graphs regressed median and p95
 latency in both warm and fresh-process runs.
 
 The later Cista experiment cleared the native latency threshold for every
-medium and large shape, including nested partial graphs. It therefore warrants
-an end-to-end PHP/APCu experiment; it does not replace that experiment.
+medium and large shape, including nested partial graphs. The subsequent
+downstream experiment above cleared the PHP/APCu threshold on its tested
+revision. Neither result establishes the performance of a later format.
 
 ## Workload and oracles
 
@@ -601,37 +610,22 @@ reverse the result in both warm and fresh-process measurements, serialization
 plus store strongly favors source, and every legacy AST consumes more than
 twice the cache space.
 
-The Cista result materially changes the next question. Direct validated archive
-views eliminate the graph reconstruction and ownership-clone costs, and their
-native read path comfortably clears the threshold. The remaining decision must
-be made at the real PHP boundary, where the larger payload, Zend string handling,
-alignment, PHP serialization, APCu copying, and one-fetch/one-render lifecycle
-can erase part of that gain.
+Direct validated archive views remove graph reconstruction and ownership-clone
+costs. The later downstream benchmark also cleared the threshold through the
+real PHP/APCu boundary. Keep those results tied to the tested revision and
+repeat the experiment when evaluating a different archive generation.
 
-Recommended follow-up:
+Current follow-up:
 
-1. Document cached source as the default persistent PHP cache value.
-2. Refactor libmustache so owned nodes and an archived-template representation
-   share one rendering algorithm without exposing Cista types in public headers.
-3. Keep archived-template support optional. It was default-off during the
-   feasibility phase and now defaults to dependency-based automatic detection.
-   Vendor a reviewed, pinned Cista snapshot and license by default; retain
-   separately tested, default-off system-package overrides for packagers.
-4. Retain the completed lambda, inline-partial, format-preamble, golden,
-   corruption, alignment, and selected
-   `WITH_VERSION | DEEP_CHECK | WITH_INTEGRITY` coverage using pinned modern
-   XXH3. Add backing-store lifetime tests and fuzz validation plus rendering.
-   Treat integrity as accidental-corruption detection rather than
-   authentication, and measure the complete policy through the PHP/APCu path.
-5. Only after the secured native path passes, prototype the libmustache-owned
-   archived view behind an experimental php-mustache API and benchmark one APCu
-   fetch plus one render against cached source. Include warm and fresh-process
-   cases, payload-copy or aligned-copy cost, peak memory, and writer cost.
-6. Treat request-local compiled reuse as a secondary optimization only for
-   applications that render the same view repeatedly in one request.
-7. Keep accepting checked legacy AST payloads through libmustache 0.6.x and
-   php-mustache 0.x. Deprecate writes when source-cache guidance or a replacement
-   format ships; require a separately announced incompatible release to remove
-   reads.
-8. Adopt a canonical persistent format only if the complete PHP/APCu path still
-   clears the predeclared threshold for every medium and large shape.
+1. Keep source as the recommended value for new durable caches. Retain checked
+   legacy reads through libmustache 0.6.x and php-mustache 0.x, and keep the
+   libmustache writer APIs through 0.6.x.
+2. Retain the implemented shared renderer, private dependencies, optional
+   archive support, and backing-store lifetime tests. Direct the archive
+   fuzzer at the public loader, since it currently uses the benchmark adapter.
+3. Preserve the experimental archive cache namespace through the complete
+   `archivedTemplateCompatibilityTag()` and retain source for regeneration.
+4. Validate the final library revision downstream. Before promoting archive
+   persistence, verify that the chosen generation meets the semantic,
+   compatibility, fuzzing, and security requirements and repeat the complete
+   PHP/APCu benchmark. A latency win alone does not settle that decision.

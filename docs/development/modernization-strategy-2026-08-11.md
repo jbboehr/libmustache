@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-11
 
-**Last revised:** 2026-08-20
+**Last revised:** 2026-09-07
 
 **Status:** Active implementation and release strategy
 
@@ -12,6 +12,13 @@ build-system hardening work. It incorporates the findings from the
 [build-hardening follow-up](build-hardening-follow-up-2026-08-11.md), a review
 of php-mustache as the library's primary downstream consumer, and subsequent
 review of the original modernization plan.
+
+The native modernization and downstream ABI 6 integration have been exercised.
+The [updated handoff status](php-mustache-handoff-2026-08-20.md#status-on-2026-09-07)
+records the downstream PHPT and PHP/APCu results and their exact library
+revisions. The phase descriptions retain the original implementation plan.
+Final-revision verification remains open, and the 0.6 compatibility policy
+below retains the current exported APIs.
 
 ## Direction
 
@@ -38,16 +45,16 @@ boundary while discarding approximate C++ source compatibility. Rust should be
 reconsidered only if the long-term product becomes a language-neutral engine
 behind a stable C ABI rather than primarily a C++ library.
 
-C++17 is the proposed initial language baseline. It provides the important
+C++17 is the implemented language baseline. It provides the
 ownership and representation tools, including `std::variant` and
 `std::string_view`, without unnecessarily raising downstream compiler
 requirements. C++20 can be selected later if a packaging and consumer survey
 shows that the higher baseline is acceptable.
 
-Raising the baseline should also remove obsolete portability machinery such as
-the `AC_CXX_STL_HASH` probe and `MUSTACHE_HASH_*` indirection. The installed
-`MUSTACHE_HAVE_CXX11` macro and `mustachec -v` output need an explicit
-deprecation or replacement rather than silent removal.
+Raising the baseline removed obsolete portability machinery such as the
+`AC_CXX_STL_HASH` probe and `MUSTACHE_HASH_*` indirection. The installed
+`MUSTACHE_HAVE_CXX11` macro remains a compatibility alias. New consumers can
+use `MUSTACHE_CXX_STANDARD` or `MUSTACHE_HAVE_CXX17`.
 
 ## Compatibility policy
 
@@ -84,19 +91,19 @@ number to every incompatible commit on the unreleased development line.
 The current public-header audit, exact source replacements, and retention
 policy are recorded in the
 [ABI 6 source-migration guide](abi-6-source-migration-2026-08-20.md). The
-development branch does not yet attach compiler deprecation attributes to
-transitional APIs: php-mustache must first be migrated and tested, and
-warnings-as-errors consumers must not be broken before a replacement has been
-validated. Before 0.6.0, the downstream results will determine which surfaces
-can be removed and which must remain for the complete 0.6 ABI lifetime.
+0.6 release retains all currently exported compatibility APIs through 0.6.x
+and adds no compiler deprecation attributes. php-mustache builds against ABI 6
+but still uses public AST compatibility operations. Their removal requires a
+separately announced incompatible release.
 
 The current AST byte format is publicly exposed by php-mustache through the
 `MustacheAST` constructor, string conversion, and PHP serialization hooks. It
 therefore cannot be treated as an internal or APC-only cache format. The
-existing decoder must be made safe now. Whether libmustache should introduce a
-replacement format, however, is a separate decision that will be made from a
-PHP benchmark of validated AST decoding versus source reparsing. The project
-will not commit to maintaining two formats indefinitely.
+checked decoder remains supported through libmustache 0.6.x and php-mustache
+0.x. Source remains the recommended value for new durable caches. The optional
+archived-template experiment has crossed the PHP/APCu performance threshold on
+a recorded development revision, but its native bytes remain experimental and
+must be recoverable by recompiling source.
 
 ## Execution principles
 
@@ -640,7 +647,8 @@ warm large-flat p95 threshold, used 2.16 to 2.38 times the cache space, and cost
 16 to 19 times as much to serialize and store at medium and large sizes. A
 later checked Cista direct-view prototype removed the graph reconstruction
 penalty and cleared the native latency threshold, but used 4.35 to 4.80 times
-the source bytes and has not been measured through PHP serialization or APCu.
+the source bytes. At that stage it had not been measured through PHP
+serialization or APCu.
 Those measurements used `WITH_STATIC_VERSION`, ordinary Cista bounds checks,
 and libmustache's semantic validator. A later four-mode native benchmark found
 that `DEEP_CHECK` cost less than 1% while Cista's FNV-1a-based
@@ -713,13 +721,15 @@ including a fixed partial and lambda. The sanitizer-backed 1,000-run smoke test
 is part of `nix build .#checks.x86_64-linux.libmustache-fuzz`; a longer
 acceptance run has completed, and the public-handle tests cover backing-store
 lifetime, unaligned caller input, copy/move behavior, reuse, corruption, and
-empty handles. The remaining gate before PHP exposure is the real
-one-fetch/one-render APCu integration and benchmark.
+empty handles. The fuzzer uses the benchmark adapter, whose validation path
+differs from the public loader. Direct fuzz coverage of the public loader
+remains a release follow-up.
 
-The next end-to-end performance slice is the real one-fetch/one-render PHP/APCu
-path after those native gates pass. Do not adopt a replacement format unless
-that path clears the threshold and the format's semantic, compatibility,
-fuzzing, and security requirements are met.
+The downstream one-fetch/one-render PHP/APCu experiment subsequently passed
+the threshold against libmustache `e6b2de0`, as recorded in the updated handoff.
+That result does not freeze the experimental byte format or validate a later
+archive generation. A persistence decision still requires the format's
+semantic, compatibility, fuzzing, and security requirements to be met.
 Keep checked legacy AST reads through libmustache 0.6.x and php-mustache 0.x;
 removal requires a separately announced incompatible release.
 
@@ -772,12 +782,21 @@ jobs, fuzz smoke tests, and the supported php-mustache matrix pass; version and
 ABI consistency checks pass; no unresolved high-severity finding remains; and
 the migration and compatibility policies are published with the release.
 
-## Immediate implementation order
+## Remaining release work
 
-As of 2026-08-20, the C++ safety work in steps 1 through 5, 7, and 8 is
-implemented on the 0.6 development branch. The remaining release-critical
-sequence is the representative downstream build, php-mustache migration and
-benchmark, compatibility-surface decision, and release verification.
+As of September 7, the native implementation, downstream ABI 6 integration,
+and PHP/APCu experiment have recorded results. The current compatibility
+surfaces will remain through 0.6.x. Before release:
+
+1. Cover the public archived-template loader directly with the archive fuzzer.
+2. Update php-mustache's library pin and run both projects' supported matrices
+   against the final release revision.
+3. Run the distribution and installed-consumer checks on the final source
+   archive and publish the [release notes](../../CHANGELOG.md).
+
+## Original implementation order
+
+The original sequence was:
 
 1. Fix specification accounting and commit the behavior/deviation ledger.
 2. Add scalar golden tests and import the php-mustache AST byte fixtures.

@@ -43,6 +43,11 @@ if [ ! -d "$source_dir" ]; then
   exit 1
 fi
 
+if [ ! -s "$source_dir/spec/LICENSE" ]; then
+  printf 'release archive is missing the Mustache specification license: spec/LICENSE\n' >&2
+  exit 1
+fi
+
 "$source_dir/scripts/check-version-consistency.sh"
 
 cmake_full="$scratch/cmake-full"

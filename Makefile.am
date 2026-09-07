@@ -7,6 +7,7 @@ ACLOCAL_AMFLAGS = -I m4
 
 EXTRA_DIST = \
 	README.md \
+	CHANGELOG.md \
 	LICENSE.md \
 	benchmarks/CMakeLists.txt \
 	benchmarks/ast-cache-vs-source.cpp \
@@ -38,6 +39,7 @@ EXTRA_DIST = \
 	src/archive/xxh3.cpp \
 	src/archive/xxh3/xxh3.h \
 	spec/specs \
+	spec/LICENSE \
 	tests/check_archive_feature_modes.cmake \
 	tests/check_cmake_config_header.cmake \
 	tests/check_cmake_subproject.cmake \
