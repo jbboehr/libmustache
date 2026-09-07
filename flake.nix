@@ -250,23 +250,11 @@
       }
     )
     // {
-      githubActions.matrix.include = let
-        cleanName = value:
-          value
-          // {
-            name =
-              builtins.replaceStrings
-              ["githubActions." "checks." "x86_64-linux." "\""]
-              ["" "" "" ""]
-              value.attr;
-          };
-      in
-        builtins.map cleanName
+      githubActions.matrix =
         (nix-github-actions.lib.mkGithubMatrix {
           attrPrefix = "checks";
-          checks = nixpkgs.lib.getAttrs ["x86_64-linux"] self.checks;
+          inherit (self) checks;
         })
-        .matrix
-        .include;
+        .matrix;
     };
 }

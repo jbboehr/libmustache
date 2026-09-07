@@ -493,7 +493,7 @@ jobs:
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   nix:
-    name: Nix (${{ matrix.name }})
+    name: Nix (${{ matrix.system }}, ${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     needs: nix-matrix
     timeout-minutes: 30
