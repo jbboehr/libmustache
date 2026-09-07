@@ -5,6 +5,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <exception>
 #include <limits>
 #include <string_view>
@@ -115,9 +116,9 @@ template <typename Type> cista::hash_t archiveCanonicalTypeHash() noexcept
         ++matched;
       }
       if (matched == removed.size()) {
-        for (std::size_t source = position + removed.size(); source < canonicalSize; ++source) {
-          canonicalName[source - removed.size()] = canonicalName[source];
-        }
+        // The suffix can overlap its destination when closing the gap.
+        std::memmove(canonicalName.data() + position, canonicalName.data() + position + removed.size(),
+            canonicalSize - position - removed.size());
         canonicalSize -= removed.size();
       } else {
         ++position;
