@@ -638,9 +638,9 @@ void Node::discardSource()
     if (node->child) {
       nodes.push_back(node->child.get());
     }
-    for (const auto& child : node->children) {
-      if (child) {
-        nodes.push_back(child.get());
+    for (const auto& childNode : node->children) {
+      if (childNode) {
+        nodes.push_back(childNode.get());
       }
     }
     for (const auto& partial : node->partials) {
