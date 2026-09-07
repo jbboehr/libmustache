@@ -863,7 +863,8 @@ template <typename PartialSource> class RenderEngine final : public Renderer::Ac
           const std::string_view start = startSequence.value();
           const std::string_view stop = stopSequence.value();
           const std::string text = lambdaSectionText(node, start, stop, depth);
-          const LambdaResult result = renderer_._invokeSectionLambda(value.lambdaValue(), text, this);
+          const LambdaResult result = renderer_._invokeSectionLambda(
+              value.lambdaValue(), text, start, stop, node.flags() & Node::FlagEscape, this);
           const std::string& invoked = result.text();
           if (isLiteralResult(result)) {
             renderer_._append(invoked);

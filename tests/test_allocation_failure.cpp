@@ -527,6 +527,71 @@ void testRenderingFailureDoesNotPublishPartialOutput()
       });
 }
 
+class AllocationContextLambda final : public mustache::Lambda {
+  public:
+    mustache::LambdaRenderContext retained;
+
+    mustache::LambdaResult invokeResult(std::string_view body, mustache::LambdaRenderContext context) override
+    {
+      retained = context;
+      return context.renderTemplate(body);
+    }
+};
+
+struct ContextRenderingCase {
+    ContextRenderingCase() :
+        engine(std::make_unique<mustache::Mustache>()),
+        callback(std::make_shared<AllocationContextLambda>())
+    {
+      engine->tokenize("Hello {{#callback}}{{name}} {{>card}}{{/callback}}", &root);
+      auto card = std::make_unique<mustache::Node>();
+      engine->tokenize("[{{name}}]", card.get());
+      partials.emplace("card", std::move(card));
+      data.set("name", mustache::Data::string("Ada"));
+      data.set("callback", mustache::Data::sharedLambda(callback));
+    }
+
+    std::unique_ptr<mustache::Mustache> engine;
+    mustache::Node root;
+    mustache::Node::Partials partials;
+    std::shared_ptr<AllocationContextLambda> callback;
+    mustache::Data data = mustache::Data::object();
+    std::string output = "preserved";
+};
+
+constexpr std::string_view expectedContextRender = "Hello Ada [Ada]";
+
+std::string renderContextCase(const ContextRenderingCase& state)
+{
+  std::string output;
+  state.engine->render(&state.root, &state.data, &state.partials, &output);
+  return output;
+}
+
+void testContextHelperAllocationFailureUnwinds()
+{
+  exerciseAllocationFailures(
+      "lambda context helper rendering",
+      []() {
+        return ContextRenderingCase();
+      },
+      [](ContextRenderingCase& state) {
+        state.output = renderContextCase(state);
+      },
+      [](const ContextRenderingCase& state) {
+        expect(state.output == "preserved", "context helper allocation failure published partial output");
+        expect(!state.callback->retained.active(), "context helper allocation failure retained an active context");
+        expect(std::string_view(renderContextCase(state)) == expectedContextRender,
+            "renderer was not reusable after context helper allocation failure");
+        expect(!state.callback->retained.active(), "context helper rerender retained an active context");
+      },
+      [](const ContextRenderingCase& state) {
+        expect(std::string_view(state.output) == expectedContextRender,
+            "context helper rendering did not complete after the allocation-failure sweep");
+        expect(!state.callback->retained.active(), "successful context helper render retained an active context");
+      });
+}
+
 } // namespace
 
 int main(int argc, char ** argv)
@@ -555,5 +620,6 @@ int main(int argc, char ** argv)
 #endif
   testDeserializationFailureDoesNotPublishPartialTree();
   testRenderingFailureDoesNotPublishPartialOutput();
+  testContextHelperAllocationFailureUnwinds();
   return failures == 0 ? 0 : 1;
 }

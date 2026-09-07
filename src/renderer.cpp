@@ -392,15 +392,15 @@ void Renderer::_appendLambdaTemplate(std::string * output, std::string_view valu
   }
 }
 
-LambdaResult Renderer::_invokeSectionLambda(
-    Lambda * lambda, std::string_view text, ActiveRenderEngine * activeRenderEngine)
+LambdaResult Renderer::_invokeSectionLambda(Lambda * lambda, std::string_view text, std::string_view start,
+    std::string_view stop, bool escapeOutput, ActiveRenderEngine * activeRenderEngine)
 {
   if (lambda == NULL) {
     throw Exception("Missing section lambda");
   }
 
   ActiveEngineScope activeEngineScope(this, activeRenderEngine);
-  LambdaRenderContext context(this);
+  LambdaRenderContext context(this, start, stop, escapeOutput);
   ++_lambdaCallbackDepth;
   const auto callbackGuard = detail::onRenderScopeExit([this, &context]() {
     context.invalidate();

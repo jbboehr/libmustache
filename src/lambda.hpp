@@ -51,7 +51,7 @@ class LambdaResult {
     \brief Callback-scoped access to the active renderer.
 
     Copies share one callback frame. Once that callback returns or throws,
-    every retained copy becomes inactive and render() throws a library
+    every retained copy becomes inactive and rendering throws a library
     exception without accessing the former Renderer object. Contexts are not
     safe for concurrent rendering.
 */
@@ -60,7 +60,7 @@ class LambdaRenderContext {
     struct State;
     std::shared_ptr<State> state;
 
-    explicit LambdaRenderContext(Renderer * renderer);
+    LambdaRenderContext(Renderer * renderer, std::string_view start, std::string_view stop, bool escapeOutput);
     Renderer * legacyRenderer() const;
     void invalidate() noexcept;
 
@@ -85,6 +85,16 @@ class LambdaRenderContext {
 
     //! Renders a node and returns owned output.
     MUSTACHE_API std::string render(const Node& node) const;
+
+    //! Renders an already-tokenized node and returns literal output.
+    MUSTACHE_API LambdaResult renderResult(const Node& node) const;
+
+    /*! Renders source using this section's opening delimiters and rendering settings.
+
+        Returns literal output. Parsing and rendering share the active render's
+        budgets; returning this result also charges its final output append.
+    */
+    MUSTACHE_API LambdaResult renderTemplate(std::string_view source) const;
 };
 
 /*! \class Lambda

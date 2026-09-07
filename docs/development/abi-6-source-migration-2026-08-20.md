@@ -344,22 +344,44 @@ delimiter rules: default delimiters for interpolation, the section's opening
 delimiters for sections. Literal results consume output budget without a parsing
 charge. Section input still consumes its existing lambda byte budget.
 
-For output already rendered through the callback context, return an explicit
-literal result to avoid another parse:
+Use `context.renderTemplate(body)` to render section source and return it as a
+literal result. It uses that callback's opening delimiters, current data stack,
+partial lookup, and rendering settings. For example, a wrapper can render its
+body before adding markup:
 
 ```cpp
 class SectionLambda : public mustache::Lambda {
   public:
     mustache::LambdaResult invokeResult(
-        std::string_view,
+        std::string_view body,
         mustache::LambdaRenderContext context) override
     {
-      mustache::Node name(
-          mustache::Node::TypeVariable, "name", mustache::Node::FlagEscape);
-      return mustache::LambdaResult::literal(context.render(name));
+      auto rendered = context.renderTemplate(body);
+      return mustache::LambdaResult::literal(
+          "<b>" + rendered.text() + "</b>");
     }
 };
 ```
+
+For `{{#wrap}}{{name}}{{/wrap}}` with `name = "{{other}}"`, this produces
+`<b>{{other}}</b>` under either string mode. The output is not parsed again.
+Returning `rendered` directly also preserves its literal interpretation.
+`LambdaResult::fromString(rendered.text())` explicitly discards that interpretation
+and makes the text subject to the configured mode again.
+
+For an existing AST node, use `context.renderResult(node)`. It keeps the node's
+tokenization and escaping flags and returns a literal result. The existing
+`context.render(node)` and output-buffer overload still return/write ordinary
+strings for callers that need those contracts.
+
+Both helpers share the active render's limits and string mode. `renderTemplate`
+charges its submitted source to the lambda-template byte budget, even when the
+same bytes were already charged as section input. Parsed nodes and subsequent
+node visits are charged separately. `renderResult` only traverses the existing
+node, without a parsing charge. Intermediate helper output and its final append
+both count toward the output budget: rendering a one-byte body and returning the
+result requires two output bytes. Nested helpers keep the same counters and
+retain their own opening delimiters.
 
 `Mustache::setLambdaStringMode(LambdaStringMode::Literal)` opts an engine into
 literal interpretation for ordinary callback strings on every member render path.
@@ -384,6 +406,7 @@ Every copy of a `LambdaRenderContext` becomes inactive when that exact callback
 returns or throws. Later use throws without dereferencing the old renderer.
 Nested callbacks have independent frames. Rendering through a context is
 synchronous and not intended for concurrent use.
+The owned result remains valid after the callback ends; the context does not.
 
 A binding should translate all `mustache::Exception` and callback failures
 before returning through its language runtime's C ABI. No C++ exception may

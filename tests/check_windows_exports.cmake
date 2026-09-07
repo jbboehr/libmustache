@@ -29,6 +29,8 @@ set(required_exports
     "?empty@CompiledTemplate@mustache@@"
     "?fromJSON@Data@mustache@@"
     "?active@LambdaRenderContext@mustache@@"
+    "?renderResult@LambdaRenderContext@mustache@@"
+    "?renderTemplate@LambdaRenderContext@mustache@@"
     "?invoke@Lambda@mustache@@"
     "?invokeResult@Lambda@mustache@@"
     "?fromString@LambdaResult@mustache@@"

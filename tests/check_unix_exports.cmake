@@ -61,6 +61,8 @@ require_export_count("^_?_ZN8mustache12LambdaResult14templateSource.*$" 1 "templ
 require_export_count("^_?_ZNK8mustache12LambdaResult4kindEv$" 1 "lambda result kind")
 require_export_count("^_?_ZNK8mustache12LambdaResult4text.*$" 1 "lambda result text")
 require_export_count("^_?_ZN8mustache6Lambda12invokeResult.*$" 2 "result callback overloads")
+require_export_count("^_?_ZNK8mustache19LambdaRenderContext12renderResult.*$" 1 "literal node render helper")
+require_export_count("^_?_ZNK8mustache19LambdaRenderContext14renderTemplate.*$" 1 "literal template render helper")
 require_export_count("^_?_ZN8mustache8Renderer19setLambdaStringMode.*$" 1 "lambda string mode setter")
 require_export_count("^_?_ZNK8mustache8Renderer19getLambdaStringModeEv$" 1 "lambda string mode getter")
 if(MUSTACHE_ARCHIVED_TEMPLATES)

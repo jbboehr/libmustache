@@ -137,7 +137,8 @@ class Renderer {
     void _consumeLambdaNodes(const Node * node);
 
     //! Invokes a section lambda within a scoped render capability frame
-    LambdaResult _invokeSectionLambda(Lambda * lambda, std::string_view text, ActiveRenderEngine * activeRenderEngine);
+    LambdaResult _invokeSectionLambda(Lambda * lambda, std::string_view text, std::string_view start,
+        std::string_view stop, bool escapeOutput, ActiveRenderEngine * activeRenderEngine);
 
     //! Appends bounded source reconstructed for a lambda callback
     void _appendLambdaTemplate(std::string * output, std::string_view value);
@@ -145,6 +146,7 @@ class Renderer {
     void setPartialResolver(PartialResolver resolver);
 
     friend class Mustache;
+    friend class LambdaRenderContext;
 
     bool _strictPaths;
 

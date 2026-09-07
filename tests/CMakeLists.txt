@@ -86,6 +86,11 @@ target_link_libraries(test_lambda_results PRIVATE mustache_static)
 mustache_apply_build_options(test_lambda_results)
 add_test(NAME lambda_results COMMAND test_lambda_results)
 
+add_executable(test_lambda_context test_lambda_context.cpp)
+target_link_libraries(test_lambda_context PRIVATE mustache_static)
+mustache_apply_build_options(test_lambda_context)
+add_test(NAME lambda_context COMMAND test_lambda_context)
+
 add_executable(test_stack_safety test_stack_safety.cpp)
 target_link_libraries(test_stack_safety PRIVATE mustache_static)
 mustache_apply_build_options(test_stack_safety)

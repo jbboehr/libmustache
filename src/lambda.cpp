@@ -6,6 +6,7 @@
 #include "exception.hpp"
 #include "node.hpp"
 #include "renderer.hpp"
+#include "tokenizer.hpp"
 
 namespace mustache {
 
@@ -40,16 +41,23 @@ const std::string& LambdaResult::text() const noexcept
 }
 
 struct LambdaRenderContext::State {
-    explicit State(Renderer * renderer) :
-        renderer(renderer)
+    State(Renderer * renderer, std::string_view start, std::string_view stop, bool escapeOutput) :
+        renderer(renderer),
+        start(start),
+        stop(stop),
+        escapeOutput(escapeOutput)
     {}
 
     mutable std::recursive_mutex mutex;
     Renderer * renderer;
+    const std::string start;
+    const std::string stop;
+    const bool escapeOutput;
 };
 
-LambdaRenderContext::LambdaRenderContext(Renderer * renderer) :
-    state(std::make_shared<State>(renderer))
+LambdaRenderContext::LambdaRenderContext(
+    Renderer * renderer, std::string_view start, std::string_view stop, bool escapeOutput) :
+    state(std::make_shared<State>(renderer, start, stop, escapeOutput))
 {}
 
 bool LambdaRenderContext::active() const
@@ -78,6 +86,29 @@ std::string LambdaRenderContext::render(const Node& node) const
   std::string output;
   render(node, output);
   return output;
+}
+
+LambdaResult LambdaRenderContext::renderResult(const Node& node) const
+{
+  return LambdaResult::literal(render(node));
+}
+
+LambdaResult LambdaRenderContext::renderTemplate(std::string_view source) const
+{
+  if (!state) {
+    throw Exception("Lambda render context is no longer active");
+  }
+  const std::lock_guard<std::recursive_mutex> lock(state->mutex);
+  if (state->renderer == NULL) {
+    throw Exception("Lambda render context is no longer active");
+  }
+  state->renderer->_consumeLambdaTemplate(source.size());
+  Tokenizer tokenizer;
+  tokenizer.setStartSequence(state->start);
+  tokenizer.setStopSequence(state->stop);
+  Node node;
+  state->renderer->_tokenizeLambda(&tokenizer, source, &node, state->escapeOutput);
+  return renderResult(node);
 }
 
 Renderer * LambdaRenderContext::legacyRenderer() const
