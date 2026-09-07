@@ -87,6 +87,7 @@ libmustache_la_SOURCES = \
 	mustache_export.hpp \
 	node.cpp \
 	node.hpp \
+	parse_budget.hpp \
 	render_engine.hpp \
 	renderer.cpp \
 	renderer.hpp \

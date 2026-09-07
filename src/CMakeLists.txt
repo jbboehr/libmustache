@@ -54,6 +54,7 @@ if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES)
     endif()
 endif()
 set(MUSTACHE_PRIVATE_HEADERS
+    parse_budget.hpp
     render_engine.hpp
 )
 if(MUSTACHE_HAVE_LIBJSON)

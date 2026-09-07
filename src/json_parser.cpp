@@ -1,4 +1,5 @@
 #include "data.hpp"
+#include "parse_budget.hpp"
 
 #include <cmath>
 #include <limits>
@@ -26,8 +27,6 @@
 namespace mustache {
 
 namespace {
-
-const std::size_t parseNestingCeiling = 256;
 
 std::optional<std::string> normalizeFloatingSpelling(const std::string& spelling)
 {
@@ -82,53 +81,6 @@ std::optional<std::string> normalizeFloatingSpelling(const std::string& spelling
   return normalized;
 }
 
-class JSONParseBudget {
-  public:
-    explicit JSONParseBudget(const Data::ParseLimits& limits) :
-        limits_(limits),
-        nodes_(0),
-        stringBytes_(0),
-        containerEntries_(0)
-    {}
-
-    void addNode(std::size_t depth)
-    {
-      if (depth >= limits_.maxNestingDepth || depth >= parseNestingCeiling) {
-        fail(" nesting limit exceeded");
-      }
-      consume(nodes_, 1, limits_.maxNodes, " node count limit exceeded");
-    }
-
-    void addString(std::size_t bytes)
-    {
-      consume(stringBytes_, bytes, limits_.maxStringBytes, " string byte limit exceeded");
-    }
-
-    void addContainerEntries(std::size_t entries)
-    {
-      consume(containerEntries_, entries, limits_.maxContainerEntries, " container entry limit exceeded");
-    }
-
-  private:
-    const Data::ParseLimits& limits_;
-    std::size_t nodes_;
-    std::size_t stringBytes_;
-    std::size_t containerEntries_;
-
-    [[noreturn]] void fail(const char * description) const
-    {
-      throw Exception(std::string("JSON") + description);
-    }
-
-    void consume(std::size_t& used, std::size_t amount, std::size_t maximum, const char * description)
-    {
-      if (used > maximum || amount > maximum - used) {
-        fail(description);
-      }
-      used += amount;
-    }
-};
-
 } // namespace
 
 #if defined(__GNUC__) && !defined(_WIN32)
@@ -140,7 +92,7 @@ class JSONParseBudget {
 class MUSTACHE_LOCAL_CLASS Data::JSONDataBuilder final : public nlohmann::json_sax<nlohmann::json> {
   public:
     explicit JSONDataBuilder(const Data::ParseLimits& limits) :
-        budget_(limits)
+        budget_(limits, "JSON")
     {}
 
     bool null() override
@@ -258,7 +210,7 @@ class MUSTACHE_LOCAL_CLASS Data::JSONDataBuilder final : public nlohmann::json_s
         std::optional<std::string> key;
     };
 
-    JSONParseBudget budget_;
+    ParseBudget budget_;
     std::vector<Frame> frames_;
     std::optional<Data> result_;
 
