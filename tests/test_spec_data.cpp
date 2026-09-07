@@ -32,20 +32,17 @@ mustache::Data parseData(std::string_view fixture)
   if (!yaml_parser_initialize(&parser)) {
     throw std::bad_alloc();
   }
+  std::unique_ptr<yaml_parser_t, decltype(&yaml_parser_delete)> parserCleanup(&parser, &yaml_parser_delete);
   yaml_parser_set_input_string(&parser, reinterpret_cast<const unsigned char *>(fixture.data()), fixture.size());
-  if (!yaml_parser_load(&parser, &document)) {
-    yaml_parser_delete(&parser);
+  const bool loaded = yaml_parser_load(&parser, &document) != 0;
+  parserCleanup.reset();
+  if (!loaded) {
     throw std::runtime_error("Unable to parse test fixture");
   }
-  yaml_parser_delete(&parser);
+  const std::unique_ptr<yaml_document_t, decltype(&yaml_document_delete)> documentCleanup(
+      &document, &yaml_document_delete);
   mustache::Data data;
-  try {
-    mustache_spec_parse_data(&document, yaml_document_get_root_node(&document), &data);
-  } catch (...) {
-    yaml_document_delete(&document);
-    throw;
-  }
-  yaml_document_delete(&document);
+  mustache_spec_parse_data(&document, yaml_document_get_root_node(&document), &data);
   return data;
 }
 

@@ -591,36 +591,26 @@ class YAMLPreflight {
       if (yaml_parser_initialize(&parser) == 0) {
         throw Exception("Failed to initialize yaml parser");
       }
+      std::unique_ptr<yaml_parser_t, decltype(&yaml_parser_delete)> parserCleanup(&parser, &yaml_parser_delete);
 
       static const unsigned char emptyInput = 0;
       const unsigned char * input =
           input_.empty() ? &emptyInput : reinterpret_cast<const unsigned char *>(input_.data());
       yaml_parser_set_input_string(&parser, input, input_.size());
 
-      try {
-        bool finished = false;
-        while (!finished) {
-          yaml_event_t event;
-          if (yaml_parser_parse(&parser, &event) == 0) {
-            if (completedDocuments_ != 0) {
-              throw Exception("Invalid trailing YAML content");
-            }
-            throw Exception("Failed to parse yaml document");
+      bool finished = false;
+      while (!finished) {
+        yaml_event_t event;
+        if (yaml_parser_parse(&parser, &event) == 0) {
+          if (completedDocuments_ != 0) {
+            throw Exception("Invalid trailing YAML content");
           }
-
-          try {
-            finished = handle(event);
-          } catch (...) {
-            yaml_event_delete(&event);
-            throw;
-          }
-          yaml_event_delete(&event);
+          throw Exception("Failed to parse yaml document");
         }
-      } catch (...) {
-        yaml_parser_delete(&parser);
-        throw;
+        const std::unique_ptr<yaml_event_t, decltype(&yaml_event_delete)> eventCleanup(&event, &yaml_event_delete);
+        finished = handle(event);
       }
-      yaml_parser_delete(&parser);
+      parserCleanup.reset();
 
       if (!sawRoot_) {
         throw Exception("Empty yaml document");
@@ -862,42 +852,37 @@ Data Data::fromYAML(std::string_view string, const ParseLimits& limits)
   if (yaml_parser_initialize(&parser) == 0) {
     throw Exception("Failed to initialize yaml parser");
   }
+  const std::unique_ptr<yaml_parser_t, decltype(&yaml_parser_delete)> parserCleanup(&parser, &yaml_parser_delete);
 
   static const unsigned char emptyInput = 0;
   const unsigned char * input = string.empty() ? &emptyInput : reinterpret_cast<const unsigned char *>(string.data());
   yaml_parser_set_input_string(&parser, input, string.size());
   if (yaml_parser_load(&parser, &document) == 0) {
-    yaml_parser_delete(&parser);
     throw Exception("Failed to parse yaml document");
   }
+  const std::unique_ptr<yaml_document_t, decltype(&yaml_document_delete)> documentCleanup(
+      &document, &yaml_document_delete);
 
-  try {
-    yaml_node_t * root = yaml_document_get_root_node(&document);
-    if (root == nullptr) {
-      throw Exception("Empty yaml document");
-    }
-    ParseBudget budget(limits, "YAML");
-    std::unordered_set<yaml_node_t *> active;
-    Data data = createFromYAMLNode(&document, root, budget, active, 0);
-
-    yaml_document_t trailingDocument;
-    if (yaml_parser_load(&parser, &trailingDocument) == 0) {
-      throw Exception("Invalid trailing YAML content");
-    }
-    const bool hasTrailingDocument = yaml_document_get_root_node(&trailingDocument) != nullptr;
-    yaml_document_delete(&trailingDocument);
-    if (hasTrailingDocument) {
-      throw Exception("Multiple YAML documents are not supported");
-    }
-
-    yaml_document_delete(&document);
-    yaml_parser_delete(&parser);
-    return data;
-  } catch (...) {
-    yaml_document_delete(&document);
-    yaml_parser_delete(&parser);
-    throw;
+  yaml_node_t * root = yaml_document_get_root_node(&document);
+  if (root == nullptr) {
+    throw Exception("Empty yaml document");
   }
+  ParseBudget budget(limits, "YAML");
+  std::unordered_set<yaml_node_t *> active;
+  Data data = createFromYAMLNode(&document, root, budget, active, 0);
+
+  yaml_document_t trailingDocument;
+  if (yaml_parser_load(&parser, &trailingDocument) == 0) {
+    throw Exception("Invalid trailing YAML content");
+  }
+  std::unique_ptr<yaml_document_t, decltype(&yaml_document_delete)> trailingDocumentCleanup(
+      &trailingDocument, &yaml_document_delete);
+  const bool hasTrailingDocument = yaml_document_get_root_node(&trailingDocument) != nullptr;
+  trailingDocumentCleanup.reset();
+  if (hasTrailingDocument) {
+    throw Exception("Multiple YAML documents are not supported");
+  }
+  return data;
 #else
   static_cast<void>(string);
   static_cast<void>(limits);

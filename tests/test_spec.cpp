@@ -163,22 +163,19 @@ void parse_file(const char * fileData, std::size_t length)
   if (!yaml_parser_initialize(&parser)) {
     throw std::bad_alloc();
   }
+  std::unique_ptr<yaml_parser_t, decltype(&yaml_parser_delete)> parserCleanup(&parser, &yaml_parser_delete);
 
   const unsigned char * input = reinterpret_cast<const unsigned char *>(fileData);
 
   yaml_parser_set_input_string(&parser, input, length);
   const bool loaded = yaml_parser_load(&parser, &document) != 0;
-  yaml_parser_delete(&parser);
+  parserCleanup.reset();
   if (!loaded) {
     throw std::runtime_error("Unable to parse specification fixture");
   }
-  try {
-    mustache_spec_parse_document(&document);
-  } catch (...) {
-    yaml_document_delete(&document);
-    throw;
-  }
-  yaml_document_delete(&document);
+  const std::unique_ptr<yaml_document_t, decltype(&yaml_document_delete)> documentCleanup(
+      &document, &yaml_document_delete);
+  mustache_spec_parse_document(&document);
 }
 
 void mustache_spec_parse_document(yaml_document_t * document)
