@@ -93,8 +93,7 @@ stdenv.mkDerivation (finalAttrs: {
     ++ lib.optional cistaBenchmarkSupport zlib;
   propagatedBuildInputs = lib.optional (libyaml != null) libyaml;
   nativeBuildInputs =
-    lib.optional checkSupport mustache_spec
-    ++ lib.optionals cmakeSupport [cmake]
+    lib.optionals cmakeSupport [cmake]
     ++ lib.optional clangTidySupport clang-tools
     ++ lib.optionals (!cmakeSupport) [autoreconfHook libtool m4 autoconf automake]
     ++ [pkg-config];
@@ -113,7 +112,7 @@ stdenv.mkDerivation (finalAttrs: {
       "--libdir=${placeholder "lib"}/lib"
       "--includedir=${placeholder "dev"}/include"
     ]
-    ++ lib.optional checkSupport "--with-mustache-spec=${mustache_spec}/share/mustache-spec/specs"
+    ++ lib.optional checkSupport "--with-mustache-spec=${mustache_spec}/specs"
     ++ lib.optional checkSupport "--enable-warnings-as-errors"
     ++ lib.optionals staticOnlySupport ["--disable-shared" "--enable-static"]
     ++ lib.optional sanitizerSupport "--enable-sanitizers"
@@ -162,7 +161,7 @@ stdenv.mkDerivation (finalAttrs: {
         else "Release"
       }"
     ]
-    ++ lib.optional checkSupport "-DMUSTACHE_SPEC_DIR=${mustache_spec}/share/mustache-spec/specs";
+    ++ lib.optional checkSupport "-DMUSTACHE_SPEC_DIR=${mustache_spec}/specs";
 
   postBuild =
     lib.optionalString (

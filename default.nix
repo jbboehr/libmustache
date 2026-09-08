@@ -19,10 +19,10 @@ in
       ) {inherit (pkgs) lib;})
       .gitignoreFilterWith,
     mustache_spec ?
-      pkgs.callPackage (import (fetchTarball {
-        url = "https://github.com/jbboehr/mustache-spec/archive/${lock.nodes.mustache_spec.locked.rev}.tar.gz";
+      fetchTarball {
+        url = "https://github.com/mustache/spec/archive/${lock.nodes.mustache_spec.locked.rev}.tar.gz";
         sha256 = lock.nodes.mustache_spec.locked.narHash;
-      })) {},
+      },
     libmustacheSrc ? ./.,
     checkSupport ? true,
     cmakeSupport ? false,

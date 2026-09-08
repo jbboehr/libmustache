@@ -24,7 +24,10 @@
       url = "github:nix-community/nix-github-actions";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    mustache_spec.url = "github:jbboehr/mustache-spec";
+    mustache_spec = {
+      url = "github:mustache/spec/v1.4.3";
+      flake = false;
+    };
   };
 
   outputs = {
@@ -63,7 +66,7 @@
 
         makePackage = args:
           pkgs.callPackage ./default.nix ({
-              mustache_spec = mustache_spec.packages.${system}.mustache-spec;
+              inherit mustache_spec;
               libmustacheSrc = packageSrc;
               inherit (gitignore.lib) gitignoreFilterWith;
             }

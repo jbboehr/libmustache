@@ -77,21 +77,6 @@
         "type": "github"
       }
     },
-    "flake-utils_3": {
-      "locked": {
-        "lastModified": 1667395993,
-        "narHash": "sha256-nuEHfE/LcWyuSWnS8t12N1wc105Qtau+/OdUAjtQ0rA=",
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "rev": "5aed5285a952e0b949eb3ba02c12fa4fcfef535f",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "type": "github"
-      }
-    },
     "gitignore": {
       "inputs": {
         "nixpkgs": [
@@ -134,21 +119,19 @@
       }
     },
     "mustache_spec": {
-      "inputs": {
-        "flake-utils": "flake-utils_3",
-        "nixpkgs": "nixpkgs"
-      },
+      "flake": false,
       "locked": {
-        "lastModified": 1694565180,
-        "narHash": "sha256-Yw/X6sLSJkD0gbba5icBeDezpzHGRGhAC1MT4z4RlDM=",
-        "owner": "jbboehr",
-        "repo": "mustache-spec",
-        "rev": "f2f334fd9660c154a125af1278f08aa4b14e8513",
+        "lastModified": 1746219697,
+        "narHash": "sha256-x7vwSZPseb895T7nh2F4UiRcurL2pbO3gt1sMOqVHIM=",
+        "owner": "mustache",
+        "repo": "spec",
+        "rev": "97c05b0652f06ef4cbe12016b8d0e41df31c4b05",
         "type": "github"
       },
       "original": {
-        "owner": "jbboehr",
-        "repo": "mustache-spec",
+        "owner": "mustache",
+        "ref": "v1.4.3",
+        "repo": "spec",
         "type": "github"
       }
     },
@@ -173,21 +156,6 @@
       }
     },
     "nixpkgs": {
-      "locked": {
-        "lastModified": 1669499201,
-        "narHash": "sha256-Lg28Hi4dnBmA11OH9+MDWTbkem4Qnz1Ep//V3DQ+Fnc=",
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "rev": "b863103eaff9d092602963838e9c22a45bb8a30d",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nixos",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_2": {
       "locked": {
         "lastModified": 1786313170,
         "narHash": "sha256-9BG7OgUWdu0ONDO5X2q6+K4bsuBITkX/3W4nNJu1Ito=",
@@ -231,7 +199,7 @@
         "gitignore": "gitignore_2",
         "mustache_spec": "mustache_spec",
         "nix-github-actions": "nix-github-actions",
-        "nixpkgs": "nixpkgs_2",
+        "nixpkgs": "nixpkgs",
         "pre-commit-hooks": "pre-commit-hooks",
         "systems": "systems_2"
       }

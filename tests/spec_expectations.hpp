@@ -35,16 +35,16 @@ struct SpecSuiteRecord {
     std::size_t files;
 };
 
-// This is the executable deviation ledger for mustache/spec at 5d3b58e.
+// This is the executable deviation ledger for mustache/spec v1.4.3 at 97c05b0.
 // A known failure that starts passing is an unexpected pass until this entry is
 // removed. A missing or duplicated entry fails the inventory validation.
 static SpecExpectationRecord specExpectations[] = {
     {"~dynamic-names.json", NULL, SpecExpectedSkip, "dynamic partial names are not implemented", 21, 0},
-    {"~inheritance.json", NULL, SpecExpectedSkip, "template inheritance is not implemented", 22, 0}};
+    {"~inheritance.json", NULL, SpecExpectedSkip, "template inheritance is not implemented", 27, 0}};
 
 static SpecSuiteRecord specSuites[] = {{"comments.json", 12, 0, 0}, {"delimiters.json", 14, 0, 0},
-    {"interpolation.json", 39, 0, 0}, {"inverted.json", 22, 0, 0}, {"partials.json", 11, 0, 0},
-    {"sections.json", 30, 0, 0}, {"~dynamic-names.json", 21, 0, 0}, {"~inheritance.json", 22, 0, 0},
+    {"interpolation.json", 42, 0, 0}, {"inverted.json", 22, 0, 0}, {"partials.json", 12, 0, 0},
+    {"sections.json", 34, 0, 0}, {"~dynamic-names.json", 21, 0, 0}, {"~inheritance.json", 27, 0, 0},
     {"~lambdas.json", 10, 0, 0}};
 
 static std::size_t unexpectedSuiteTests = 0;
