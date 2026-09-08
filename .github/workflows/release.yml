@@ -1,0 +1,95 @@
+name: release
+
+on:
+  push:
+    branches: [master, develop]
+    tags: ['v*']
+  pull_request:
+    branches: [master, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  build:
+    name: Windows (${{ matrix.architecture }}, ${{ matrix.toolset }}, ${{ matrix.linkage }})
+    runs-on: windows-2022
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [x86, x64]
+        toolset: [v142, v143]
+        linkage: [static, shared]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Check build metadata
+        shell: bash
+        run: ./scripts/check-version-consistency.sh
+
+      - name: Test packaging and publishing rules
+        run: python tests/test_windows_release.py
+
+      - name: Build, test, and package
+        shell: pwsh
+        run: >-
+          ./scripts/build-windows.ps1
+          -Architecture '${{ matrix.architecture }}'
+          -Toolset '${{ matrix.toolset }}'
+          -Linkage '${{ matrix.linkage }}'
+          -WorkDirectory "$env:RUNNER_TEMP/libmustache-windows"
+
+      - name: Upload packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-package-${{ matrix.architecture }}-${{ matrix.toolset }}-${{ matrix.linkage }}
+          path: |
+            ${{ runner.temp }}/libmustache-windows/archives/*.zip
+            ${{ runner.temp }}/libmustache-windows/archives/*.sha256
+          if-no-files-found: error
+
+      - name: Upload test diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-tests-${{ matrix.architecture }}-${{ matrix.toolset }}-${{ matrix.linkage }}
+          path: |
+            ${{ runner.temp }}/libmustache-windows/build/ctest-results.xml
+            ${{ runner.temp }}/libmustache-windows/build/ctest-output.log
+          if-no-files-found: ignore
+
+  publish:
+    name: Publish Windows release assets
+    needs: build
+    if: ${{ github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out publishing script
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Download tested packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: windows-package-*
+          merge-multiple: true
+          path: windows-artifacts
+
+      - name: Publish only for a version tag push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/publish-windows-release.py windows-artifacts

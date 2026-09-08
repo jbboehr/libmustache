@@ -456,6 +456,11 @@ compatibility APIs; new rendering code should use `CompiledTemplate`.
 
 ## Windows
 
+See [Windows binaries](docs/windows-binaries.md) for selecting a binary package
+and using it with php-mustache. Packages include headers, libraries, and
+`mustachec.exe` for x86/x64 and the v142/v143 toolsets, using the dynamic MSVC
+runtime (`/MD`).
+
 The repository contains a vcpkg manifest and is tested with Visual Studio 2022
 for both `x86-windows` and `x64-windows`:
 
@@ -466,6 +471,9 @@ cmake --build build --config Release --parallel
 cmake -E chdir build ctest -C Release --output-on-failure
 cmake --install build --config Release --prefix artifacts
 ```
+
+Use `-DMUSTACHE_CLI_STATIC=ON` to link the executable to the static libmustache
+library. This does not change the runtime linkage of its other dependencies.
 
 The optional archived-template implementation is exercised on both Win32 and
 x64 with shared and static installed consumers. Cista and xxHash are bundled

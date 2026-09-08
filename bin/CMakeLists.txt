@@ -1,5 +1,9 @@
 add_executable(mustachec mustache.cpp cli.cpp cli.hpp)
-target_link_libraries(mustachec PRIVATE mustache)
+if(MUSTACHE_CLI_STATIC)
+    target_link_libraries(mustachec PRIVATE mustache_static)
+else()
+    target_link_libraries(mustachec PRIVATE mustache)
+endif()
 mustache_apply_build_options(mustachec)
 mustache_enable_clang_tidy(mustachec)
 

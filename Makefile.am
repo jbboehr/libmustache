@@ -17,11 +17,13 @@ EXTRA_DIST = \
 	docs/development/abi-6-source-migration-2026-08-20.md \
 	docs/development/cista-archive-format-v2.md \
 	docs/development/cista-archive-format-v3.md \
+	docs/windows-binaries.md \
 	CMakeLists.txt \
 	.clang-tidy \
 	.appveyor.yml \
 	.envrc \
 	.github/workflows/ci.yml \
+	.github/workflows/release.yml \
 	cmake/mustache_config.h.in \
 	cmake/mustacheConfig.cmake.in \
 	cmake/generate_pkgconfig.cmake.in \
@@ -32,6 +34,9 @@ EXTRA_DIST = \
 	nix/derivation.nix \
 	scripts/check-release-archive.sh \
 	scripts/check-version-consistency.sh \
+	scripts/build-windows.ps1 \
+	scripts/package-windows.ps1 \
+	scripts/publish-windows-release.py \
 	src/archive/.clang-tidy \
 	src/archive/cista.cpp \
 	src/archive/cista_include.hpp \
@@ -50,6 +55,7 @@ EXTRA_DIST = \
 	tests/cmake-consumer/main.cpp \
 	tests/cmake-find-quiet/CMakeLists.txt \
 	tests/cmake-subproject/CMakeLists.txt \
+	tests/test_windows_release.py \
 	vendor/cista/LICENSE \
 	vendor/cista/README.md \
 	vendor/cista/cista.h \
