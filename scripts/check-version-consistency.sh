@@ -122,7 +122,7 @@ check_documented_checksum() {
   fi
 }
 
-expected_cista_sha256=e409ba42914b9988d662896cf5e7b855d9a46aab4d0726d85265a3aea2b915d2
+expected_cista_sha256=88aa1b41df4b974f4937f7c8ea842cd085922c43b3bce8f3a1bf328518d6adae
 expected_xxhash_sha256=17973c0dc49d9854ca26caa191f0e12f7a424b68858d9a78de3860d959d85e4b
 check_vendored_header Cista "$repo_root/vendor/cista/cista.h" "$expected_cista_sha256"
 check_documented_checksum Cista "$repo_root/vendor/cista/README.md" "$expected_cista_sha256"

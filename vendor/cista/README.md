@@ -12,7 +12,7 @@ directory is installed or included by libmustache's public headers.
 - Nix recursive source hash:
   `sha256-Q7IDQckFa/iMZ/f3Bim/yWyKCGqsNxJJ5C9PTToFZYI=`
 - Generated `cista.h` SHA-256:
-  `e409ba42914b9988d662896cf5e7b855d9a46aab4d0726d85265a3aea2b915d2`
+  `88aa1b41df4b974f4937f7c8ea842cd085922c43b3bce8f3a1bf328518d6adae`
 - License: MIT; see `LICENSE`. The generated header also embeds the license.
 
 The snapshot is generated with Cista's upstream `uniter` tool and is not edited

@@ -6273,7 +6273,7 @@ auto format_as(cista::basic_string<Ptr> const& s) {
 
 }  // namespace cista
 
-#if __has_include("fmt/ranges.h")
+#if defined(CISTA_FMT) && __has_include("fmt/ranges.h")
 
 // include/fmt/ranges.h: basic_ios::clear: iostream error
 
