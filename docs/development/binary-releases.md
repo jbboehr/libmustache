@@ -1,8 +1,13 @@
 # Binary releases
 
-The `release` workflow builds on pushes to `master`, `develop`, `release`, and
+The `ci` workflow runs on pushes to `master`, `develop`, `release`, and
 `release/**`, pull requests targeting those branches, manual runs, and `v*` tag
-pushes. Release branch pushes create or update a draft for the package version;
+pushes. After all its checks succeed, it calls `release.yml` for the same commit
+and ref to build the Windows and Unix packages. CI's Nix caches are saved before
+packaging tries to restore them. The existing CI checks keep their names;
+packaging and publishing appear under the `Release` job in the same run.
+
+Release branch pushes create or update a draft for the package version;
 manual runs can opt in with the **draft** checkbox. Only a pushed `vX.Y.Z` tag
 matching the package metadata automatically publishes release assets.
 All 13 matrix entries must pass before publication; each archive has a SHA-256
@@ -11,7 +16,7 @@ sidecar. Other runs retain the same packages as Actions artifacts.
 To inspect a release before tagging:
 
 1. Update the package version consistently (for example, to `0.6.1`) and push
-   the commit to `release/0.6.1`, or manually run the workflow on that commit's
+   the commit to `release/0.6.1`, or manually run `ci` on that commit's
    branch with **draft** enabled.
 2. Wait for the workflow to finish, then open the `v0.6.1` draft in GitHub
    Releases to inspect its binaries and edit its title or notes. The draft
@@ -22,8 +27,9 @@ To inspect a release before tagging:
    title or notes.
 
 Manual runs can also draft an existing version tag by selecting it and enabling
-**draft**. Manual dispatch becomes available once this workflow is on the default
-branch (`master`). A draft run refuses to modify an already published release.
+**draft** in `ci`. The new manual input becomes available once these workflow
+changes are on the default branch (`master`). A draft run refuses to modify an
+already published release.
 Release uploads are serialized and queued so branch drafts and tag publication
 cannot overlap or displace pending uploads. New runs do not cancel active release
 branch, manual draft, or tag runs.
@@ -46,10 +52,13 @@ Nix still determines which store paths match the requested build.
 
 GitHub's cache scope rules apply: jobs can read caches from their current ref
 and the default branch (`master`); pull requests can also read their base branch.
-Tag runs can therefore reuse `master` caches, but cannot directly read caches
-that exist only on `develop`. Cache entries are subject to GitHub's storage and
-retention limits. The cache covers Nix inputs and outputs, including the musl
-job's JSON inputs and the Windows cross-builds. Native MSVC builds are outside it.
+Tag runs reuse caches saved by their own CI stage and can also reuse `master`
+caches, but cannot directly read caches that exist only on `develop`.
+Cache entries are subject to GitHub's storage and retention limits. The cache
+covers Nix inputs and outputs, including the musl job's JSON inputs and the
+Windows cross-builds. Native MSVC builds are outside it.
+macOS CI uses Homebrew, so it does not populate the macOS Nix cache; those release
+jobs can reuse caches from earlier macOS package builds.
 
 Windows uses MSVC v142/v143 on x86/x64. Linux glibc and macOS arm64 use the
 locked Nix inputs:

@@ -5,18 +5,31 @@ on:
     branches:
       - master
       - develop
+      - release
+      - 'release/**'
+    tags:
+      - 'v*'
   pull_request:
     branches:
       - master
       - develop
+      - release
+      - 'release/**'
   workflow_dispatch:
+    inputs:
+      draft:
+        description: Create or update a draft release for the package version
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ inputs.draft && 'draft' || 'build' }}
+  cancel-in-progress: >-
+    ${{ github.ref_type != 'tag' && github.ref_name != 'release' &&
+        !startsWith(github.ref_name, 'release/') && !inputs.draft }}
 
 jobs:
   quality:
@@ -527,3 +540,23 @@ jobs:
 
       - name: Build check
         run: nix build --print-build-logs ".#${{ matrix.attr }}"
+
+  release:
+    name: Release
+    needs:
+      - quality
+      - autotools
+      - cmake
+      - cmake-macos
+      - sanitizers
+      - thread-sanitizer
+      - nix-matrix
+      - nix
+    permissions:
+      contents: write
+      actions: read
+    uses: ./.github/workflows/release.yml
+    with:
+      draft: ${{ inputs.draft || false }}
+    secrets:
+      RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}

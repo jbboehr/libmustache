@@ -1,26 +1,19 @@
 name: release
 
 on:
-  push:
-    branches: [master, develop, release, 'release/**']
-    tags: ['v*']
-  pull_request:
-    branches: [master, develop, release, 'release/**']
-  workflow_dispatch:
+  workflow_call:
     inputs:
       draft:
         description: Create or update a draft release for the package version
         type: boolean
         default: false
+    secrets:
+      RELEASE_TOKEN:
+        description: Optional token for draft release creation
+        required: false
 
 permissions:
   contents: read
-
-concurrency:
-  group: release-${{ github.workflow }}-${{ github.ref }}-${{ inputs.draft && 'draft' || 'build' }}
-  cancel-in-progress: >-
-    ${{ github.ref_type != 'tag' && github.ref_name != 'release' &&
-        !startsWith(github.ref_name, 'release/') && !inputs.draft }}
 
 jobs:
   build:
