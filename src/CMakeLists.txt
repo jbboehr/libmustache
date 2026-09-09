@@ -59,10 +59,12 @@ set(MUSTACHE_PRIVATE_HEADERS
 )
 if(MUSTACHE_HAVE_LIBJSON)
     list(APPEND MUSTACHE_SOURCES json_parser.cpp)
-    set_property(SOURCE json_parser.cpp APPEND PROPERTY COMPILE_OPTIONS
-        "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility=hidden>"
-        "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility-inlines-hidden>"
-    )
+    if(NOT MSVC)
+        set_property(SOURCE json_parser.cpp APPEND PROPERTY COMPILE_OPTIONS
+            "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility=hidden>"
+            "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-fvisibility-inlines-hidden>"
+        )
+    endif()
 endif()
 
 set(MUSTACHE_PRIVATE_DEPENDENCIES)
