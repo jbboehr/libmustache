@@ -41,7 +41,7 @@
     nix-github-actions,
     ...
   }:
-    flake-utils.lib.eachDefaultSystem (
+    nixpkgs.lib.recursiveUpdate (flake-utils.lib.eachDefaultSystem (
       system: let
         pkgs = nixpkgs.legacyPackages.${system};
         src = gitignore.lib.gitignoreSource ./.;
@@ -96,6 +96,12 @@
           libmustache = makePackage {cmakeSupport = false;};
           libmustache-cmake = makePackage {cmakeSupport = true;};
           default = libmustache;
+          release-linux-x64-musl-static = pkgs.pkgsCross.musl64.callPackage ./nix/release.nix {
+            source = src;
+            platform = "linux-x64-musl";
+            linkage = "static";
+            stdenv = pkgs.pkgsCross.musl64.stdenv;
+          };
         };
 
         checks = {
@@ -251,7 +257,22 @@
 
         formatter = pkgs.alejandra;
       }
-    )
+    )) (flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-darwin"] (system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+      platform =
+        if system == "x86_64-linux"
+        then "linux-x64-glibc"
+        else "macos-aarch64";
+    in {
+      packages = pkgs.lib.listToAttrs (map (linkage: {
+        name = "release-${platform}-${linkage}";
+        value = import ./nix/release.nix {
+          inherit pkgs;
+          source = gitignore.lib.gitignoreSource ./.;
+          inherit platform linkage;
+        };
+      }) ["static" "shared"]);
+    }))
     // {
       githubActions.matrix =
         (nix-github-actions.lib.mkGithubMatrix {

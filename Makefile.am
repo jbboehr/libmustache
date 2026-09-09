@@ -11,37 +11,17 @@ EXTRA_DIST = \
 	LICENSE.md \
 	benchmarks/CMakeLists.txt \
 	benchmarks/ast-cache-vs-source.cpp \
-	benchmarks/ast-cache-vs-source.php \
-	benchmarks/cista-archive.hpp \
-	benchmarks/test-cista-archive.cpp \
 	docs/development/abi-6-source-migration-2026-08-20.md \
 	docs/development/cista-archive-format-v2.md \
 	docs/development/cista-archive-format-v3.md \
 	docs/windows-binaries.md \
+	docs/unix-binaries.md \
 	CMakeLists.txt \
-	.clang-tidy \
-	.appveyor.yml \
-	.envrc \
-	.github/workflows/ci.yml \
-	.github/workflows/release.yml \
 	cmake/mustache_config.h.in \
 	cmake/mustacheConfig.cmake.in \
 	cmake/generate_pkgconfig.cmake.in \
 	cmake/check_cista_version_algorithm.cpp \
-	default.nix \
-	flake.nix \
-	flake.lock \
-	nix/derivation.nix \
-	scripts/check-release-archive.sh \
 	scripts/check-version-consistency.sh \
-	scripts/build-windows.ps1 \
-	scripts/package-windows.ps1 \
-	scripts/publish-windows-release.py \
-	src/archive/.clang-tidy \
-	src/archive/cista.cpp \
-	src/archive/cista_include.hpp \
-	src/archive/cista_version.hpp \
-	src/archive/xxh3.cpp \
 	src/archive/xxh3/xxh3.h \
 	spec/specs \
 	spec/LICENSE \
@@ -55,7 +35,6 @@ EXTRA_DIST = \
 	tests/cmake-consumer/main.cpp \
 	tests/cmake-find-quiet/CMakeLists.txt \
 	tests/cmake-subproject/CMakeLists.txt \
-	tests/test_windows_release.py \
 	vendor/cista/LICENSE \
 	vendor/cista/README.md \
 	vendor/cista/cista.h \
@@ -71,7 +50,8 @@ RELEASE_CHECK_JOBS ?= 2
 check-local: check-version
 
 check-version:
-	$(SHELL) $(top_srcdir)/scripts/check-version-consistency.sh
+	MUSTACHE_VERSION_CHECK_ALLOW_MISSING=1 \
+		$(SHELL) $(top_srcdir)/scripts/check-version-consistency.sh
 
 check-release:
 	$(MAKE) check-release-archive

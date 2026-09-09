@@ -31,6 +31,13 @@ git clone --recurse-submodules https://github.com/jbboehr/libmustache.git
 cd libmustache
 ```
 
+## Binary packages
+
+Prebuilt SDKs include the library, public headers, CMake package files, and the
+command-line executable. See [Linux and macOS binaries](docs/unix-binaries.md)
+or [Windows binaries](docs/windows-binaries.md) to choose a package for your
+application or PHP extension.
+
 ## Build with CMake
 
 ```sh
@@ -200,6 +207,8 @@ selects the bundled Cista and xxHash snapshots; add `--with-system-cista` and/or
 custom locations.
 
 ## Nix
+
+From a Git checkout:
 
 ```sh
 nix build .#libmustache

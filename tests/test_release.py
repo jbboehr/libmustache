@@ -1,4 +1,4 @@
-"""Exercise Windows package contents and the release publishing boundary."""
+"""Exercise package contents and the release publishing boundary."""
 
 import hashlib
 import importlib.util
@@ -14,7 +14,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
-    "publish_windows_release", ROOT / "scripts/publish-windows-release.py"
+    "publish_release", ROOT / ".github/scripts/publish-release.py"
 )
 publisher = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(publisher)
@@ -35,12 +35,22 @@ class PublishingTests(unittest.TestCase):
             for toolset in ("v142", "v143"):
                 for linkage in ("static", "shared"):
                     name = f"libmustache-0.6.0-windows-{architecture}-{toolset}-md-{linkage}.zip"
-                    archive = self.assets / name
-                    archive.write_bytes(b"test archive")
-                    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-                    archive.with_suffix(".zip.sha256").write_text(
-                        f"{digest} *{name}\n", encoding="ascii"
-                    )
+                    self.write_asset(name, b"test archive")
+        for platform, linkages in (
+            ("linux-x64-glibc", ("static", "shared")),
+            ("linux-x64-musl", ("static",)),
+            ("macos-aarch64", ("static", "shared")),
+        ):
+            for linkage in linkages:
+                name = f"libmustache-0.6.0-{platform}-{linkage}.tar.gz"
+                self.write_asset(name, b"Unix test archive")
+
+    def write_asset(self, name, contents):
+        (self.assets / name).write_bytes(contents)
+        digest = hashlib.sha256(contents).hexdigest()
+        (self.assets / (name + ".sha256")).write_text(
+            f"{digest} *{name}\n", encoding="ascii"
+        )
 
     def test_only_version_tag_pushes_can_publish(self):
         cases = (
@@ -56,8 +66,21 @@ class PublishingTests(unittest.TestCase):
                     publisher.publish_release(self.assets, self.environment | changes)
                 run.assert_not_called()
 
+    def test_complete_matrix_can_be_validated_without_publishing(self):
+        with mock.patch("subprocess.run") as run:
+            publisher.validate_release(self.assets, "0.6.0")
+        run.assert_not_called()
+
     def test_incomplete_matrix_cannot_publish(self):
         next(self.assets.glob("*.zip")).unlink()
+        with mock.patch("subprocess.run") as run:
+            with self.assertRaises(ValueError):
+                publisher.publish_release(self.assets, self.environment)
+            run.assert_not_called()
+
+    def test_stale_archive_outside_matrix_cannot_publish(self):
+        stale = self.assets / "libmustache-0.5.0-linux-x64-glibc-static.tar.gz"
+        stale.write_bytes(b"stale archive")
         with mock.patch("subprocess.run") as run:
             with self.assertRaises(ValueError):
                 publisher.publish_release(self.assets, self.environment)
@@ -72,6 +95,23 @@ class PublishingTests(unittest.TestCase):
 
     def test_missing_checksum_cannot_publish(self):
         next(self.assets.glob("*.sha256")).unlink()
+        with mock.patch("subprocess.run") as run:
+            with self.assertRaises(ValueError):
+                publisher.publish_release(self.assets, self.environment)
+            run.assert_not_called()
+
+    def test_each_unix_package_is_required_before_publishing(self):
+        for archive in sorted(self.assets.glob("*.tar.gz")):
+            contents = archive.read_bytes()
+            archive.unlink()
+            with self.subTest(archive=archive.name), mock.patch("subprocess.run") as run:
+                with self.assertRaises(ValueError):
+                    publisher.publish_release(self.assets, self.environment)
+                run.assert_not_called()
+            archive.write_bytes(contents)
+
+    def test_corrupted_unix_archive_cannot_publish(self):
+        next(self.assets.glob("*.tar.gz")).write_bytes(b"corrupted")
         with mock.patch("subprocess.run") as run:
             with self.assertRaises(ValueError):
                 publisher.publish_release(self.assets, self.environment)

@@ -14,7 +14,7 @@ function Invoke-Native([string] $Command, [string[]] $Arguments) {
     if ($LASTEXITCODE -ne 0) { throw "$Command failed with exit code $LASTEXITCODE" }
 }
 
-$source = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$source = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $work = [IO.Path]::GetFullPath($WorkDirectory)
 if (Test-Path -LiteralPath $work) { throw "Build directory already exists: $work" }
 New-Item -ItemType Directory -Path $work | Out-Null
@@ -57,7 +57,7 @@ Invoke-Native ctest @('--test-dir', $build, '-C', 'Release', '--output-on-failur
     '--output-junit', "$build/ctest-results.xml", '--output-log', "$build/ctest-output.log")
 Invoke-Native cmake @('--install', $build, '--config', 'Release')
 
-$archive = & (Join-Path $PSScriptRoot 'package-windows.ps1') -InstallPrefix $prefix `
+$archive = & (Join-Path $PSScriptRoot '../../scripts/package-windows.ps1') -InstallPrefix $prefix `
     -SourceDirectory $source -JsonLicense "$dependencies/x64-windows/share/nlohmann-json/copyright" `
     -OutputDirectory (Join-Path $work 'archives') -Version $version `
     -Architecture $Architecture -Toolset $Toolset -Linkage $Linkage

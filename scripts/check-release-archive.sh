@@ -48,7 +48,8 @@ if [ ! -s "$source_dir/spec/LICENSE" ]; then
   exit 1
 fi
 
-"$source_dir/scripts/check-version-consistency.sh"
+MUSTACHE_VERSION_CHECK_ALLOW_MISSING=1 \
+  "$source_dir/scripts/check-version-consistency.sh"
 
 cmake_full="$scratch/cmake-full"
 cmake_prefix="$scratch/cmake-prefix"
