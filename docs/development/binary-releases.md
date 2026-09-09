@@ -3,8 +3,9 @@
 The `ci` workflow runs on pushes to `master`, `develop`, `release`, and
 `release/**`, pull requests targeting those branches, manual runs, and `v*` tag
 pushes. After all its checks succeed, it calls `release.yml` for the same commit
-and ref to build the Windows and Unix packages. CI's Nix caches are saved before
-packaging tries to restore them. The existing CI checks keep their names;
+and ref to build the Windows and Unix packages. On `master` and `develop`, CI
+prepares shared Nix dependency caches before the Nix checks and packaging jobs.
+The existing CI checks keep their names;
 packaging and publishing appear under the `Release` job in the same run.
 
 Release branch pushes create or update a draft for the package version;
@@ -44,21 +45,42 @@ Only the draft step uses this optional token.
 
 CI and release Nix jobs share a GitHub Actions cache through
 `nix-community/cache-nix-action`; no external cache account or token is required.
-Caches are separated by operating system and architecture. Each matrix entry
-saves under its own commit-specific key, while restores merge available caches
-for the same `flake.lock`, including dependencies built by other jobs. A fallback
-to an older cache also allows unchanged dependencies to survive lockfile updates.
-Nix still determines which store paths match the requested build.
+The `nix-cache` job prepares one dependency cache per host: Linux x64, Linux
+ARM64, and macOS ARM64. `nix/cache.nix` collects the build inputs of the CI checks
+and release packages through Nix's `inputDerivation`, including dependencies
+referenced from build scripts and toolchain files. It does not build libmustache
+or run its tests. To prepare the Linux x64 dependencies locally:
+
+```sh
+nix build .#githubActions.dependencies.x86_64-linux
+```
+
+Cache keys include the host OS and architecture and a hash of `flake.lock` and
+the Nix definitions. Source-only commits reuse the same cache. Only runs on
+`master` and `develop` save caches; all build jobs restore a single matching
+snapshot with `save: false`. When the dependency definitions change, a fallback
+snapshot can supply unchanged dependencies. Missing inputs are fetched or built
+by Nix, and libmustache is built and tested in each matrix job.
+
+Before saving, the preparation job garbage-collects unused store paths while
+retaining the dependency set. It then retires other dependency snapshots and
+the old `nix-store-v1` and `nix-eval-v1` caches for its own host and branch. This
+cleanup starts when the new workflow runs; it does not delete other branches'
+caches.
 
 GitHub's cache scope rules apply: jobs can read caches from their current ref
 and the default branch (`master`); pull requests can also read their base branch.
-Tag runs reuse caches saved by their own CI stage and can also reuse `master`
-caches, but cannot directly read caches that exist only on `develop`.
-Cache entries are subject to GitHub's storage and retention limits. The cache
-covers Nix inputs and outputs, including the musl job's JSON inputs and the
-Windows cross-builds. Native MSVC builds are outside it.
-macOS CI uses Homebrew, so it does not populate the macOS Nix cache; those release
-jobs can reuse caches from earlier macOS package builds.
+Tags and release branches can reuse `master` caches but cannot directly read
+caches that exist only on `develop`. They do not create new snapshots. Cache
+entries remain subject to GitHub's storage and retention limits. Linux x64's
+dependency set includes the musl toolchain and Windows SDK/Wine cross-build
+inputs. macOS's set covers the Nix release packages; Homebrew CI and native MSVC
+builds remain outside this cache.
+
+After rollout, compare cache storage and the restore-step durations across two
+successive runs with unchanged dependencies. The second run should reuse the
+same keys without uploading new snapshots. Check both branches separately if
+`master` and `develop` are active, since GitHub scopes caches by ref.
 
 Windows uses MSVC v142/v143 on x86/x64. Linux glibc and macOS arm64 use the
 locked Nix inputs:

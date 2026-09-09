@@ -135,10 +135,18 @@ in {
   }) ["static" "shared"]);
 }))
 // {
-  githubActions.matrix =
-    (nix-github-actions.lib.mkGithubMatrix {
-      attrPrefix = "checks";
-      inherit (self) checks;
-    })
-      .matrix;
+  githubActions = {
+    matrix =
+      (nix-github-actions.lib.mkGithubMatrix {
+        attrPrefix = "checks";
+        inherit (self) checks;
+      })
+        .matrix;
+    dependencies = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux" "aarch64-darwin"] (system:
+      import ./cache.nix {
+        pkgs = nixpkgs.legacyPackages.${system};
+        checks = self.checks.${system} or {};
+        packages = self.packages.${system};
+      });
+  };
 }

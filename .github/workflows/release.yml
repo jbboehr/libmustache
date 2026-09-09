@@ -114,12 +114,12 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
 
-      - name: Share Nix build cache
+      - name: Restore Nix dependencies
         uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
         with:
-          primary-key: nix-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}-release-${{ matrix.platform }}-${{ matrix.linkage }}-${{ github.sha }}
-          restore-prefixes-first-match: nix-store-v1-${{ runner.os }}-${{ runner.arch }}-
-          restore-prefixes-all-matches: nix-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}-
+          primary-key: nix-deps-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', '**/*.nix') }}
+          restore-prefixes-first-match: nix-deps-v1-${{ runner.os }}-${{ runner.arch }}-
+          save: false
 
       - name: Build, test, and package with Nix
         shell: bash

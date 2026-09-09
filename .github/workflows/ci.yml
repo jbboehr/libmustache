@@ -498,12 +498,6 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
 
-      - name: Cache Nix evaluation
-        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
-        with:
-          primary-key: nix-eval-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', '**/*.nix') }}
-          restore-prefixes-first-match: nix-eval-v1-${{ runner.os }}-${{ runner.arch }}-
-
       - id: set-matrix
         name: Generate matrix
         run: |
@@ -511,13 +505,66 @@ jobs:
           matrix=$(nix eval --json '.#githubActions.matrix')
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
+  nix-cache:
+    name: Nix dependencies (${{ matrix.system }})
+    if: >-
+      ${{ github.event_name != 'pull_request' &&
+          (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      actions: write
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            os: ubuntu-24.04
+          - system: aarch64-linux
+            os: ubuntu-24.04-arm
+          - system: aarch64-darwin
+            os: macos-15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+
+      - name: Cache Nix dependencies
+        id: cache
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
+        with:
+          primary-key: nix-deps-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', '**/*.nix') }}
+          restore-prefixes-first-match: nix-deps-v1-${{ runner.os }}-${{ runner.arch }}-
+          # The build below roots the dependencies; discard unused paths before saving.
+          gc-max-store-size: 0
+          purge: true
+          purge-primary-key: never
+          purge-prefixes: |
+            nix-deps-v1-${{ runner.os }}-${{ runner.arch }}-
+            nix-store-v1-${{ runner.os }}-${{ runner.arch }}-
+            nix-eval-v1-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Prepare dependencies
+        if: steps.cache.outputs.hit-primary-key != 'true'
+        run: >-
+          nix build --print-build-logs --out-link "$RUNNER_TEMP/nix-dependencies"
+          '.#githubActions.dependencies.${{ matrix.system }}'
+
   nix:
     name: Nix (${{ matrix.system }}, ${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       actions: read
-    needs: nix-matrix
+    needs:
+      - nix-matrix
+    if: >-
+      ${{ !cancelled() && needs.nix-matrix.result == 'success' }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -531,12 +578,12 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
 
-      - name: Share Nix build cache
+      - name: Restore Nix dependencies
         uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
         with:
-          primary-key: nix-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}-ci-${{ matrix.name }}-${{ github.sha }}
-          restore-prefixes-first-match: nix-store-v1-${{ runner.os }}-${{ runner.arch }}-
-          restore-prefixes-all-matches: nix-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}-
+          primary-key: nix-deps-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock', '**/*.nix') }}
+          restore-prefixes-first-match: nix-deps-v1-${{ runner.os }}-${{ runner.arch }}-
+          save: false
 
       - name: Build check
         run: nix build --print-build-logs ".#${{ matrix.attr }}"
@@ -552,6 +599,10 @@ jobs:
       - thread-sanitizer
       - nix-matrix
       - nix
+    # Only run release when all required predecessor jobs completed successfully.
+    if: >-
+      ${{ !cancelled() && !contains(needs.*.result, 'failure') &&
+          !contains(needs.*.result, 'cancelled') && !contains(needs.*.result, 'skipped') }}
     permissions:
       contents: write
       actions: read
