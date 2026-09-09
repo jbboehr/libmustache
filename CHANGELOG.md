@@ -1,5 +1,16 @@
 # Release notes
 
+## 0.6.1 (unreleased)
+
+Shared-library ABI 6 and the public C++ API are unchanged from 0.6.0.
+
+- Fix archived-template builds on systems with newer fmt headers installed.
+- Add binary packages containing libmustache, public headers, package metadata,
+  and `mustachec` for Windows x86/x64, Linux x64 (glibc/musl), and macOS arm64.
+  Static and shared variants are available, except musl, which is static only.
+  See the [Windows](docs/windows-binaries.md) and
+  [Linux/macOS](docs/unix-binaries.md) package guides for requirements and usage.
+
 ## 0.6.0 (2026-09-07)
 
 Version 0.6.0 introduces shared-library ABI 6 and intentionally breaks binary

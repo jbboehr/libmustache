@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(mustache VERSION 0.6.0 LANGUAGES CXX)
+project(mustache VERSION 0.6.1 LANGUAGES CXX)
 
 # Quoted public-header includes would select this file before the build header.
 if(NOT CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_CURRENT_BINARY_DIR AND

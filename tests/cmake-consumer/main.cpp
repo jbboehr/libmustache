@@ -10,7 +10,7 @@
 #include <vector>
 
 #ifndef MUSTACHE_EXPECTED_VERSION
-#define MUSTACHE_EXPECTED_VERSION "0.6.0"
+#define MUSTACHE_EXPECTED_VERSION "0.6.1"
 #endif
 
 #if defined(_MSVC_LANG)
