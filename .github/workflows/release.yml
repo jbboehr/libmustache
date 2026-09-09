@@ -2,18 +2,25 @@ name: release
 
 on:
   push:
-    branches: [master, develop]
+    branches: [master, develop, release, 'release/**']
     tags: ['v*']
   pull_request:
-    branches: [master, develop]
+    branches: [master, develop, release, 'release/**']
   workflow_dispatch:
+    inputs:
+      draft:
+        description: Create or update a draft release for the package version
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  group: release-${{ github.workflow }}-${{ github.ref }}-${{ inputs.draft && 'draft' || 'build' }}
+  cancel-in-progress: >-
+    ${{ github.ref_type != 'tag' && github.ref_name != 'release' &&
+        !startsWith(github.ref_name, 'release/') && !inputs.draft }}
 
 jobs:
   build:
@@ -138,12 +145,16 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Publish release assets
+    name: Validate and upload release assets
     needs: [build, unix]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
+    concurrency:
+      group: release-assets
+      cancel-in-progress: false
+      queue: max
     steps:
       - name: Check out publishing script
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -164,6 +175,15 @@ jobs:
 
       - name: Validate complete release assets
         run: python3 .github/scripts/publish-release.py validate release-artifacts '${{ steps.version.outputs.version }}'
+
+      - name: Create or update draft release
+        if: >-
+          ${{ (github.event_name == 'push' && github.ref_type == 'branch' &&
+               (github.ref_name == 'release' || startsWith(github.ref_name, 'release/'))) ||
+              (github.event_name == 'workflow_dispatch' && inputs.draft) }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+        run: python3 .github/scripts/publish-release.py draft release-artifacts '${{ steps.version.outputs.version }}'
 
       - name: Publish only for a version tag push
         if: ${{ github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref_name, 'v') }}

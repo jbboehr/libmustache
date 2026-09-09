@@ -1,10 +1,40 @@
 # Binary releases
 
-The `release` workflow builds on pushes to `master` and `develop`, pull
-requests targeting those branches, manual runs, and `v*` tag pushes. Only a
-pushed `vX.Y.Z` tag matching the package metadata publishes release assets.
+The `release` workflow builds on pushes to `master`, `develop`, `release`, and
+`release/**`, pull requests targeting those branches, manual runs, and `v*` tag
+pushes. Release branch pushes create or update a draft for the package version;
+manual runs can opt in with the **draft** checkbox. Only a pushed `vX.Y.Z` tag
+matching the package metadata automatically publishes release assets.
 All 13 matrix entries must pass before publication; each archive has a SHA-256
 sidecar. Other runs retain the same packages as Actions artifacts.
+
+To inspect a release before tagging:
+
+1. Update the package version consistently (for example, to `0.6.1`) and push
+   the commit to `release/0.6.1`, or manually run the workflow on that commit's
+   branch with **draft** enabled.
+2. Wait for the workflow to finish, then open the `v0.6.1` draft in GitHub
+   Releases to inspect its binaries and edit its title or notes. The draft
+   targets the exact build commit and does not create the Git tag. Further
+   release branch pushes refresh its assets and target, preserving edited notes.
+3. Push `v0.6.1` at the commit you approved. Its workflow rebuilds and validates
+   the packages, uploads them, and publishes the draft without replacing your
+   title or notes.
+
+Manual runs can also draft an existing version tag by selecting it and enabling
+**draft**. Manual dispatch becomes available once this workflow is on the default
+branch (`master`). A draft run refuses to modify an already published release.
+Release uploads are serialized and queued so branch drafts and tag publication
+cannot overlap or displace pending uploads. New runs do not cancel active release
+branch, manual draft, or tag runs.
+
+Draft creation uses the workflow's normal `GITHUB_TOKEN` unless the repository
+secret `RELEASE_TOKEN` is set. The normal token suffices once the workflow changes
+are on `master`. If the draft's target commit has workflow files that differ from
+`master`, GitHub's [release creation API](https://docs.github.com/en/rest/releases/releases#create-a-release)
+also requires **Workflows: write**; provide `RELEASE_TOKEN` with both
+**Contents: write** and **Workflows: write** repository permissions for that case.
+Only the draft step uses this optional token.
 
 CI and release Nix jobs share a GitHub Actions cache through
 `nix-community/cache-nix-action`; no external cache account or token is required.
@@ -64,5 +94,5 @@ These checks supplement the native MSVC release jobs; they do not publish
 additional release assets.
 
 `.github/scripts/publish-release.py` validates the entire artifact matrix and checksums,
-then creates the tagged GitHub release or updates its binary assets. Updating
-an existing release preserves its title and notes.
+then creates or updates the GitHub release. Draft publication happens only after
+asset uploads succeed. Updating an existing release preserves its title and notes.

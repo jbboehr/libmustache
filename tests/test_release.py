@@ -30,6 +30,7 @@ class PublishingTests(unittest.TestCase):
             "GITHUB_REF_TYPE": "tag",
             "GITHUB_REF_NAME": "v0.6.0",
             "GITHUB_REPOSITORY": "example/libmustache",
+            "GITHUB_SHA": "a" * 40,
         }
         for architecture in ("x86", "x64"):
             for toolset in ("v142", "v143"):
@@ -132,12 +133,115 @@ class PublishingTests(unittest.TestCase):
 
     def test_existing_release_uploads_without_replacing_notes(self):
         with mock.patch("subprocess.run") as run:
-            run.return_value = subprocess.CompletedProcess([], 0)
+            run.return_value = subprocess.CompletedProcess([], 0, stdout='{"isDraft": false}')
             publisher.publish_release(self.assets, self.environment)
         command = run.call_args.args[0]
         self.assertEqual(command[:4], ["gh", "release", "upload", "v0.6.0"])
         self.assertIn("--clobber", command)
         self.assertNotIn("--generate-notes", command)
+
+    def test_release_branches_and_manual_runs_can_draft_before_tagging(self):
+        cases = (
+            {"GITHUB_REF_TYPE": "branch", "GITHUB_REF_NAME": "release"},
+            {"GITHUB_REF_TYPE": "branch", "GITHUB_REF_NAME": "release/0.6.0"},
+            {"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF_TYPE": "branch",
+             "GITHUB_REF_NAME": "develop"},
+            {"GITHUB_EVENT_NAME": "workflow_dispatch"},
+        )
+        for changes in cases:
+            with self.subTest(changes=changes), mock.patch("subprocess.run") as run:
+                run.side_effect = [subprocess.CompletedProcess([], 1), subprocess.CompletedProcess([], 0)]
+                publisher.publish_release(self.assets, self.environment | changes, draft_version="0.6.0")
+                command = run.call_args.args[0]
+                self.assertEqual(command[:4], ["gh", "release", "create", "v0.6.0"])
+                self.assertIn("--draft", command)
+                self.assertNotIn("--verify-tag", command)
+                self.assertEqual(command[command.index("--target") + 1], "a" * 40)
+                expected_assets = {str(path.resolve()) for path in self.assets.iterdir()}
+                self.assertEqual(set(command) & expected_assets, expected_assets)
+
+    def test_drafting_rejects_other_events_and_mismatched_tags(self):
+        cases = (
+            {"GITHUB_REF_TYPE": "branch", "GITHUB_REF_NAME": "master"},
+            {"GITHUB_REF_TYPE": "branch", "GITHUB_REF_NAME": "develop"},
+            {"GITHUB_REF_TYPE": "branch", "GITHUB_REF_NAME": "release-candidate"},
+            {"GITHUB_EVENT_NAME": "pull_request", "GITHUB_REF_TYPE": "branch",
+             "GITHUB_REF_NAME": "release"},
+            {"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF_NAME": "v0.5.0"},
+        )
+        for changes in cases:
+            with self.subTest(changes=changes), mock.patch("subprocess.run") as run:
+                with self.assertRaises(ValueError):
+                    publisher.publish_release(self.assets, self.environment | changes, draft_version="0.6.0")
+                run.assert_not_called()
+
+    def test_incomplete_or_corrupt_assets_cannot_update_a_draft(self):
+        environment = self.environment | {"GITHUB_REF_TYPE": "branch", "GITHUB_REF_NAME": "release"}
+        archive = next(self.assets.glob("*.zip"))
+        contents = archive.read_bytes()
+        cases = (
+            ("missing", lambda: archive.unlink()),
+            ("corrupt", lambda: archive.write_bytes(b"corrupted archive")),
+        )
+        for name, damage in cases:
+            with self.subTest(name=name), mock.patch("subprocess.run") as run:
+                archive.write_bytes(contents)
+                damage()
+                with self.assertRaises(ValueError):
+                    publisher.publish_release(
+                        self.assets, environment, draft_version="0.6.0"
+                    )
+                run.assert_not_called()
+
+    def test_refreshing_draft_updates_target_and_assets_but_preserves_notes(self):
+        environment = self.environment | {"GITHUB_REF_TYPE": "branch", "GITHUB_REF_NAME": "release"}
+        with mock.patch("subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess([], 0, stdout='{"isDraft": true}')
+            publisher.publish_release(self.assets, environment, draft_version="0.6.0")
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual([command[2] for command in commands], ["view", "upload", "edit"])
+        self.assertEqual(commands[1][:4], ["gh", "release", "upload", "v0.6.0"])
+        self.assertIn("--clobber", commands[1])
+        self.assertEqual(commands[2][:4], ["gh", "release", "edit", "v0.6.0"])
+        self.assertEqual(commands[2][commands[2].index("--target") + 1], "a" * 40)
+        for command in commands:
+            self.assertNotIn("--draft=false", command)
+            self.assertNotIn("--title", command)
+            self.assertNotIn("--notes", command)
+            self.assertNotIn("--generate-notes", command)
+
+    def test_draft_run_cannot_modify_published_release(self):
+        environment = self.environment | {"GITHUB_REF_TYPE": "branch", "GITHUB_REF_NAME": "release"}
+        with mock.patch("subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess([], 0, stdout='{"isDraft": false}')
+            with self.assertRaisesRegex(ValueError, "already published"):
+                publisher.publish_release(self.assets, environment, draft_version="0.6.0")
+        self.assertEqual([call.args[0][2] for call in run.call_args_list], ["view"])
+
+    def test_tag_push_publishes_draft_only_after_uploading_assets(self):
+        with mock.patch("subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess([], 0, stdout='{"isDraft": true}')
+            publisher.publish_release(self.assets, self.environment)
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual([command[2] for command in commands], ["view", "upload", "edit"])
+        self.assertEqual(commands[1][:4], ["gh", "release", "upload", "v0.6.0"])
+        self.assertEqual(commands[2][:4], ["gh", "release", "edit", "v0.6.0"])
+        self.assertIn("--draft=false", commands[2])
+        self.assertIn("--verify-tag", commands[2])
+        self.assertIn("--tag", commands[2])
+        self.assertEqual(commands[2][commands[2].index("--tag") + 1], "v0.6.0")
+        self.assertNotIn("--title", commands[2])
+        self.assertNotIn("--notes", commands[2])
+
+    def test_failed_upload_leaves_release_in_draft(self):
+        with mock.patch("subprocess.run") as run:
+            run.side_effect = [
+                subprocess.CompletedProcess([], 0, stdout='{"isDraft": true}'),
+                subprocess.CalledProcessError(1, "gh release upload"),
+            ]
+            with self.assertRaises(subprocess.CalledProcessError):
+                publisher.publish_release(self.assets, self.environment)
+        self.assertEqual([call.args[0][2] for call in run.call_args_list], ["view", "upload"])
 
 
 class PackageTests(unittest.TestCase):
