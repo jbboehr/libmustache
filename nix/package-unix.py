@@ -58,20 +58,31 @@ def run(*arguments):
     return subprocess.check_output(arguments, text=True).strip()
 
 
+def has_interpreter(path):
+    result = subprocess.run(["patchelf", "--print-interpreter", str(path)],
+                            capture_output=True, text=True)
+    return result.returncode == 0 and bool(result.stdout.strip())
+
+
 def relocate(package, platform):
     executable = package / "bin/mustachec"
     libraries = [path for path in (package / "lib").iterdir()
                  if path.is_file() and not path.is_symlink() and path.suffix != ".a"]
     binaries = [executable, *libraries]
     if platform.startswith("linux-"):
-        interpreter = ("/lib/ld-musl-x86_64.so.1" if platform.endswith("musl")
-                       else "/lib64/ld-linux-x86-64.so.2")
-        run("patchelf", "--set-interpreter", interpreter, str(executable))
-        for binary in binaries:
+        # Fully static executables have no interpreter or RPATH, and patchelf
+        # cannot process them at all.
+        dynamic = has_interpreter(executable)
+        relocatable = [executable, *libraries] if dynamic else libraries
+        for binary in relocatable:
             run("patchelf", "--remove-rpath", str(binary))
             if "/" in run("patchelf", "--print-needed", str(binary)):
                 raise ValueError(f"Non-relocatable dependency in {binary}")
-        run("patchelf", "--set-rpath", "$ORIGIN/../lib", str(executable))
+        if dynamic:
+            interpreter = ("/lib/ld-musl-x86_64.so.1" if platform.endswith("musl")
+                           else "/lib64/ld-linux-x86-64.so.2")
+            run("patchelf", "--set-interpreter", interpreter, str(executable))
+            run("patchelf", "--set-rpath", "$ORIGIN/../lib", str(executable))
     else:
         for binary in binaries:
             for line in run("otool", "-L", str(binary)).splitlines()[1:]:

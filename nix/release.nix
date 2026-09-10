@@ -36,7 +36,9 @@ in
         "-Dnlohmann_json_DIR=${json}/share/cmake/nlohmann_json"
         "-DMUSTACHE_ENABLE_YAML=OFF"
         (lib.cmakeBool "MUSTACHE_CLI_STATIC" (linkage == "static"))
+        (lib.cmakeBool "MUSTACHE_CLI_STATIC_RUNTIME" (linkage == "static"))
       ]
+      ++ lib.optional (platform == "linux-x64-musl" && linkage == "static") "-DCMAKE_EXE_LINKER_FLAGS=-static"
       ++ lib.optional stdenv.hostPlatform.isDarwin "-DCMAKE_INSTALL_NAME_DIR=@rpath";
     enableParallelBuilding = true;
     doCheck = true;

@@ -483,6 +483,12 @@ cmake --install build --config Release --prefix artifacts
 
 Use `-DMUSTACHE_CLI_STATIC=ON` to link the executable to the static libmustache
 library. This does not change the runtime linkage of its other dependencies.
+Use `-DMUSTACHE_CLI_STATIC_RUNTIME=ON` to additionally link the C++ runtime
+statically into the executable (`-static-libstdc++ -static-libgcc`); on Linux
+this removes the `libstdc++.so.6` and `libgcc_s.so.1` dependencies. It has no
+effect on MSVC builds, where the runtime is selected through
+`CMAKE_MSVC_RUNTIME_LIBRARY`, or on macOS, where the system `libc++.dylib` is
+always available.
 
 The optional archived-template implementation is exercised on both Win32 and
 x64 with shared and static installed consumers. Cista and xxHash are bundled

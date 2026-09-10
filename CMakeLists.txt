@@ -65,6 +65,8 @@ endif()
 
 option(MUSTACHE_BUILD_CLI "Build the mustache command-line program" ${MUSTACHE_IS_TOP_LEVEL})
 option(MUSTACHE_CLI_STATIC "Link the command-line program to the static library" OFF)
+option(MUSTACHE_CLI_STATIC_RUNTIME
+    "Statically link the C++ runtime into the command-line program" OFF)
 option(MUSTACHE_ENABLE_TESTS "Build and register the test suite" ${MUSTACHE_IS_TOP_LEVEL})
 option(MUSTACHE_ENABLE_HARDENING "Enable supported compiler and linker hardening" ON)
 option(MUSTACHE_ENABLE_ASSERTIONS "Enable standard-library runtime assertions" ON)
