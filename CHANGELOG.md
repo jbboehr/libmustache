@@ -15,7 +15,7 @@
   instead. This matches the JSON adapter and the mustache spec's falsiness
   rules (fixes #18).
 
-## 0.6.1 (unreleased)
+## 0.6.1 (2026-09-10)
 
 Shared-library ABI 6 and the public C++ API are unchanged from 0.6.0.
 
