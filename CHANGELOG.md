@@ -1,6 +1,6 @@
 # Release notes
 
-## Unreleased
+## [Unreleased]
 
 - Type YAML 1.1 plain scalars during data parsing: `true`/`false`/`yes`/`no`/
   `on`/`off` (and their case variants) become boolean data, `null`/`~` and
@@ -15,7 +15,7 @@
   instead. This matches the JSON adapter and the mustache spec's falsiness
   rules (fixes #18).
 
-## 0.6.1 (2026-09-10)
+## [0.6.1] - 2026-09-10
 
 Shared-library ABI 6 and the public C++ API are unchanged from 0.6.0.
 
@@ -26,7 +26,7 @@ Shared-library ABI 6 and the public C++ API are unchanged from 0.6.0.
   See the [Windows](docs/windows-binaries.md) and
   [Linux/macOS](docs/unix-binaries.md) package guides for requirements and usage.
 
-## 0.6.0 (2026-09-07)
+## [0.6.0] - 2026-09-07
 
 Version 0.6.0 introduces shared-library ABI 6 and intentionally breaks binary
 and source compatibility with 0.5. Rebuild C++ applications and language
@@ -104,3 +104,7 @@ translation. The legacy `-r` option is a deprecated no-op.
 
 Source distributions now include the Mustache specification license alongside
 the fixtures.
+
+[Unreleased]: https://github.com/jbboehr/libmustache/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/jbboehr/libmustache/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/jbboehr/libmustache/compare/v0.5.0...v0.6.0
