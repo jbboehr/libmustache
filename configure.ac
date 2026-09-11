@@ -263,6 +263,44 @@ AS_IF([test "x$enable_thread_sanitizer" = "xyes"], [
 AM_CONDITIONAL([MUSTACHE_THREAD_SANITIZER_ENABLED],
     [test "x$enable_thread_sanitizer" = "xyes"])
 
+AC_ARG_ENABLE([lto],
+    [AS_HELP_STRING([--enable-lto],
+        [enable link-time optimization where the toolchain supports it])],
+    [], [enable_lto=no])
+AS_IF([test "x$enable_lto" = "xyes"], [
+    AS_IF([test "x$GXX" != "xyes"], [
+        AC_MSG_ERROR([--enable-lto requires a GCC-compatible C++ compiler])
+    ])
+    AC_CACHE_CHECK([whether $CXX supports link-time optimization],
+        [mustache_cv_cxx_lto_flavor], [
+        mustache_save_CXXFLAGS=$CXXFLAGS
+        mustache_save_LDFLAGS=$LDFLAGS
+        CXXFLAGS="$CXXFLAGS -flto=auto -ffat-lto-objects"
+        LDFLAGS="$LDFLAGS -flto=auto"
+        AC_LINK_IFELSE([AC_LANG_PROGRAM([[]], [[]])],
+            [mustache_cv_cxx_lto_flavor=gcc],
+            [
+                CXXFLAGS="$mustache_save_CXXFLAGS -flto"
+                LDFLAGS="$mustache_save_LDFLAGS -flto"
+                AC_LINK_IFELSE([AC_LANG_PROGRAM([[]], [[]])],
+                    [mustache_cv_cxx_lto_flavor=generic],
+                    [mustache_cv_cxx_lto_flavor=no])
+            ])
+        CXXFLAGS=$mustache_save_CXXFLAGS
+        LDFLAGS=$mustache_save_LDFLAGS
+    ])
+    AS_IF([test "x$mustache_cv_cxx_lto_flavor" = "xno"], [
+        AC_MSG_ERROR([--enable-lto requires compiler and linker support])
+    ])
+    AS_IF([test "x$mustache_cv_cxx_lto_flavor" = "xgcc"], [
+        MUSTACHE_CXXFLAGS="$MUSTACHE_CXXFLAGS -flto=auto -ffat-lto-objects"
+        MUSTACHE_LDFLAGS="$MUSTACHE_LDFLAGS -flto=auto"
+    ], [
+        MUSTACHE_CXXFLAGS="$MUSTACHE_CXXFLAGS -flto"
+        MUSTACHE_LDFLAGS="$MUSTACHE_LDFLAGS -flto"
+    ])
+])
+
 AC_ARG_ENABLE([gcov],
     [AS_HELP_STRING([--enable-gcov], [enable gcov coverage instrumentation])],
     [], [enable_gcov=no])

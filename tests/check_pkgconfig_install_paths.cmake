@@ -8,6 +8,18 @@ foreach(required IN ITEMS MUSTACHE_TEST_SOURCE_DIR MUSTACHE_TEST_BINARY_ROOT
 endforeach()
 
 include("${CMAKE_CURRENT_LIST_DIR}/copy_cmake_test_source.cmake")
+
+# GCC's lto-wrapper single-quotes the paths it feeds to the LTRANS make
+# recipes, so a path containing an apostrophe breaks the consumer link under
+# -flto. The pkg-config escaping under test is unaffected; skip only the
+# apostrophe install locations when LTO flags reach the consumer environment.
+# Detection is deliberately conservative: other compilers' LTO modes skip the
+# apostrophe cases too, and CMake regexes have no POSIX classes.
+set(lto_consumer NO)
+if((DEFINED ENV{CXXFLAGS} AND "$ENV{CXXFLAGS}" MATCHES "(^|[ =])-flto") OR
+        (DEFINED ENV{CFLAGS} AND "$ENV{CFLAGS}" MATCHES "(^|[ =])-flto"))
+    set(lto_consumer YES)
+endif()
 set(source "${MUSTACHE_TEST_BINARY_ROOT}/source")
 mustache_copy_cmake_test_source("${MUSTACHE_TEST_SOURCE_DIR}" "${source}")
 set(build "${MUSTACHE_TEST_BINARY_ROOT}/build")
@@ -123,6 +135,11 @@ endfunction()
 string(RANDOM LENGTH 12 ALPHABET 0123456789abcdef run_id)
 set(install_root "${MUSTACHE_TEST_BINARY_ROOT}/install-${run_id}")
 foreach(name IN ITEMS nested lib lib64 absolute apostrophe absolute-apostrophe "with spaces")
+    if(lto_consumer AND name MATCHES "apostrophe")
+        message(STATUS
+            "${name}: skipped under link-time optimization (GCC lto-wrapper cannot handle apostrophes in paths; see issue #28)")
+        continue()
+    endif()
     set(case_root "${install_root}/${name}")
     if(name STREQUAL "apostrophe")
         set(case_root "${case_root}/O'Brien")

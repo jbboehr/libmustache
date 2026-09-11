@@ -192,7 +192,10 @@ Use `--without-mustache-spec` when configuring a source tree without the
 specification submodule. `./configure --help` lists the warning-as-error,
 hardening, sanitizer, coverage, and profiling options. AddressSanitizer with
 UndefinedBehaviorSanitizer is selected by `--enable-sanitizers`; the mutually
-exclusive `--enable-thread-sanitizer` mode selects ThreadSanitizer.
+exclusive `--enable-thread-sanitizer` mode selects ThreadSanitizer. Link-time
+optimization is opt-in via `--enable-lto` (or `MUSTACHE_ENABLE_LTO=ON` with
+CMake); it is not enabled by default because the installed static archive
+would embed compiler-specific LTO objects.
 
 JSON and YAML support are independently auto-detected by default. Use
 `--with-json=yes` or `--with-yaml=yes` to require the corresponding dependency,

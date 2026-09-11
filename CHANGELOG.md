@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+- Add opt-in link-time optimization support: `MUSTACHE_ENABLE_LTO` for CMake
+  (interprocedural optimization, applied only when the toolchain supports it)
+  and `--enable-lto` for Autotools (`-flto=auto -ffat-lto-objects` on GCC,
+  `-flto` elsewhere). LTO stays off by default because the installed static
+  archive would embed compiler-specific objects.
+- Skip the apostrophe-prefixed pkg-config install checks when LTO flags reach
+  the consumer build. GCC's `lto-wrapper` cannot quote apostrophes in the
+  paths it passes to its LTRANS recipes, so those installs fail inside GCC
+  under `-flto` even though the pkg-config escaping under test is correct
+  (fixes #28).
+- Run a Nix check that builds and tests the library with Fedora's default
+  LTO flags (`-flto=auto -ffat-lto-objects`).
 - Type YAML 1.1 plain scalars during data parsing: `true`/`false`/`yes`/`no`/
   `on`/`off` (and their case variants) become boolean data, `null`/`~` and
   empty values become null data, and decimal, hexadecimal (`0x`), octal

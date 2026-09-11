@@ -31,6 +31,15 @@
     cmakeSupport = true;
     clangTidySupport = true;
   };
+  libmustache-lto =
+    (makePackage {
+      cmakeSupport = true;
+    }).overrideAttrs (previousAttrs: {
+      pname = "${previousAttrs.pname}-lto";
+      # Fedora-style flags: -flto appears mid-string, never first.
+      CXXFLAGS = "-O2 -g -flto=auto -ffat-lto-objects";
+      LDFLAGS = "-O2 -g -flto=auto";
+    });
   libmustache-no-json = makePackage {
     cmakeSupport = false;
     nlohmann_json = null;

@@ -73,6 +73,7 @@ option(MUSTACHE_ENABLE_ASSERTIONS "Enable standard-library runtime assertions" O
 option(MUSTACHE_WARNINGS_AS_ERRORS "Treat project compiler warnings as errors" OFF)
 option(MUSTACHE_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(MUSTACHE_ENABLE_THREAD_SANITIZER "Enable ThreadSanitizer" OFF)
+option(MUSTACHE_ENABLE_LTO "Enable link-time optimization where the toolchain supports it" OFF)
 option(MUSTACHE_ENABLE_FUZZING "Build the Clang libFuzzer targets and smoke tests" OFF)
 option(MUSTACHE_ENABLE_CLANG_TIDY "Run clang-tidy on production targets" OFF)
 set(MUSTACHE_ENABLE_ARCHIVED_TEMPLATES AUTO CACHE STRING
@@ -98,6 +99,18 @@ if(MUSTACHE_ENABLE_SANITIZERS AND MUSTACHE_ENABLE_THREAD_SANITIZER)
     message(FATAL_ERROR
         "MUSTACHE_ENABLE_SANITIZERS and MUSTACHE_ENABLE_THREAD_SANITIZER "
         "cannot be enabled together")
+endif()
+
+if(MUSTACHE_ENABLE_LTO)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT MUSTACHE_IPO_SUPPORTED OUTPUT MUSTACHE_IPO_OUTPUT)
+    if(MUSTACHE_IPO_SUPPORTED)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+    else()
+        message(WARNING
+            "MUSTACHE_ENABLE_LTO was requested but the toolchain does not "
+            "support it: ${MUSTACHE_IPO_OUTPUT}")
+    endif()
 endif()
 
 if(MUSTACHE_ENABLE_THREAD_SANITIZER)
