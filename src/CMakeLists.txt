@@ -144,7 +144,8 @@ add_library(mustache::mustache ALIAS mustache)
 mustache_configure_library(mustache)
 target_compile_definitions(mustache PRIVATE MUSTACHE_BUILDING_LIBRARY)
 set_target_properties(mustache PROPERTIES
-    VERSION "${MUSTACHE_ABI_VERSION}.0.0"
+    # Match the Autotools libtool -version-info mapping: current-age.age.revision
+    VERSION "${MUSTACHE_ABI_VERSION}.0.${PROJECT_VERSION_PATCH}"
     SOVERSION "${MUSTACHE_ABI_VERSION}"
 )
 if(MUSTACHE_HAVE_ARCHIVED_TEMPLATES AND
