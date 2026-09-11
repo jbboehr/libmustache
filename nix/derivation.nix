@@ -45,7 +45,7 @@ stdenv.mkDerivation (finalAttrs: {
     + lib.optionalString useSystemXxhash "-system-xxhash"
     + lib.optionalString cistaBenchmarkSupport "-cista-benchmark"
     + lib.optionalString cistaBuiltinXxh3Support "-builtin-xxh3";
-  version = "0.6.1";
+  version = "0.6.2";
 
   src =
     if builtins.isPath libmustacheSrc

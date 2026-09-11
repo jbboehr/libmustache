@@ -114,7 +114,7 @@ endif
 # https://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
 libmustache_la_LDFLAGS = \
 	-no-undefined \
-	-version-info 6:1:0
+	-version-info 6:2:0
 if MUSTACHE_ARCHIVE_ELF_EXPORT_BOUNDARY
 libmustache_la_LDFLAGS += \
 	-Wl,--version-script=$(top_srcdir)/src/archive/private_symbols.map

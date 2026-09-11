@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-09-11
+
 - Add opt-in link-time optimization support: `MUSTACHE_ENABLE_LTO` for CMake
   (interprocedural optimization, applied only when the toolchain supports it)
   and `--enable-lto` for Autotools (`-flto=auto -ffat-lto-objects` on GCC,
@@ -117,6 +119,7 @@ translation. The legacy `-r` option is a deprecated no-op.
 Source distributions now include the Mustache specification license alongside
 the fixtures.
 
-[Unreleased]: https://github.com/jbboehr/libmustache/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/jbboehr/libmustache/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/jbboehr/libmustache/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/jbboehr/libmustache/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/jbboehr/libmustache/compare/v0.5.0...v0.6.0
