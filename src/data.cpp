@@ -9,6 +9,8 @@
 #include <charconv>
 #include <cmath>
 #include <limits>
+#include <locale>
+#include <sstream>
 #include <system_error>
 #include <unordered_set>
 #include <utility>
@@ -735,59 +737,264 @@ std::string yamlScalarString(const yaml_node_t * node)
   return std::string(reinterpret_cast<const char *>(node->data.scalar.value), node->data.scalar.length);
 }
 
-Data createFromYAMLNode(yaml_document_t * document, yaml_node_t * node, ParseBudget& budget,
-    std::unordered_set<yaml_node_t *>& active, std::size_t depth)
+bool equalsAny(const std::string& value, std::initializer_list<const char *> candidates)
 {
-  if (node == nullptr) {
-    throw Exception("Missing yaml node");
+  for (const char * candidate : candidates) {
+    if (value == candidate) {
+      return true;
+    }
   }
-  budget.addNode(depth);
-  ActiveYAMLNode activeNode(active, node);
+  return false;
+}
 
-  switch (node->type) {
-    case YAML_SCALAR_NODE: {
-      budget.addString(node->data.scalar.length);
-      return Data::string(yamlScalarString(node));
-    }
-    case YAML_MAPPING_NODE: {
-      const std::size_t length =
-          static_cast<std::size_t>(node->data.mapping.pairs.top - node->data.mapping.pairs.start);
-      budget.addContainerEntries(length);
-      if (length > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-        throw Exception("YAML object is too large");
-      }
-      Data result(Data::TypeMap, static_cast<int>(length));
-      for (yaml_node_pair_t * pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; ++pair) {
-        yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
-        yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
-        if (keyNode == nullptr || keyNode->type != YAML_SCALAR_NODE) {
-          throw Exception("Invalid yaml object key");
-        }
-        budget.addString(keyNode->data.scalar.length);
-        result.set(yamlScalarString(keyNode), createFromYAMLNode(document, valueNode, budget, active, depth + 1));
-      }
-      return result;
-    }
-    case YAML_SEQUENCE_NODE: {
-      const std::size_t length =
-          static_cast<std::size_t>(node->data.sequence.items.top - node->data.sequence.items.start);
-      budget.addContainerEntries(length);
-      if (length > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-        throw Exception("YAML array is too large");
-      }
-      Data result(Data::TypeArray, static_cast<int>(length));
-      for (yaml_node_item_t * item = node->data.sequence.items.start; item < node->data.sequence.items.top; ++item) {
-        result.push_back(
-            createFromYAMLNode(document, yaml_document_get_node(document, *item), budget, active, depth + 1));
-      }
-      return result;
-    }
-    default:
-      throw Exception("Unknown yaml type");
+bool isYAMLNull(const std::string& value)
+{
+  return value.empty() || equalsAny(value, {"~", "null", "Null", "NULL"});
+}
+
+bool resolveYAMLBoolean(const std::string& value, bool& result)
+{
+  if (value == "y" || value == "Y" ||
+      equalsAny(value, {"yes", "Yes", "YES", "true", "True", "TRUE", "on", "On", "ON"})) {
+    result = true;
+    return true;
   }
+  if (value == "n" || value == "N" ||
+      equalsAny(value, {"no", "No", "NO", "false", "False", "FALSE", "off", "Off", "OFF"})) {
+    result = false;
+    return true;
+  }
+  return false;
+}
+
+bool parseYAMLSimpleDouble(const std::string& text, double& out)
+{
+  std::istringstream stream(text);
+  stream.imbue(std::locale::classic());
+  stream.exceptions(std::istringstream::badbit);
+  double value = 0.0;
+  if (!(stream >> value)) {
+    stream.clear();
+    return false;
+  }
+  stream >> std::ws;
+  if (!stream.eof()) {
+    return false;
+  }
+  out = value;
+  return true;
+}
+
+int parseYAMLInteger(const std::string& value, std::int64_t& out)
+{
+  std::size_t offset = 0;
+  bool negative = false;
+  if (offset < value.size() && (value[offset] == '+' || value[offset] == '-')) {
+    negative = value[offset] == '-';
+    ++offset;
+  }
+  int base = 10;
+  if (value.size() - offset >= 2 && value[offset] == '0') {
+    const char marker = value[offset + 1];
+    if (marker == 'x') {
+      base = 16;
+      offset += 2;
+    } else if (marker == 'b') {
+      base = 2;
+      offset += 2;
+    } else {
+      base = 8;
+      offset += 1;
+    }
+  }
+  if (offset >= value.size()) {
+    return 0;
+  }
+  const char * digits = value.data() + offset;
+  const std::size_t length = value.size() - offset;
+  std::uint64_t magnitude = 0;
+  const std::from_chars_result parsed = std::from_chars(digits, digits + length, magnitude, base);
+  if (parsed.ec == std::errc::result_out_of_range) {
+    return 2;
+  }
+  if (parsed.ec != std::errc() || parsed.ptr != digits + length) {
+    return 0;
+  }
+  const std::uint64_t limit = negative ? static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()) + 1
+                                       : static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
+  if (magnitude > limit) {
+    return 2;
+  }
+  if (negative && magnitude == limit) {
+    out = std::numeric_limits<std::int64_t>::min();
+  } else {
+    out = negative ? -static_cast<std::int64_t>(magnitude) : static_cast<std::int64_t>(magnitude);
+  }
+  return 1;
+}
+
+bool parseYAMLFloat(const std::string& value, double& out)
+{
+  std::size_t offset = 0;
+  if (offset < value.size() && (value[offset] == '+' || value[offset] == '-')) {
+    ++offset;
+  }
+  std::size_t position = offset;
+  std::size_t digits = 0;
+  while (position < value.size() && value[position] >= '0' && value[position] <= '9') {
+    ++position;
+    ++digits;
+  }
+  if (position < value.size() && value[position] == '.') {
+    ++position;
+    while (position < value.size() && value[position] >= '0' && value[position] <= '9') {
+      ++position;
+      ++digits;
+    }
+  } else {
+    return false;
+  }
+  if (digits == 0) {
+    return false;
+  }
+  if (position < value.size() && (value[position] == 'e' || value[position] == 'E')) {
+    ++position;
+    if (position >= value.size() || (value[position] != '+' && value[position] != '-')) {
+      return false;
+    }
+    ++position;
+    std::size_t exponentDigits = 0;
+    while (position < value.size() && value[position] >= '0' && value[position] <= '9') {
+      ++position;
+      ++exponentDigits;
+    }
+    if (exponentDigits == 0) {
+      return false;
+    }
+  }
+  if (position != value.size()) {
+    return false;
+  }
+  return parseYAMLSimpleDouble(value, out);
 }
 
 } // namespace
+
+class Data::YAMLDataBuilder {
+  public:
+    static Data createFromNode(yaml_document_t * document, yaml_node_t * node, ParseBudget& budget,
+        std::unordered_set<yaml_node_t *>& active, std::size_t depth)
+    {
+      if (node == nullptr) {
+        throw Exception("Missing yaml node");
+      }
+      budget.addNode(depth);
+      ActiveYAMLNode activeNode(active, node);
+
+      switch (node->type) {
+        case YAML_SCALAR_NODE: {
+          budget.addString(node->data.scalar.length);
+          std::string scalar = yamlScalarString(node);
+          const std::string tag =
+              node->tag == NULL ? std::string() : std::string(reinterpret_cast<const char *>(node->tag));
+          if (tag == "tag:yaml.org,2002:bool" || tag == "tag:yaml.org,2002:int" || tag == "tag:yaml.org,2002:float" ||
+              tag == "tag:yaml.org,2002:null") {
+            return resolveTaggedScalar(tag, scalar);
+          }
+          if (node->data.scalar.style == YAML_PLAIN_SCALAR_STYLE && (tag.empty() || tag == "tag:yaml.org,2002:str")) {
+            return resolveScalar(std::move(scalar));
+          }
+          return Data::string(std::move(scalar));
+        }
+        case YAML_MAPPING_NODE: {
+          const std::size_t length =
+              static_cast<std::size_t>(node->data.mapping.pairs.top - node->data.mapping.pairs.start);
+          budget.addContainerEntries(length);
+          if (length > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+            throw Exception("YAML object is too large");
+          }
+          Data result(Data::TypeMap, static_cast<int>(length));
+          for (yaml_node_pair_t * pair = node->data.mapping.pairs.start; pair < node->data.mapping.pairs.top; ++pair) {
+            yaml_node_t * keyNode = yaml_document_get_node(document, pair->key);
+            yaml_node_t * valueNode = yaml_document_get_node(document, pair->value);
+            if (keyNode == nullptr || keyNode->type != YAML_SCALAR_NODE) {
+              throw Exception("Invalid yaml object key");
+            }
+            budget.addString(keyNode->data.scalar.length);
+            result.set(yamlScalarString(keyNode), createFromNode(document, valueNode, budget, active, depth + 1));
+          }
+          return result;
+        }
+        case YAML_SEQUENCE_NODE: {
+          const std::size_t length =
+              static_cast<std::size_t>(node->data.sequence.items.top - node->data.sequence.items.start);
+          budget.addContainerEntries(length);
+          if (length > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+            throw Exception("YAML array is too large");
+          }
+          Data result(Data::TypeArray, static_cast<int>(length));
+          for (yaml_node_item_t * item = node->data.sequence.items.start; item < node->data.sequence.items.top;
+              ++item) {
+            result.push_back(
+                createFromNode(document, yaml_document_get_node(document, *item), budget, active, depth + 1));
+          }
+          return result;
+        }
+        default:
+          throw Exception("Unknown yaml type");
+      }
+    }
+
+  private:
+    static Data resolveTaggedScalar(const std::string& tag, const std::string& value)
+    {
+      if (tag == "tag:yaml.org,2002:bool") {
+        bool boolean = false;
+        if (resolveYAMLBoolean(value, boolean)) {
+          return Data::boolean(boolean);
+        }
+      } else if (tag == "tag:yaml.org,2002:int") {
+        std::int64_t integer = 0;
+        const int integerResult = parseYAMLInteger(value, integer);
+        double floating = 0.0;
+        if (integerResult == 1) {
+          return Data::integer(integer);
+        }
+        if (integerResult == 2 && parseYAMLSimpleDouble(value, floating)) {
+          return Data::parsedFloating(floating, value);
+        }
+      } else if (tag == "tag:yaml.org,2002:float") {
+        double floating = 0.0;
+        if (parseYAMLFloat(value, floating) || parseYAMLSimpleDouble(value, floating)) {
+          return Data::parsedFloating(floating, value);
+        }
+      } else if (tag == "tag:yaml.org,2002:null") {
+        return Data::null();
+      }
+      return Data::string(value);
+    }
+
+    static Data resolveScalar(std::string value)
+    {
+      if (isYAMLNull(value)) {
+        return Data::null();
+      }
+      bool boolean = false;
+      if (resolveYAMLBoolean(value, boolean)) {
+        return Data::boolean(boolean);
+      }
+      std::int64_t integer = 0;
+      const int integerResult = parseYAMLInteger(value, integer);
+      if (integerResult == 1) {
+        return Data::integer(integer);
+      }
+      double floating = 0.0;
+      if (parseYAMLFloat(value, floating) || (integerResult == 2 && parseYAMLSimpleDouble(value, floating))) {
+        return Data::parsedFloating(floating, value);
+      }
+      return Data::string(std::move(value));
+    }
+};
 
 #endif
 
@@ -819,7 +1026,7 @@ Data Data::fromYAML(std::string_view string, const ParseLimits& limits)
   }
   ParseBudget budget(limits, "YAML");
   std::unordered_set<yaml_node_t *> active;
-  Data data = createFromYAMLNode(&document, root, budget, active, 0);
+  Data data = YAMLDataBuilder::createFromNode(&document, root, budget, active, 0);
 
   yaml_document_t trailingDocument;
   if (yaml_parser_load(&parser, &trailingDocument) == 0) {

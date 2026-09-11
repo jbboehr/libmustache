@@ -402,27 +402,128 @@ void testJSONErrorDetails()
 void testYAMLData()
 {
   const char yaml[] = "nullValue: null\n"
+                      "tildeValue: ~\n"
+                      "emptyValue:\n"
                       "falseValue: false\n"
+                      "noValue: no\n"
+                      "offValue: off\n"
+                      "nValue: n\n"
                       "trueValue: true\n"
+                      "yesValue: yes\n"
+                      "onValue: on\n"
                       "zeroValue: 0\n"
                       "integerValue: 42\n"
+                      "negativeInteger: -17\n"
+                      "maximumInteger: 9223372036854775807\n"
+                      "hexValue: 0x1F\n"
+                      "octalValue: 010\n"
+                      "binaryValue: 0b101\n"
                       "decimalValue: 1.50\n"
+                      "trailingDecimal: 2.\n"
+                      "leadingDecimal: .5\n"
+                      "signedExponent: 1.5e+10\n"
                       "stringValue: \"false\"\n"
-                      "emptyValue: \"\"\n";
+                      "singleQuotedValue: 'no'\n"
+                      "emptyStringValue: \"\"\n";
   std::unique_ptr<mustache::Data> data(mustache::Data::createFromYAML(yaml));
 
-  expect(data->find("falseValue")->type() == mustache::Data::TypeString &&
-          data->find("integerValue")->type() == mustache::Data::TypeString,
-      "YAML scalar compatibility unexpectedly changed type behavior");
+  expect(data->find("nullValue")->type() == mustache::Data::TypeNone &&
+          data->find("falseValue")->type() == mustache::Data::TypeBoolean &&
+          data->find("integerValue")->type() == mustache::Data::TypeInteger &&
+          data->find("decimalValue")->type() == mustache::Data::TypeDouble &&
+          data->find("stringValue")->type() == mustache::Data::TypeString,
+      "YAML conversion collapsed typed scalars");
 
-  expectEqual("YAML null", renderScalar(data.get(), "nullValue"), "null|Y|");
-  expectEqual("YAML false", renderScalar(data.get(), "falseValue"), "false|Y|");
+  expectEqual("YAML null", renderScalar(data.get(), "nullValue"), "||N");
+  expectEqual("YAML tilde null", renderScalar(data.get(), "tildeValue"), "||N");
+  expectEqual("YAML empty null", renderScalar(data.get(), "emptyValue"), "||N");
+  expectEqual("YAML false", renderScalar(data.get(), "falseValue"), "||N");
+  expectEqual("YAML no", renderScalar(data.get(), "noValue"), "||N");
+  expectEqual("YAML off", renderScalar(data.get(), "offValue"), "||N");
+  expectEqual("YAML n", renderScalar(data.get(), "nValue"), "||N");
   expectEqual("YAML true", renderScalar(data.get(), "trueValue"), "true|Y|");
+  expectEqual("YAML yes", renderScalar(data.get(), "yesValue"), "true|Y|");
+  expectEqual("YAML on", renderScalar(data.get(), "onValue"), "true|Y|");
   expectEqual("YAML zero", renderScalar(data.get(), "zeroValue"), "0|Y|");
   expectEqual("YAML integer", renderScalar(data.get(), "integerValue"), "42|Y|");
-  expectEqual("YAML decimal", renderScalar(data.get(), "decimalValue"), "1.50|Y|");
+  expectEqual("YAML negative integer", renderScalar(data.get(), "negativeInteger"), "-17|Y|");
+  expectEqual("YAML maximum integer", renderScalar(data.get(), "maximumInteger"), "9223372036854775807|Y|");
+  expectEqual("YAML hexadecimal integer", renderScalar(data.get(), "hexValue"), "31|Y|");
+  expectEqual("YAML octal integer", renderScalar(data.get(), "octalValue"), "8|Y|");
+  expectEqual("YAML binary integer", renderScalar(data.get(), "binaryValue"), "5|Y|");
+  expectEqual("YAML decimal spelling", renderScalar(data.get(), "decimalValue"), "1.50|Y|");
+  expectEqual("YAML trailing decimal spelling", renderScalar(data.get(), "trailingDecimal"), "2.|Y|");
+  expectEqual("YAML leading decimal spelling", renderScalar(data.get(), "leadingDecimal"), ".5|Y|");
+  expectEqual("YAML signed exponent spelling", renderScalar(data.get(), "signedExponent"), "1.5e+10|Y|");
   expectEqual("YAML string", renderScalar(data.get(), "stringValue"), "false|Y|");
-  expectEqual("YAML empty string", renderScalar(data.get(), "emptyValue"), "||N");
+  expectEqual("YAML single-quoted string", renderScalar(data.get(), "singleQuotedValue"), "no|Y|");
+  expectEqual("YAML empty string", renderScalar(data.get(), "emptyStringValue"), "||N");
+}
+
+void testYAMLScalarTypingRejections()
+{
+  const char yaml[] = "unsignedExponent: 1e30\n"
+                      "loneDot: .\n"
+                      "leadingZeroDecimal: 09\n"
+                      "sexagesimal: 190:20:30\n"
+                      "underscored: 1_000\n"
+                      "timestamp: 2001-12-14\n"
+                      "infinity: .inf\n"
+                      "nan: .nan\n";
+  std::unique_ptr<mustache::Data> data(mustache::Data::createFromYAML(yaml));
+
+  expect(data->find("unsignedExponent")->type() == mustache::Data::TypeString &&
+          data->find("loneDot")->type() == mustache::Data::TypeString &&
+          data->find("leadingZeroDecimal")->type() == mustache::Data::TypeString &&
+          data->find("sexagesimal")->type() == mustache::Data::TypeString &&
+          data->find("underscored")->type() == mustache::Data::TypeString &&
+          data->find("timestamp")->type() == mustache::Data::TypeString &&
+          data->find("infinity")->type() == mustache::Data::TypeString &&
+          data->find("nan")->type() == mustache::Data::TypeString,
+      "YAML scalar typing accepted a non-YAML-1.1 form");
+
+  expectEqual("YAML unsigned exponent string", renderScalar(data.get(), "unsignedExponent"), "1e30|Y|");
+  expectEqual("YAML sexagesimal string", renderScalar(data.get(), "sexagesimal"), "190:20:30|Y|");
+  expectEqual("YAML timestamp string", renderScalar(data.get(), "timestamp"), "2001-12-14|Y|");
+  expectEqual("YAML infinity string", renderScalar(data.get(), "infinity"), ".inf|Y|");
+  expectEqual("YAML nan string", renderScalar(data.get(), "nan"), ".nan|Y|");
+
+  mustache::Data overflowed = mustache::Data::fromYAML("9223372036854775809");
+  expect(overflowed.type() == mustache::Data::TypeDouble, "YAML integer overflow did not fall back to a double");
+  expectEqual("YAML overflow spelling", renderScalar(&overflowed, ""), "9223372036854775809|Y|");
+
+  mustache::Data topLevelFalse = mustache::Data::fromYAML("false");
+  expect(topLevelFalse.type() == mustache::Data::TypeBoolean, "YAML top-level false did not produce boolean data");
+  expectEqual("YAML top-level false", renderScalar(&topLevelFalse, ""), "||N");
+}
+
+void testYAMLTaggedScalars()
+{
+  const char yaml[] = "taggedBool: !!bool false\n"
+                      "taggedInt: !!int 42\n"
+                      "taggedFloat: !!float 1.5\n"
+                      "taggedNull: !!null value\n"
+                      "taggedQuotedInt: !!int \"7\"\n"
+                      "taggedBoolInvalid: !!bool maybe\n"
+                      "plusValue: +\n";
+  std::unique_ptr<mustache::Data> data(mustache::Data::createFromYAML(yaml));
+
+  expect(data->find("taggedBool")->type() == mustache::Data::TypeBoolean &&
+          data->find("taggedInt")->type() == mustache::Data::TypeInteger &&
+          data->find("taggedFloat")->type() == mustache::Data::TypeDouble &&
+          data->find("taggedNull")->type() == mustache::Data::TypeNone &&
+          data->find("taggedQuotedInt")->type() == mustache::Data::TypeInteger &&
+          data->find("taggedBoolInvalid")->type() == mustache::Data::TypeString &&
+          data->find("plusValue")->type() == mustache::Data::TypeString,
+      "YAML explicit tags were not honored");
+
+  expectEqual("YAML tagged bool", renderScalar(data.get(), "taggedBool"), "||N");
+  expectEqual("YAML tagged int", renderScalar(data.get(), "taggedInt"), "42|Y|");
+  expectEqual("YAML tagged float spelling", renderScalar(data.get(), "taggedFloat"), "1.5|Y|");
+  expectEqual("YAML tagged null", renderScalar(data.get(), "taggedNull"), "||N");
+  expectEqual("YAML tagged quoted int", renderScalar(data.get(), "taggedQuotedInt"), "7|Y|");
+  expectEqual("YAML tagged invalid bool", renderScalar(data.get(), "taggedBoolInvalid"), "maybe|Y|");
+  expectEqual("YAML bare plus", renderScalar(data.get(), "plusValue"), "+|Y|");
 }
 #endif
 
@@ -660,6 +761,8 @@ int main()
 #endif
 #ifdef MUSTACHE_HAVE_LIBYAML
   testYAMLData();
+  testYAMLScalarTypingRejections();
+  testYAMLTaggedScalars();
 #endif
   testParseLimits();
   testUnavailableParsers();

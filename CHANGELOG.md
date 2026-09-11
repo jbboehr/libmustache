@@ -1,5 +1,20 @@
 # Release notes
 
+## Unreleased
+
+- Type YAML 1.1 plain scalars during data parsing: `true`/`false`/`yes`/`no`/
+  `on`/`off` (and their case variants) become boolean data, `null`/`~` and
+  empty values become null data, and decimal, hexadecimal (`0x`), octal
+  (leading zero), and binary (`0b`) integers plus dotted decimals become
+  integer and floating-point data. Quoted scalars are unaffected and remain
+  strings, and integer spellings such as `0x1F` render as their decimal value.
+  Explicit `!!bool`, `!!int`, `!!float`, and `!!null` tags are honored,
+  including on quoted scalars; invalid tagged values fall back to strings.
+  Because libyaml reports implicit scalars with the `!!str` tag, an explicit
+  `!!str` tag cannot force string treatment of a plain value — use quotes
+  instead. This matches the JSON adapter and the mustache spec's falsiness
+  rules (fixes #18).
+
 ## 0.6.1 (unreleased)
 
 Shared-library ABI 6 and the public C++ API are unchanged from 0.6.0.

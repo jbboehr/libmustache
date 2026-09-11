@@ -160,6 +160,7 @@ class Data {
 
   private:
     class JSONDataBuilder;
+    class YAMLDataBuilder;
     struct Storage;
     std::unique_ptr<Storage> storage_;
 
