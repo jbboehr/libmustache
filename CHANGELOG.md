@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Avoid GCC/AArch64 internal compiler errors during LTO by using xxHash's
+  `memcpy` read mode.
 - Fix inconsistent archived-template type hashes with GCC 16 LTO by backporting
   xxHash's strict-aliasing fix and preserving the private adapter's optimization
   boundary for system xxHash builds (fixes #29).

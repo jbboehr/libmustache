@@ -1,6 +1,13 @@
 #include <cstddef>
 #include <cstdint>
 
+#if defined(XXH_IMPLEMENTATION) && defined(__aarch64__) && defined(__GNUC__) && !defined(__clang__) &&                 \
+    !defined(XXH_FORCE_MEMORY_ACCESS)
+// GCC's AArch64 backend can ICE on aligned may_alias scalar types under LTO.
+// Use xxHash's memcpy reads to avoid those types while preserving aliasing.
+// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=124146
+#define XXH_FORCE_MEMORY_ACCESS 0
+#endif
 #include <xxhash.h>
 
 #if defined(XXH_IMPLEMENTATION) && defined(__aarch64__) && defined(__GNUC__) && !defined(__clang__) &&                 \

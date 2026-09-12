@@ -36,6 +36,13 @@ normal optimization without `noipa`. System xxHash may still be unpatched, so
 the private adapter retains GCC's `noipa` attribute where available for those
 builds, including LTO and configuration probes.
 
+On GCC/AArch64, the bundled adapter defaults to `XXH_FORCE_MEMORY_ACCESS=0`
+before including the header. This selects xxHash's `memcpy` scalar reads and
+avoids [GCC bug #124146](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=124146),
+an internal compiler error involving aligned `may_alias` types during LTO.
+The hash algorithm, vector implementation, and LTO remain enabled as before.
+The upstream backport is retained for other configurations.
+
 ## Updating
 
 Treat an xxHash update as an archive-format dependency change. Review the
