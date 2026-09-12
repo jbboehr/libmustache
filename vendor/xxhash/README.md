@@ -8,26 +8,40 @@ headers.
 - Upstream release and revision: `v0.8.3`
 - Release archive:
   `https://github.com/Cyan4973/xxHash/archive/v0.8.3.tar.gz`
-- Nix recursive source hash:
+- Nix recursive source hash of the unpatched upstream release:
   `sha256-h6kohM+NxvQ89R9NEXZcYBG2wPOuB4mcyPfofKrx9wQ=`
 - Vendored `xxhash.h` SHA-256:
-  `17973c0dc49d9854ca26caa191f0e12f7a424b68858d9a78de3860d959d85e4b`
+  `153be464f90daf4239f3e5aa0b347b0b316774555ae1f18826162e5cef1dc3e1`
 - License: BSD 2-Clause; see `LICENSE`. The header also embeds the license.
 
 The bundled configuration defines `XXH_IMPLEMENTATION`,
 `XXH_STATIC_LINKING_ONLY`, and a libmustache-specific `XXH_NAMESPACE` before
 including this header. This keeps one implementation behind the private
 out-of-line Cista XXH3 adapter, avoids symbol collisions, and does not require a
-separately linked xxHash library. `XXH_INLINE_ALL` is deliberately not used
-because it makes Cista 0.16's runtime type hash unstable in optimized GCC
-builds. The out-of-line boundary also avoids a GCC 15 miscompilation of Cista's
-address-of-parameter hash helper while preserving identical archive bytes.
+separately linked xxHash library.
+
+## Backported fix
+
+The header includes the two-line strict-aliasing fix from upstream
+[PR #1013](https://github.com/Cyan4973/xxHash/pull/1013), merged in commit
+`ee34939dee941c8241d6a97097c49b62b46b9dae`. It adds `__may_alias__` to the
+unaligned 32-bit and 64-bit read typedefs used by `XXH_FORCE_MEMORY_ACCESS=1`.
+These reads must be allowed to alias the input's original type. Without that
+attribute, optimized GCC builds can produce inconsistent Cista type hashes;
+GCC 16 LTO exposes this in
+[libmustache issue #29](https://github.com/jbboehr/libmustache/issues/29).
+
+The patch preserves the hash algorithm and archive bytes. Bundled builds use
+normal optimization without `noipa`. System xxHash may still be unpatched, so
+the private adapter retains GCC's `noipa` attribute where available for those
+builds, including LTO and configuration probes.
 
 ## Updating
 
 Treat an xxHash update as an archive-format dependency change. Review the
 upstream diff and license, copy `xxhash.h` and `LICENSE` from a clean checkout
-of the selected release, update every pin and checksum above plus
+of the selected release, reapply the backport above if it is not yet included,
+update every pin and checksum above plus
 `expected_xxhash_sha256` in `scripts/check-version-consistency.sh`, update the
 libmustache archive format generation when compatibility changes, update the
 golden fixture deliberately if the selected bytes change, and run the complete

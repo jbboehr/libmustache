@@ -1,7 +1,17 @@
 {
   pkgs,
   makePackage,
-}: {
+}: let
+  makeLtoCheck = args:
+    (makePackage args).overrideAttrs (previousAttrs: {
+      pname = "${previousAttrs.pname}-lto";
+      # Fedora-style flags: -flto appears mid-string, never first.
+      CXXFLAGS = "-O2 -g -flto=auto -ffat-lto-objects";
+      LDFLAGS = "-O2 -g -flto=auto";
+      # Keep Release's default -O3 from overriding the -O2 reproducer for #29.
+      cmakeFlags = previousAttrs.cmakeFlags ++ pkgs.lib.optional args.cmakeSupport "-DCMAKE_CXX_FLAGS_RELEASE=-DNDEBUG";
+    });
+in {
   libmustache-static-only = makePackage {
     cmakeSupport = false;
     staticOnlySupport = true;
@@ -31,15 +41,33 @@
     cmakeSupport = true;
     clangTidySupport = true;
   };
-  libmustache-lto =
-    (makePackage {
-      cmakeSupport = true;
-    }).overrideAttrs (previousAttrs: {
-      pname = "${previousAttrs.pname}-lto";
-      # Fedora-style flags: -flto appears mid-string, never first.
-      CXXFLAGS = "-O2 -g -flto=auto -ffat-lto-objects";
-      LDFLAGS = "-O2 -g -flto=auto";
-    });
+  libmustache-lto = makeLtoCheck {
+    cmakeSupport = true;
+  };
+  libmustache-gcc16-lto-cmake = makeLtoCheck {
+    stdenv = pkgs.gcc16Stdenv;
+    cmakeSupport = true;
+    archivedTemplateSupport = true;
+  };
+  libmustache-gcc16-lto-autotools = makeLtoCheck {
+    stdenv = pkgs.gcc16Stdenv;
+    cmakeSupport = false;
+    archivedTemplateSupport = true;
+  };
+  libmustache-gcc16-lto-system-xxhash-cmake = makeLtoCheck {
+    stdenv = pkgs.gcc16Stdenv;
+    cmakeSupport = true;
+    archivedTemplateSupport = true;
+    xxhash = pkgs.xxhash;
+    useSystemXxhash = true;
+  };
+  libmustache-gcc16-lto-system-xxhash-autotools = makeLtoCheck {
+    stdenv = pkgs.gcc16Stdenv;
+    cmakeSupport = false;
+    archivedTemplateSupport = true;
+    xxhash = pkgs.xxhash;
+    useSystemXxhash = true;
+  };
   libmustache-no-json = makePackage {
     cmakeSupport = false;
     nlohmann_json = null;

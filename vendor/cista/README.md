@@ -20,9 +20,14 @@ by hand. Libmustache pre-includes its small `src/archive/xxh3/xxh3.h`
 compatibility header, which suppresses the older embedded copy and routes
 Cista's hash calls through one private out-of-line adapter. That adapter uses
 the selected modern XXH3 API from the separately versioned bundled or system
-xxHash dependency. Keeping the call out of Cista's inline parameter-pack hash
-avoids a demonstrated GCC 15 optimized-build miscompilation that otherwise
-produces different writer and reader type hashes.
+xxHash dependency. Cista's parameter-pack hashing exposes a strict-aliasing
+defect in unpatched xxHash 0.8.3 during optimized GCC builds, including GCC 16
+LTO ([issue #29](https://github.com/jbboehr/libmustache/issues/29)). The bundled
+xxHash header carries the upstream fix; see [its provenance](../xxhash/README.md).
+For system xxHash builds, the adapter uses GCC's `noipa` attribute where
+available to preserve its optimization boundary under LTO and in configuration
+probes. This compatibility workaround is unnecessary for the patched bundled
+header.
 
 ## Updating
 

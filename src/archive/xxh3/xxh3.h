@@ -1,10 +1,10 @@
 #ifndef MUSTACHE_BENCHMARK_CISTA_XXH3_H
 #define MUSTACHE_BENCHMARK_CISTA_XXH3_H
 
-/* Cista 0.16 expects its development-era xxh3.h and hashes addresses of
-   function-local parameters. Keep the modern xxHash implementation behind a
-   separately compiled function so optimizing compilers cannot incorrectly
-   treat those initialized bytes as indeterminate. */
+/* Cista 0.16 expects its development-era xxh3.h. Route its calls through a
+   private adapter to the selected modern xxHash implementation. The adapter
+   also provides an optimization boundary for system xxHash versions that
+   lack the strict-aliasing fix backported to the bundled header. */
 #include <cstddef>
 #include <cstdint>
 

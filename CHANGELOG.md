@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Fix inconsistent archived-template type hashes with GCC 16 LTO by backporting
+  xxHash's strict-aliasing fix and preserving the private adapter's optimization
+  boundary for system xxHash builds (fixes #29).
+
 ## [0.6.2] - 2026-09-11
 
 - Add opt-in link-time optimization support: `MUSTACHE_ENABLE_LTO` for CMake

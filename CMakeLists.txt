@@ -311,8 +311,6 @@ if(MUSTACHE_NEED_CISTA)
         target_include_directories(mustache_xxhash_headers SYSTEM INTERFACE
             "${CMAKE_CURRENT_SOURCE_DIR}/vendor/xxhash")
         # Keep one private implementation in the archive translation unit.
-        # XXH_INLINE_ALL makes Cista 0.16 runtime type hashes unstable under
-        # optimized GCC builds, while the implementation mode is deterministic.
         target_compile_definitions(mustache_xxhash_headers INTERFACE
             XXH_IMPLEMENTATION=1
             XXH_STATIC_LINKING_ONLY=1

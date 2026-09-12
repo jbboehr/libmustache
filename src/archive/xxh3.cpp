@@ -14,8 +14,18 @@ XXH_FORCE_INLINE uint64x2_t XXH_vld1q_u64(void const * ptr) __attribute__((no_sa
 }
 #endif
 
-extern "C" std::uint64_t mustache_cista_xxh3_64bits_with_seed(
-    const void * data, std::size_t size, std::uint64_t seed) noexcept
+extern "C" {
+// System xxHash may lack the strict-aliasing fix backported to our bundled
+// header. Preserve this boundary for those builds, including under GCC LTO
+// and in the single-translation-unit configure probe.
+// https://github.com/jbboehr/libmustache/issues/29
+#if !defined(XXH_IMPLEMENTATION) && defined(__GNUC__) && !defined(__clang__)
+#if __has_attribute(noipa)
+__attribute__((noipa))
+#endif
+#endif
+std::uint64_t mustache_cista_xxh3_64bits_with_seed(const void * data, std::size_t size, std::uint64_t seed) noexcept
 {
   return XXH3_64bits_withSeed(data, size, seed);
+}
 }
